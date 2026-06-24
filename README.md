@@ -25,6 +25,22 @@ can be kept and tested. The split between what is **guaranteed** and what is **m
 So "verified" means a citation **exists and is real** — not that it *supports* the claim.
 Entailment quality is a measured score, foregrounded in the eval harness, not an overclaim.
 
+## See it run
+
+A guided, dependency-free walkthrough over Apple's FY2024 10-K — grounded answers
+with their verbatim source spans, and structured refusals that show the system
+looked and where:
+
+```bash
+python demo.py          # narrated tour of seven representative questions
+python attest_rig.py    # the full 20-item gate: precision, hallucination, abstention
+```
+
+The demo needs no install (pure standard library). It exercises the M0 audition
+rig — the deterministic evidence layer (retrieval → cite → verify → abstain). At
+M2+ the Claude Code agent drafts the prose, calling these same tools; the demo's
+abstention guards are documented stand-ins for the agent's reasoning until then.
+
 ## Runtime model — v1 is a Claude Code tool, not an API service
 
 ATTEST ships as a set of **deterministic tools** (an MCP server + a CLI mirror) that

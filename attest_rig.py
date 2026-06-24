@@ -127,9 +127,11 @@ def load_spans() -> list[Span]:
             if line.endswith(":") and not _THOUSANDS.search(line):
                 header = line.rstrip(":")
                 continue
-            text = f"{header}: {line}" if header else line
+            # .text is the *verbatim* source line we cite; the breadcrumb is a retrieval
+            # feature only (so citations stay honest while ranking gets section context).
+            aug = f"{header}: {line}" if header else line
             sid = f"{ex['excerpt_id']}#L{n}"
-            spans.append(Span(sid, ex["excerpt_id"], text, featurize(text)))
+            spans.append(Span(sid, ex["excerpt_id"], line, featurize(aug)))
     return spans
 
 
@@ -203,17 +205,19 @@ class Outcome:
     evidence: list[str]
     covered: list[str]
     top_score: float = 0.0
+    reason: str = ""
 
 
-def abstention_guard(question: str, ranked: list[tuple[float, Span]]) -> str | None:
+def abstention_guard(question: str, ranked: list[tuple[float, Span]]) -> tuple[str, str] | None:
+    """Return (kind, human-readable reason) if the agent should not answer, else None."""
     q = question.lower()
     qtokens = set(tokenize(q))
     if any(c in q for c in COMPETITORS):
-        return "partial-abstain"  # entity-scope: a non-Apple comparison
+        return "partial-abstain", "comparison to a company outside this corpus (Apple-only)"
     if any(m in q for m in OUT_OF_PERIOD_MARKERS):
-        return "abstain"  # temporal: outside the filing's coverage period
+        return "abstain", "question dated outside the filing's coverage period (FY2024 / FY2023)"
     if any(subj <= qtokens for subj in NOT_DISCLOSED):
-        return "abstain"  # subject not disclosed in a 10-K (proxy / not reported)
+        return "abstain", "subject not disclosed in a 10-K (proxy statement, or not reported)"
     if "why" in q and any(w in q for w in DECLINE_WORDS):
         # false-premise: does the top numeric span actually show a decline?
         for _sc, sp in ranked:
@@ -222,7 +226,7 @@ def abstention_guard(question: str, ranked: list[tuple[float, Span]]) -> str | N
                 cur = int(nums[0].replace(",", ""))
                 prior = int(nums[1].replace(",", ""))
                 if cur >= prior:  # rose or flat → the "decline" premise is false
-                    return "reject-false-premise"
+                    return "reject-false-premise", "the cited figures show the value rose, not fell"
                 break
     return None
 
@@ -233,27 +237,30 @@ def run_item(item: dict, bm25: BM25) -> Outcome:
     ranked = bm25.rank(q)
     evidence = evidence_strings(item)
 
-    kind = abstention_guard(q, ranked)
+    guard = abstention_guard(q, ranked)
+    kind = guard[0] if guard else None
+    reason = guard[1] if guard else ""
     top = ranked[0][0] if ranked else 0.0
     if kind is None and top < THRESHOLD:
         kind = "abstain"  # relevance threshold: nothing in-corpus supports this
+        reason = "no retrieved span cleared the relevance threshold"
 
     # Cite the spans within CITE_RATIO of the top score (ties stay → plural; tail drops).
     band = [(sc, sp) for sc, sp in ranked if sc >= max(THRESHOLD, top * CITE_RATIO)]
 
     if kind is not None and kind not in ("partial-abstain", "reject-false-premise"):
-        return Outcome(iid, ans, True, kind, [], [], evidence, [], top)
+        return Outcome(iid, ans, True, kind, [], [], evidence, [], top, reason)
     if kind in ("partial-abstain", "reject-false-premise"):
         # Still cite whatever Apple-side evidence we did find (G016/G020 carry a span).
         cited = [sp.span_id for _s, sp in band]
-        return Outcome(iid, ans, True, kind, cited, [], evidence, [], top)
+        return Outcome(iid, ans, True, kind, cited, [], evidence, [], top, reason)
 
     # Grounded answer path: cite the band; assert only values found in those spans.
     cited_spans = [sp for _sc, sp in band]
     cited = [sp.span_id for sp in cited_spans]
     cited_text = "\n".join(sp.text for sp in cited_spans)
     asserted = [e for e in evidence if e in cited_text]  # verify: assert only what's cited
-    return Outcome(iid, ans, False, None, cited, asserted, evidence, asserted, top)
+    return Outcome(iid, ans, False, None, cited, asserted, evidence, asserted, top, "")
 
 
 def supports(span_text: str, evidence: list[str]) -> bool:
