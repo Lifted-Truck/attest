@@ -8,7 +8,7 @@
 `TODO` · `WIP` · `BLOCKED` · `DONE` — task checkboxes mirror this (`- [ ]` / `- [x]`).
 
 ### ▶ Current focus
-**M0 · M0-T2** — assemble the EDGAR toy corpus. M0-T1 (scaffold) merged to main.
+**M0 · M0-T4** — `attest_rig.py` (M0-T2 corpus + M0-T3 golden seed both in place; T3 still pending its human verification pass — see note below).
 
 > **Working mode:** single primary agent develops directly on `main` (no PR-per-task gate
 > in this repo). CI still runs on every push to `main`; a red gate or a violated invariant
@@ -56,7 +56,7 @@
 **Gate:** on the ~20-item toy set — citation precision high, hallucination 0 on answerable items, **abstains on 100% of unanswerable items**. If it can't, iterate the rig; do not proceed.
 
 - [x] **M0-T1** · `branch: chore/scaffold` — Repo scaffold: directory layout, env, deps, place `ATTEST_build_brief.md` + this file, CI skeleton. **AC:** clean install runs an empty test suite green. **DONE** — src-layout `attest` package, pytest+ruff, CI skeleton; clean-venv install runs ruff + smoke suite green; CI green on merge.
-- [ ] **M0-T2** · `branch: feat/m0-toy-corpus` — Assemble 5–10 EDGAR excerpts as the toy corpus. **AC:** raw text stored verbatim; provenance (ticker, form, accession) recorded per excerpt.
+- [x] **M0-T2** · `branch: feat/m0-toy-corpus` — Assemble 5–10 EDGAR excerpts as the toy corpus. **AC:** raw text stored verbatim; provenance (ticker, form, accession) recorded per excerpt. **DONE** — 5 verbatim excerpts from AAPL FY2024 10-K (cover, operations, balance sheets, cash flows, auditor report) in `corpus/toy/`; provenance + per-excerpt sha256 in `manifest.json`; rebuilt deterministically by `scripts/build_toy_corpus.py` (raw cached under gitignored `data/raw/`); standing integrity test in `tests/test_toy_corpus.py`. **Finding for human review:** golden item **G008 labels are inverted** — the filing reports *current* marketable securities $35,228M and *non-current* $91,479M; G008 calls $91,479M "current." Fix in M0-T3's verification pass, not by an unreviewed agent edit.
 - [x] **M0-T3** · `branch: feat/m0-golden-seed` — Hand-label ~20 golden items in the **quote + locator** schema (brief §3, D7), **≥5 deliberately unanswerable**. **AC:** schema-valid; answerable/unanswerable split recorded; honesty fields (`value_seen`/`source_status`) present. **DONE — see `golden_seed.json` (20 items, Apple FY2024 10-K). Still requires human verification pass (fill `verbatim_quote`s from canonical text; confirm `unverified_from_memory` items G008 non-current, G009 auditor).**
 - [ ] **M0-T4** · `branch: feat/m0-rig` — `attest_rig.py`: trivial retrieval + draft-from-spans + verify + abstention + inline metrics (a Python stand-in for the agent loop, to prove the core). **AC:** runs end-to-end on the seed; prints the four gate metrics; **meets the M0 gate.**
 
@@ -129,3 +129,4 @@ API-wrapped service with **inline entailment-gating** (the structural-intercepti
 - 2026-06-23 · M0-T3 · golden_seed.json added (20 items, Apple FY2024 10-K); pending human verification.
 - 2026-06-23 · — · Runtime pivot to Claude Code tool (D6) + schema reconciliation to quote+locator (D7); brief and ROADMAP updated; M2/M4 restructured, oracle split into Layer-0/Layer-E.
 - 2026-06-23 · M0-T1 · Repo scaffold merged: src-layout `attest` package, pytest+ruff, CI skeleton; clean install runs smoke suite green. Switched to single-agent-on-main working mode.
+- 2026-06-23 · M0-T2 · Toy corpus assembled: 5 verbatim AAPL FY2024 10-K excerpts + provenance/sha256 manifest (`corpus/toy/`), deterministic build script, integrity test. Flagged inverted current/non-current marketable-securities labels in golden G008 for M0-T3 human review.

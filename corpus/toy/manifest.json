@@ -1,0 +1,71 @@
+{
+  "_note": "M0 toy corpus (ROADMAP M0-T2). Verbatim excerpts from a single EDGAR filing with provenance. HTML->text conversion here is throwaway-grade; canonical normalization + content-hashing is M1 (ingestion adapter). Rebuild: python scripts/build_toy_corpus.py",
+  "schema_version": "0.1.0",
+  "source": {
+    "doc_key": "AAPL-10K-FY2024",
+    "company": "Apple Inc.",
+    "ticker": "AAPL",
+    "cik": "0000320193",
+    "form": "10-K",
+    "period_of_report": "2024-09-28",
+    "accession": "0000320193-24-000123",
+    "primary_document": "aapl-20240928.htm",
+    "index_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/0000320193-24-000123-index.htm",
+    "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/aapl-20240928.htm"
+  },
+  "retrieved_with_user_agent_format": "name contact-email (SEC EDGAR fair-access policy)",
+  "excerpt_count": 5,
+  "excerpts": [
+    {
+      "excerpt_id": "AAPL-10K-FY2024::01_cover",
+      "section_title": "Cover page (period of report)",
+      "path": "corpus/toy/AAPL-10K-FY2024/01_cover.txt",
+      "covers_golden": [
+        "G010"
+      ],
+      "char_len": 8658,
+      "sha256": "6dd4ccf77101d17ce1da690df84ad31d0c6e3b2fa908044ced51cbb6a6e2188f"
+    },
+    {
+      "excerpt_id": "AAPL-10K-FY2024::02_statements_of_operations",
+      "section_title": "Consolidated Statements of Operations",
+      "path": "corpus/toy/AAPL-10K-FY2024/02_statements_of_operations.txt",
+      "covers_golden": [
+        "distractor"
+      ],
+      "char_len": 1201,
+      "sha256": "200aa1cafffc5360859be214ef15282039c0d460cd45ba26aa28729a9595495a"
+    },
+    {
+      "excerpt_id": "AAPL-10K-FY2024::03_balance_sheets",
+      "section_title": "Consolidated Balance Sheets",
+      "path": "corpus/toy/AAPL-10K-FY2024/03_balance_sheets.txt",
+      "covers_golden": [
+        "G001-G008",
+        "G016-G020"
+      ],
+      "char_len": 1641,
+      "sha256": "5a14d80199cc2fa19a475fdf1d7ea0f24dc6c8e6b2d6ca37e66c08644f2fe029"
+    },
+    {
+      "excerpt_id": "AAPL-10K-FY2024::04_statements_of_cash_flows",
+      "section_title": "Consolidated Statements of Cash Flows",
+      "path": "corpus/toy/AAPL-10K-FY2024/04_statements_of_cash_flows.txt",
+      "covers_golden": [
+        "distractor"
+      ],
+      "char_len": 2259,
+      "sha256": "6828ebabc52e2a2be35d642e5a46b2973f5a50d7947cf9aac3e80dd71a13891f"
+    },
+    {
+      "excerpt_id": "AAPL-10K-FY2024::05_auditor_report",
+      "section_title": "Report of Independent Registered Public Accounting Firm (financial statements)",
+      "path": "corpus/toy/AAPL-10K-FY2024/05_auditor_report.txt",
+      "covers_golden": [
+        "G009"
+      ],
+      "char_len": 5823,
+      "sha256": "f68ac70a803e79377596176f06818d94ab62217ad0a127b0e102a467f50f6ee4"
+    }
+  ]
+}
