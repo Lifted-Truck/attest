@@ -129,26 +129,28 @@
       "id": "G008",
       "question": "How much does Apple hold in marketable securities?",
       "answerable": true,
-      "expected_answer": "Plural — current marketable securities $91,479M plus non-current marketable securities [VALUE TO VERIFY]. Correct behavior: surface both line items.",
+      "expected_answer": "Plural — current marketable securities $35,228M plus non-current marketable securities $91,479M. Correct behavior: surface both line items.",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Marketable securities' (current assets) · FY2024 column", "verbatim_quote": null, "value_seen": "$91,479 million (current)", "source_status": "fetched_value_quote_to_resolve" },
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Marketable securities' (non-current assets) · FY2024 column", "verbatim_quote": null, "value_seen": null, "source_status": "unverified_from_memory" }
+        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Marketable securities' (current assets) · FY2024 column", "verbatim_quote": null, "value_seen": "$35,228 million (current)", "source_status": "grounded" },
+        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Marketable securities' (non-current assets) · FY2024 column", "verbatim_quote": null, "value_seen": "$91,479 million (non-current)", "source_status": "grounded" }
       ],
       "difficulty": "hard",
       "tests": ["plural-and-ranked", "partial-grounding"],
-      "rationale": "Second plural case. NOTE: non-current value not fetched this session — verifier must fill it. Left intentionally partial to model the real labeling workflow."
+      "rationale": "Second plural case. Current ($35,228M) and non-current ($91,479M) marketable securities both appear on the balance sheet; correct behavior surfaces both, distinguished.",
+      "verification_note": "AGENT-CORRECTED 2026-06-23 (M0-T2) from canonical AAPL FY2024 10-K balance sheet (corpus/toy). Prior labels were inverted ($91,479M mislabeled 'current'; non-current left unfetched). Human re-review still recommended."
     },
     {
       "id": "G009",
       "question": "Who is Apple's independent registered public accounting firm?",
       "answerable": true,
-      "expected_answer": "Ernst & Young LLP  [VERIFY against the Report of Independent Registered Public Accounting Firm — not fetched this session]",
+      "expected_answer": "Ernst & Young LLP",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · Report of Independent Registered Public Accounting Firm (signature/firm name)", "verbatim_quote": null, "value_seen": null, "source_status": "unverified_from_memory" }
+        { "locator": "AAPL-10K-FY2024 · Report of Independent Registered Public Accounting Firm (signature/firm name)", "verbatim_quote": null, "value_seen": "Ernst & Young LLP", "source_status": "grounded" }
       ],
       "difficulty": "medium",
       "tests": ["single-span", "non-financial-section", "retrieval-beyond-balance-sheet"],
-      "rationale": "Pulls retrieval away from the balance sheet into a qualitative section. Expected answer is from memory — VERIFY."
+      "rationale": "Pulls retrieval away from the balance sheet into a qualitative section. Firm name appears in the auditor's signature ('/s/ Ernst & Young LLP').",
+      "verification_note": "AGENT-VERIFIED 2026-06-23 (M0-T2) against canonical AAPL FY2024 10-K auditor report (corpus/toy). Confirmed Ernst & Young LLP; was unverified_from_memory."
     },
     {
       "id": "G010",
