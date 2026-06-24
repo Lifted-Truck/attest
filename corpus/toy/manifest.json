@@ -1,8 +1,8 @@
 {
-  "_note": "M0 toy corpus (ROADMAP M0-T2). Verbatim excerpts from a single EDGAR filing with provenance. HTML->text conversion here is throwaway-grade; canonical normalization + content-hashing is M1 (ingestion adapter). Rebuild: python scripts/build_toy_corpus.py",
+  "_note": "M0 toy corpus (ROADMAP M0-T2). Verbatim excerpts from a single EDGAR filing, sliced from the M1 adapter's canonical normalization (attest.ingest.edgar). Rebuild: python scripts/build_toy_corpus.py",
   "schema_version": "0.1.0",
   "source": {
-    "doc_key": "AAPL-10K-FY2024",
+    "doc_id": "AAPL-10K-FY2024",
     "company": "Apple Inc.",
     "ticker": "AAPL",
     "cik": "0000320193",

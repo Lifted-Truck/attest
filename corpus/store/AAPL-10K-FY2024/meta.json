@@ -1,0 +1,16 @@
+{
+  "doc_id": "AAPL-10K-FY2024",
+  "content_hash": "5785ed2393bcd96d76fba248111b7a5a8cd3f8d296d0156da4f34763b577d224",
+  "char_len": 219068,
+  "metadata": {
+    "company": "Apple Inc.",
+    "ticker": "AAPL",
+    "cik": "0000320193",
+    "form": "10-K",
+    "period_of_report": "2024-09-28",
+    "accession": "0000320193-24-000123",
+    "primary_document": "aapl-20240928.htm",
+    "index_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/0000320193-24-000123-index.htm",
+    "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/aapl-20240928.htm"
+  }
+}

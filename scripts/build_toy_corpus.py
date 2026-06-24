@@ -1,51 +1,35 @@
 #!/usr/bin/env python3
 """Build the M0 toy corpus (ROADMAP M0-T2) from a single SEC EDGAR filing.
 
-Scope (brief §2): a tiny doc set of 5-10 verbatim excerpts to clear the audition
-rig, NOT the real ingestion adapter (that is M1, where canonical normalization
-and content-hashing live). This is a throwaway-grade fixture: it stores excerpts
-*verbatim* with provenance, but the HTML->text conversion here is deliberately
-simple and is NOT the canonical normalization M1 will define.
+Scope (brief §2): a tiny doc set of 5-10 verbatim excerpts that the audition rig
+(`attest_rig.py`) runs over. This is an M0 fixture builder; the durable evidence
+layer is M1. To honor "corpus-specific code lives in one file" (brief §8), the
+fetch + normalization now come from the M1 EDGAR adapter (`attest.ingest.edgar`);
+this script only slices the normalized text into the rig's excerpts.
 
 Deterministic and offline-after-first-run: the raw filing is cached under
 data/raw/ (gitignored); re-runs read the cache so we don't re-hit EDGAR.
 
 Usage:
-    python scripts/build_toy_corpus.py            # build from cache or fetch
+    python scripts/build_toy_corpus.py
     SEC_USER_AGENT="you you@example.com" python scripts/build_toy_corpus.py
 """
 
 from __future__ import annotations
 
 import hashlib
-import html as html_mod
 import json
-import os
-import re
 import sys
-import urllib.request
-from html.parser import HTMLParser
 from pathlib import Path
+
+from attest.ingest.edgar import FILINGS, fetch_html, normalize
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW_DIR = ROOT / "data" / "raw"
 OUT_DIR = ROOT / "corpus" / "toy"
 
-# Provenance for the single v1 reference filing (mirrors golden_seed.json corpus block).
-DOC = {
-    "doc_key": "AAPL-10K-FY2024",
-    "company": "Apple Inc.",
-    "ticker": "AAPL",
-    "cik": "0000320193",
-    "form": "10-K",
-    "period_of_report": "2024-09-28",
-    "accession": "0000320193-24-000123",
-    "primary_document": "aapl-20240928.htm",
-    "index_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/0000320193-24-000123-index.htm",
-    "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/aapl-20240928.htm",
-}
-
-SEC_USER_AGENT = os.environ.get("SEC_USER_AGENT", "ATTEST research contact@example.com")
+FILING = FILINGS["AAPL-10K-FY2024"]  # provenance single-sourced from the adapter
+DOC_ID = FILING["doc_id"]
 
 # Each excerpt is sliced [start_anchor .. end_anchor). end_anchor is the first
 # occurrence at/after the start. Anchors chosen for legibility, not cleverness.
@@ -111,59 +95,6 @@ REQUIRED_STRINGS = [
 ]
 
 
-class _TextExtractor(HTMLParser):
-    """Minimal, dependency-free HTML -> text. Preserves visible words verbatim."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.parts: list[str] = []
-        self._skip = 0
-
-    def handle_starttag(self, tag, attrs):
-        if tag in ("script", "style"):
-            self._skip += 1
-        if tag in ("p", "div", "tr", "br", "table", "h1", "h2", "h3", "li"):
-            self.parts.append("\n")
-        if tag == "td":
-            self.parts.append(" ")
-
-    def handle_endtag(self, tag):
-        if tag in ("script", "style") and self._skip:
-            self._skip -= 1
-        if tag in ("p", "div", "tr", "table"):
-            self.parts.append("\n")
-
-    def handle_data(self, data):
-        if not self._skip:
-            self.parts.append(data)
-
-
-def html_to_text(raw_html: str) -> str:
-    p = _TextExtractor()
-    p.feed(raw_html)
-    txt = html_mod.unescape("".join(p.parts))
-    # Normalize Unicode spaces (NBSP, thin, narrow-NBSP) to ASCII — content-preserving.
-    txt = txt.translate({0xA0: " ", 0x2009: " ", 0x202F: " ", 0x2007: " "})
-    txt = re.sub(r"[ \t]+", " ", txt)
-    txt = re.sub(r"\n[ \t]+", "\n", txt)
-    txt = re.sub(r"\n{3,}", "\n\n", txt)
-    return txt
-
-
-def fetch_raw() -> str:
-    RAW_DIR.mkdir(parents=True, exist_ok=True)
-    cache = RAW_DIR / DOC["primary_document"]
-    if cache.exists():
-        print(f"[cache] {cache.relative_to(ROOT)}")
-        return cache.read_text(encoding="utf-8")
-    print(f"[fetch] {DOC['primary_url']}")
-    req = urllib.request.Request(DOC["primary_url"], headers={"User-Agent": SEC_USER_AGENT})
-    with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310 (trusted SEC host)
-        raw = resp.read().decode("utf-8")
-    cache.write_text(raw, encoding="utf-8")
-    return raw
-
-
 def slice_section(text: str, sec: dict) -> str:
     start = text.find(sec["start"])
     if start == -1:
@@ -178,19 +109,18 @@ def slice_section(text: str, sec: dict) -> str:
     end = text.find(sec["end"], floor)
     if end == -1:
         end = len(text)
-    else:
+    elif sec["end"].startswith("See accompanying"):
         # Statements: keep the terminating "See accompanying Notes" line in the excerpt.
-        if sec["end"].startswith("See accompanying"):
-            end += len(sec["end"])
+        end += len(sec["end"])
     return text[start:end].strip() + "\n"
 
 
 def main() -> int:
-    raw = fetch_raw()
-    text = html_to_text(raw)
+    raw = fetch_html(DOC_ID, RAW_DIR)
+    text = normalize(raw)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    doc_dir = OUT_DIR / DOC["doc_key"]
+    doc_dir = OUT_DIR / DOC_ID
     doc_dir.mkdir(parents=True, exist_ok=True)
 
     excerpts = []
@@ -202,7 +132,7 @@ def main() -> int:
         sha = hashlib.sha256(body.encode("utf-8")).hexdigest()
         excerpts.append(
             {
-                "excerpt_id": f"{DOC['doc_key']}::{sec['key']}",
+                "excerpt_id": f"{DOC_ID}::{sec['key']}",
                 "section_title": sec["title"],
                 "path": str((doc_dir / fname).relative_to(ROOT)),
                 "granularity": sec["granularity"],
@@ -223,13 +153,12 @@ def main() -> int:
 
     manifest = {
         "_note": (
-            "M0 toy corpus (ROADMAP M0-T2). Verbatim excerpts from a single EDGAR filing "
-            "with provenance. HTML->text conversion here is throwaway-grade; canonical "
-            "normalization + content-hashing is M1 (ingestion adapter). Rebuild: "
-            "python scripts/build_toy_corpus.py"
+            "M0 toy corpus (ROADMAP M0-T2). Verbatim excerpts from a single EDGAR filing, "
+            "sliced from the M1 adapter's canonical normalization (attest.ingest.edgar). "
+            "Rebuild: python scripts/build_toy_corpus.py"
         ),
         "schema_version": "0.1.0",
-        "source": DOC,
+        "source": FILING,
         "retrieved_with_user_agent_format": "name contact-email (SEC EDGAR fair-access policy)",
         "excerpt_count": len(excerpts),
         "excerpts": excerpts,
