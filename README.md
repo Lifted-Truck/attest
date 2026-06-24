@@ -95,8 +95,8 @@ architecture, invariants, and rationale live in
 
 Build order is **M0 → M5**, each milestone gated by the oracle:
 
-- **M0** — Audition rig: prove the risky core cheaply on the 20-item seed. *(current)*
-- **M1** — Ingestion + retrieval + span store (immutable evidence layer).
+- **M0** — Audition rig: prove the risky core cheaply on the 20-item seed. ✅ *gate met — `python attest_rig.py`*
+- **M1** — Ingestion + retrieval + span store (immutable evidence layer). *(current)*
 - **M2** — Deterministic `verify` + `check_support`; Layer-0 / Layer-E evals go live.
 - **M3** — Append-only audit log (replayable; write-asymmetry enforced).
 - **M4** — MCP server + CLI (the primary v1 interface).

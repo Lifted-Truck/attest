@@ -20,6 +20,7 @@
       "excerpt_id": "AAPL-10K-FY2024::01_cover",
       "section_title": "Cover page (period of report)",
       "path": "corpus/toy/AAPL-10K-FY2024/01_cover.txt",
+      "granularity": "line",
       "covers_golden": [
         "G010"
       ],
@@ -30,6 +31,7 @@
       "excerpt_id": "AAPL-10K-FY2024::02_statements_of_operations",
       "section_title": "Consolidated Statements of Operations",
       "path": "corpus/toy/AAPL-10K-FY2024/02_statements_of_operations.txt",
+      "granularity": "line",
       "covers_golden": [
         "distractor"
       ],
@@ -40,6 +42,7 @@
       "excerpt_id": "AAPL-10K-FY2024::03_balance_sheets",
       "section_title": "Consolidated Balance Sheets",
       "path": "corpus/toy/AAPL-10K-FY2024/03_balance_sheets.txt",
+      "granularity": "line",
       "covers_golden": [
         "G001-G008",
         "G016-G020"
@@ -51,6 +54,7 @@
       "excerpt_id": "AAPL-10K-FY2024::04_statements_of_cash_flows",
       "section_title": "Consolidated Statements of Cash Flows",
       "path": "corpus/toy/AAPL-10K-FY2024/04_statements_of_cash_flows.txt",
+      "granularity": "line",
       "covers_golden": [
         "distractor"
       ],
@@ -61,6 +65,7 @@
       "excerpt_id": "AAPL-10K-FY2024::05_auditor_report",
       "section_title": "Report of Independent Registered Public Accounting Firm (financial statements)",
       "path": "corpus/toy/AAPL-10K-FY2024/05_auditor_report.txt",
+      "granularity": "block",
       "covers_golden": [
         "G009"
       ],

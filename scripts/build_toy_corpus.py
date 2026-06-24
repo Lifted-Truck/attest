@@ -55,6 +55,7 @@ SECTIONS = [
         "title": "Cover page (period of report)",
         "start": "UNITED STATES",
         "end": "PART I\n",
+        "granularity": "line",
         "covers": ["G010"],
     },
     {
@@ -62,6 +63,7 @@ SECTIONS = [
         "title": "Consolidated Statements of Operations",
         "start": "CONSOLIDATED STATEMENTS OF OPERATIONS",
         "end": "See accompanying Notes to Consolidated Financial Statements.",
+        "granularity": "line",  # tabular: one line item per span
         "covers": ["distractor"],
     },
     {
@@ -69,6 +71,7 @@ SECTIONS = [
         "title": "Consolidated Balance Sheets",
         "start": "CONSOLIDATED BALANCE SHEETS",
         "end": "See accompanying Notes to Consolidated Financial Statements.",
+        "granularity": "line",
         "covers": ["G001-G008", "G016-G020"],
     },
     {
@@ -76,6 +79,7 @@ SECTIONS = [
         "title": "Consolidated Statements of Cash Flows",
         "start": "CONSOLIDATED STATEMENTS OF CASH FLOWS",
         "end": "See accompanying Notes to Consolidated Financial Statements.",
+        "granularity": "line",
         "covers": ["distractor"],
     },
     {
@@ -85,6 +89,7 @@ SECTIONS = [
         # Terminate at the *second* report header (internal control over financial reporting).
         "end": "To the Shareholders and the Board of Directors of Apple Inc.",
         "end_after": "/s/ Ernst & Young LLP",
+        "granularity": "block",
         "covers": ["G009"],
     },
 ]
@@ -200,6 +205,7 @@ def main() -> int:
                 "excerpt_id": f"{DOC['doc_key']}::{sec['key']}",
                 "section_title": sec["title"],
                 "path": str((doc_dir / fname).relative_to(ROOT)),
+                "granularity": sec["granularity"],
                 "covers_golden": sec["covers"],
                 "char_len": len(body),
                 "sha256": sha,
