@@ -53,6 +53,7 @@
 | D5 | 2026-06-23 | **Citation precision hard gate starts at 0.9.** | Defensible opening bar; tighten as the golden set grows. | After M2 baseline is measured. |
 | D6 | 2026-06-23 | **v1 runtime = Claude Code tool.** ATTEST ships as an MCP server + CLI that Claude Code invokes; the agent is the reasoner; ATTEST makes no runtime model calls. API-wrapped service (with inline entailment-gating) is v2. | Relocates the grounding guarantee to deterministic tools + a mandatory verify/log step. Splits the oracle into Layer-0 (deterministic, CI-blocking) and Layer-E (agent end-to-end, periodic via headless Claude Code). See brief "Runtime model" + §3, §4, §5. | v2 is scoped. |
 | D7 | 2026-06-23 | **Golden schema = quote + locator** (not span IDs). A resolver binds `verbatim_quote → span_id` at M1 and must match each quote exactly once (resolution invariant). | Span IDs/offsets can't exist before M1 and depend on M1 normalization. Supersedes the brief's original §3 span-id schema (brief §3 now updated). Seed lives in `golden_seed.json`. | — |
+| D8 | 2026-06-24 | **Highlighted evidence-view GUI is pulled forward** to a small, server-less static-HTML renderer (`render_evidence_view`, new **M2-T7**) the moment `verify` exists; the polished React/audit-log replay app stays at **M5** and upgrades it. **Contract:** the agent drafts an answer with each sentence tagged by `span_id`(s) → `verify` confirms every tag resolves + hash-matches (I1/I3) → `log` records it (I5) → the renderer deterministically emits a two-pane page (canonical document left with `<mark>` highlights, answer right with click-to-source hyperlinks). The agent's tagged markdown is an *authoring surface that passes through verify/log* — never a hand-maintained source of truth; hyperlinks are generated, never asserted. Render the **normalized canonical text** (the hashed, cited text), not the original filing HTML. | Visual payoff is the conversion surface (brief §6) and worth pulling to mid-project, but faithful highlighting needs char-offset spans (M1-T2) + validated citations (M2-T1), so the earliest *honest* viewer is post-M2. Hand-authored citation links would reintroduce the exact unverified-claim failure ATTEST exists to prevent (I1). Refines brief §6. | If the React app at M5 fully subsumes the static renderer, retire the latter. |
 
 ---
 
@@ -88,6 +89,7 @@
 - [ ] **M2-T4** · `branch: feat/m2-claude-md` — Project `CLAUDE.md` documenting the required agent loop: search → draft from returned spans only → `check_support` → `verify` → present-or-abstain. **AC:** loop is unambiguous; references the tool contracts. **NOTE (2026-06-23):** `CLAUDE.md` already exists at repo root and carries a provisional "Runtime agent loop" section. This task is therefore *expand-in-place*, not create — flesh that section out against the **actual M4 tool contracts** (exact tool names, arg/return shapes, error modes) rather than authoring a second file. Keep it the single canonical CLAUDE.md.
 - [ ] **M2-T5** · `branch: feat/m2-layer0` — Layer-0 deterministic component-eval suite as required CI (brief §3). **AC:** PR shows the Layer-0 gate table; suite is fast and deterministic.
 - [ ] **M2-T6** · `branch: feat/m2-layer-e` — Layer-E agent end-to-end eval: drive the Claude Code agent over the golden set in headless mode; score the transcript (hallucination/entailment via judge, abstention correctness, calibration → Brier + reliability curve to a results file). **AC:** runs on demand; produces the trend file. **Periodic, NOT a blocking CI gate.**
+- [ ] **M2-T7** · `branch: feat/m2-evidence-view` — `render_evidence_view`: a deterministic, server-less generator that turns one verified interaction (a `verify` result over a span-tagged answer) into a **self-contained two-pane HTML** — canonical document on the left with `<mark>` highlights, answer on the right with click-to-source hyperlinks (D8). Reads the span store + verify output; mutates nothing (I4). **AC:** for a sample tagged answer, every cited sentence hyperlinks to the exact highlighted span in the document pane; an unbound sentence is shown flagged, not silently linked; opening the HTML needs no server or network. **Not part of the M2 Layer-0 gate** — a deliverable that rides on `verify`; M5 upgrades it to the React replay app.
 
 ---
 
@@ -113,11 +115,11 @@
 ---
 
 ## M5 — Demo UI  ·  `TODO`
-**Goal:** subsystem 7 (brief §6). The conversion surface. Three flows, nothing more.
+**Goal:** subsystem 7 (brief §6). The conversion surface — the polished **upgrade** of the M2-T7 static evidence view (D8): two-pane document-beside-response with click-to-source hyperlinks, now replaying from the audit log. Three flows, nothing more.
 **Gate:** the three demo flows work end-to-end on EDGAR.
 
-- [ ] **M5-T1** · `branch: feat/m5-scaffold` — React/TS app that **replays from the audit log** (no API backend in v1; brief §6). **AC:** loads a logged interaction and renders its answer.
-- [ ] **M5-T2** · `branch: feat/m5-highlight` — Sentence → source-span highlight on hover/click. **AC:** clicking a sentence reveals its exact span.
+- [ ] **M5-T1** · `branch: feat/m5-scaffold` — React/TS app that **replays from the audit log** (no API backend in v1; brief §6), in the **two-pane layout** (canonical document beside the answer) established by M2-T7. **AC:** loads a logged interaction and renders document + answer side by side.
+- [ ] **M5-T2** · `branch: feat/m5-highlight` — Sentence → source-span highlight via click-to-source hyperlinks (the M2-T7 contract, D8): clicking a claim flashes its exact `<mark>`ed span in the document pane. **AC:** clicking a sentence reveals its exact span; an unbound sentence is shown flagged, never silently linked.
 - [ ] **M5-T3** · `branch: feat/m5-abstain-demo` — Pre-loaded unanswerable question that visibly shows the system refusing. **AC:** abstention is shown, not hidden.
 - [ ] **M5-T4** · `branch: feat/m5-audit-panel` — Audit panel: retrieval + citations + confidence for the last answer. **AC:** panel opens and reflects the real last interaction.
 
@@ -138,3 +140,5 @@ API-wrapped service with **inline entailment-gating** (the structural-intercepti
 - 2026-06-23 · M0-T2 · Toy corpus assembled: 5 verbatim AAPL FY2024 10-K excerpts + provenance/sha256 manifest (`corpus/toy/`), deterministic build script, integrity test. Flagged inverted current/non-current marketable-securities labels in golden G008 for M0-T3 human review.
 - 2026-06-24 · M0-T3 · Golden verification: corrected G008 (inverted labels → current $35,228M / non-current $91,479M) and grounded G009 (Ernst & Young LLP) against the canonical filing; both marked grounded + verification_note.
 - 2026-06-24 · M0-T4 · Audition rig `attest_rig.py` clears the M0 gate (precision/recall/correctness 100%, hallucination 0%, abstention 100%). Standing gate test added. **M0 DONE** — advancing to M1.
+- 2026-06-24 · — · Added `demo.py` (guided M0 walkthrough) + README "See it run".
+- 2026-06-24 · — · D8: highlighted two-pane evidence-view GUI pulled forward to **M2-T7** (server-less static-HTML renderer on the verify result); M5 becomes its polished log-replay upgrade. Contract: agent tags spans → verify → log → deterministic render (hyperlinks are verified span refs, not hand-authored). Brief §6 + M5 reworded.

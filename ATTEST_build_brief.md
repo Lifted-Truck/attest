@@ -160,7 +160,7 @@ The MCP server (plus a CLI mirror) is the **primary and only** interface in v1 �
 
 ## §6 — Demo UI (the conversion surface)
 
-Clean React/TS (your Audiology muscle). In v1 there's no API backend serving answers — so the demo **replays from the audit log** (I5): the agent runs a session over the tools, everything is logged, and the UI visualizes logged interactions. It exists to make a non-technical buyer *get it in one glance*. Three things, nothing more in v1:
+Clean React/TS (your Audiology muscle). In v1 there's no API backend serving answers — so the demo **replays from the audit log** (I5): the agent runs a session over the tools, everything is logged, and the UI visualizes logged interactions. It exists to make a non-technical buyer *get it in one glance*. The **layout is two-pane** — canonical document beside the answer — and references are **click-to-source hyperlinks**. (See ROADMAP **D8**: a server-less static-HTML version of this view ships early, at **M2-T7**, the moment `verify` exists; M5 is its polished, log-replaying upgrade. The contract — agent tags sentences with `span_id`s → `verify` → `log` → deterministic render — keeps every hyperlink a *verified* span reference, never a hand-authored link.) Three things, nothing more in v1:
 1. Ask a question → the answer renders with **each sentence highlighting back to its source span** on click/hover.
 2. A pre-loaded **deliberately unanswerable** question whose answer is the system refusing — show the abstention, don't hide it.
 3. An **audit panel** the user can open to see retrieval + citations + confidence for the last answer.
