@@ -8,7 +8,11 @@
 `TODO` · `WIP` · `BLOCKED` · `DONE` — task checkboxes mirror this (`- [ ]` / `- [x]`).
 
 ### ▶ Current focus
-**M0 · M0-T1** — repo scaffold. Nothing else is started until M0 clears its gate.
+**M0 · M0-T2** — assemble the EDGAR toy corpus. M0-T1 (scaffold) merged to main.
+
+> **Working mode:** single primary agent develops directly on `main` (no PR-per-task gate
+> in this repo). CI still runs on every push to `main`; a red gate or a violated invariant
+> is treated as not-done and must be fixed before advancing focus.
 
 ---
 
@@ -51,7 +55,7 @@
 **Goal:** prove the risky core cheaply before building anything real (brief §2).
 **Gate:** on the ~20-item toy set — citation precision high, hallucination 0 on answerable items, **abstains on 100% of unanswerable items**. If it can't, iterate the rig; do not proceed.
 
-- [ ] **M0-T1** · `branch: chore/scaffold` — Repo scaffold: directory layout, env, deps, place `ATTEST_build_brief.md` + this file, CI skeleton. **AC:** clean install runs an empty test suite green.
+- [x] **M0-T1** · `branch: chore/scaffold` — Repo scaffold: directory layout, env, deps, place `ATTEST_build_brief.md` + this file, CI skeleton. **AC:** clean install runs an empty test suite green. **DONE** — src-layout `attest` package, pytest+ruff, CI skeleton; clean-venv install runs ruff + smoke suite green; CI green on merge.
 - [ ] **M0-T2** · `branch: feat/m0-toy-corpus` — Assemble 5–10 EDGAR excerpts as the toy corpus. **AC:** raw text stored verbatim; provenance (ticker, form, accession) recorded per excerpt.
 - [x] **M0-T3** · `branch: feat/m0-golden-seed` — Hand-label ~20 golden items in the **quote + locator** schema (brief §3, D7), **≥5 deliberately unanswerable**. **AC:** schema-valid; answerable/unanswerable split recorded; honesty fields (`value_seen`/`source_status`) present. **DONE — see `golden_seed.json` (20 items, Apple FY2024 10-K). Still requires human verification pass (fill `verbatim_quote`s from canonical text; confirm `unverified_from_memory` items G008 non-current, G009 auditor).**
 - [ ] **M0-T4** · `branch: feat/m0-rig` — `attest_rig.py`: trivial retrieval + draft-from-spans + verify + abstention + inline metrics (a Python stand-in for the agent loop, to prove the core). **AC:** runs end-to-end on the seed; prints the four gate metrics; **meets the M0 gate.**
@@ -124,3 +128,4 @@ API-wrapped service with **inline entailment-gating** (the structural-intercepti
 - 2026-06-23 · — · ROADMAP created; M0 set as current focus.
 - 2026-06-23 · M0-T3 · golden_seed.json added (20 items, Apple FY2024 10-K); pending human verification.
 - 2026-06-23 · — · Runtime pivot to Claude Code tool (D6) + schema reconciliation to quote+locator (D7); brief and ROADMAP updated; M2/M4 restructured, oracle split into Layer-0/Layer-E.
+- 2026-06-23 · M0-T1 · Repo scaffold merged: src-layout `attest` package, pytest+ruff, CI skeleton; clean install runs smoke suite green. Switched to single-agent-on-main working mode.
