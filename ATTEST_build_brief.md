@@ -156,6 +156,8 @@ The MCP server (plus a CLI mirror) is the **primary and only** interface in v1 �
 
 `check_claim` is worth highlighting separately in the portfolio — "paste a sentence, find out if your own documents actually back it" is an instantly graspable client demo. A project `CLAUDE.md` documents the required loop (search → draft from spans only → `check_support` → `verify` → present-or-abstain) so the agent follows it every session.
 
+Both `verify` and `check_claim` share one deterministic primitive — an **atom resolver** (ROADMAP **D9**): the agent decomposes its answer into load-bearing atoms (numbers, dates, named entities), binds each to a specific `(doc_id, content_hash, char_start, char_end)`, and the resolver confirms the slice at that offset equals the atom *exactly*, hash-matches (I3), and sits within the query's retrieved scope. The agent **parameterizes** the check (supplies atoms + bindings); it never **authors** it. `verify` independently re-extracts atoms from the final answer so an untagged figure can't slip through. This kills *invented* citations; it does **not** confirm entailment (existence ≠ support — measured offline at Layer-E, structural in v2). Open implementation contingencies live under ROADMAP M2-T1.
+
 ---
 
 ## §6 — Demo UI (the conversion surface)
