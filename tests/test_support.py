@@ -82,3 +82,22 @@ def test_supporting_is_ranked(retriever, golden):
     result = check_support(by_id["G007"]["question"], retriever)  # plural: two term-debt lines
     scores = [h.score for h in result.supporting]
     assert scores == sorted(scores, reverse=True)
+
+
+# M2-T3 (brief §4): genuinely plural questions must surface ALL qualifying spans,
+# ranked, never collapsed to one. G007 = current + non-current term debt; G008 =
+# current + non-current marketable securities.
+PLURAL = {"G007": 2, "G008": 2}
+
+
+def test_plural_items_surface_all_gold_spans_ranked(store, retriever, golden):
+    by_id = {it["id"]: it for it in golden}
+    for gid, n in PLURAL.items():
+        item = by_id[gid]
+        gold = _gold_span_ids(store, item)
+        assert len(gold) == n, f"{gid}: expected {n} distinct gold spans"
+        result = check_support(item["question"], retriever)
+        returned = [h.span.span_id for h in result.supporting]
+        assert gold <= set(returned), f"{gid}: not all gold spans surfaced (collapsed?)"
+        scores = [h.score for h in result.supporting]
+        assert scores == sorted(scores, reverse=True), f"{gid}: supporting not ranked"
