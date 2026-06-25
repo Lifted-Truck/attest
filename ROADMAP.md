@@ -10,13 +10,13 @@
 `TODO` · `WIP` · `BLOCKED` · `DONE` — task checkboxes mirror this (`- [ ]` / `- [x]`).
 
 ### ▶ Current focus
-**M1 · M1-T3** — hybrid retrieval (BM25 + single embedding) over the span store, with a standing I6 reproducibility test. M1-T1 (ingestion/I3) and M1-T2 (span store + resolution invariant) are `DONE`.
+**M2 · M2-T1** — `verify(answer_with_tags)`: the deterministic atom resolver (D9). **M1 is `DONE`** — ingestion/I3, span store + resolution invariant (D7), reproducible retrieval (I6) all green (27 tests).
 
-> **Golden set is now fully bound:** all 21 `verbatim_quote`s resolve 1:1 to the
-> canonical text (`scripts/resolve_golden_quotes.py`; guarded by `tests/test_spans.py`).
-> G016 was split into current/non-current term-debt entries to keep each quote
-> singly resolvable. A broader human verification pass remains welcome but the
-> seed is no longer `null`-quoted.
+> **M2 builds the shared engine's grounding tools** (`verify`, `check_support`),
+> which both EDGAR and the patent track reuse. Carry the patent seams (D10): the
+> abstention path generalizes to the *adjudication refusal class*; the atom resolver
+> to patent atoms (claim terms, numerals, dates). Retrieval recall tuning (the
+> G009 lexical gap) also lands here, where the Layer-0 recall gate drives it.
 
 > **Working mode:** single primary agent develops directly on `main` (no PR-per-task gate
 > in this repo). CI still runs on every push to `main`; a red gate or a violated invariant
@@ -74,13 +74,14 @@
 
 ---
 
-## M1 — Ingestion + retrieval + span store  ·  `TODO`
+## M1 — Ingestion + retrieval + span store  ·  `DONE`
 **Goal:** subsystems 1–2 (brief §1). Evidence layer becomes real and immutable.
 **Gate:** span hashes verify (I3); retrieval reproducible across two runs (I6); unit tests green.
+**Gate met (2026-06-25):** I3 hash re-verify + tamper rejection (`tests/test_ingest.py`); all 21 golden quotes bind 1:1 (`tests/test_spans.py`); retrieval byte-identical across runs (`tests/test_retrieval.py`); 27 tests green. Known carry-forward: G009 (auditor) lexical-gap recall miss → M2 retrieval tuning (embedding backend / section-aware chunking).
 
 - [x] **M1-T1** · `branch: feat/m1-ingestion` — EDGAR adapter: fetch + normalize + **content-hash at ingest** (I3). Corpus-specific code lives *only* here. **AC:** every stored doc carries its hash; standing I3 hash test passes. **DONE** — `src/attest/ingest/` package: `document.py` (Document + sha256 content hash + `verify_document`, corpus-agnostic), `store.py` (on-disk store; re-verifies hash on every load), `edgar.py` (the *only* corpus-specific module — filing registry, fetch+cache, deterministic HTML→canonical-text normalization). Apple FY2024 10-K ingested to `corpus/store/` (219K chars, hash in `meta.json`) via `scripts/ingest_corpus.py`; M0's `build_toy_corpus.py` now reuses `edgar.normalize` (no duplicated corpus code). Standing I3 tests in `tests/test_ingest.py`: hash re-verifies, tamper (text or hash drift) rejected, normalization deterministic (I6), golden evidence preserved.
 - [x] **M1-T2** · `branch: feat/m1-spanstore` — Chunk + span index by char offset `(doc_id, start, end)`. **AC:** `get_span` returns the exact slice and re-verifies against the doc hash; mismatch raises a hard failure. **DONE** — `src/attest/spans.py`: deterministic line-level `chunk_document` (exact offsets, `canonical_text[start:end] == span.text`), `SpanStore.get_span` (re-verifies doc hash via `verify_document` before serving; out-of-range → `SpanError`), and `resolve_quote` enforcing the **resolution invariant** (D7: exactly-once, else `ResolutionError`). All **21 golden `verbatim_quote`s bound 1:1** to the canonical text via `scripts/resolve_golden_quotes.py` (G016 split into current/non-current so each resolves singly; `source_status` → `grounded`). Standing tests in `tests/test_spans.py`: exact-slice, hash re-verify on drift, deterministic chunking (I6), resolution invariant, duplicate/missing quote rejected.
-- [ ] **M1-T3** · `branch: feat/m1-retrieval` — Hybrid retrieval (BM25 + single embedding model), deliberately simple (brief §8). **AC:** returns candidate spans with offsets; **standing I6 reproducibility test** passes (identical results, two seeded runs).
+- [x] **M1-T3** · `branch: feat/m1-retrieval` — Hybrid retrieval (BM25 + single embedding model), deliberately simple (brief §8). **AC:** returns candidate spans with offsets; **standing I6 reproducibility test** passes (identical results, two seeded runs). **DONE** — `src/attest/retrieval.py`: deterministic Okapi BM25 (unigram+bigram features; standard query stopword/bare-number normalization) behind a corpus-agnostic `RetrievalBackend` interface; `Retriever` facade is multi-document-ready (patent track reuses it). Returns `Hit(span, score)` whose offsets round-trip through the hash-verified store. **Embedding half deferred** (D-note): seam left open (add a backend + RRF fusion) so CI stays offline/deterministic — BM25-only already gives recall@20 12/13 on the golden set. Standing tests in `tests/test_retrieval.py`: offsets resolvable, **I6 reproducibility** (byte-identical across independent runs), golden recall (all answerable but G009).
 
 ---
 
@@ -194,6 +195,7 @@ API-wrapped service with **inline entailment-gating** (the structural-intercepti
 - 2026-06-24 · M0-T4 · Audition rig `attest_rig.py` clears the M0 gate (precision/recall/correctness 100%, hallucination 0%, abstention 100%). Standing gate test added. **M0 DONE** — advancing to M1.
 - 2026-06-24 · — · Added `demo.py` (guided M0 walkthrough) + README "See it run".
 - 2026-06-24 · — · D9: atom-resolver contract for `verify`/`check_claim` (agent supplies located atoms; fixed resolver checks exact literal at offset + hash + scope; independent re-extraction; derived-value operands). Open contingencies tracked under M2-T1; brief §5 updated.
+- 2026-06-25 · M1-T3 · Retrieval (`attest.retrieval`): deterministic BM25 (unigram+bigram) behind a corpus-agnostic `RetrievalBackend`; multi-doc-ready `Retriever`; embedding half deferred (seam open). I6 reproducibility test; recall@20 12/13 (G009 lexical gap → M2). **M1 DONE.**
 - 2026-06-25 · — · D10: reconciled the patent retarget into the roadmap. EDGAR reframed as the reference build; new **Patent Engagement** track (PE-0…PE-6, mechanism-agnostic core per tailoring §11) gated on client intake (blockers Q2 mechanism, Q17 confidentiality); locate-never-adjudicate boundary; CLAUDE.md hierarchy + brief alignment. Current focus unchanged (M1-T3, shared engine).
 - 2026-06-25 · M1-T2 · Span store (`attest.spans`): char-offset chunking, `get_span` with hash re-verify (I3), `resolve_quote` enforcing the resolution invariant (D7). All 21 golden quotes bound 1:1 to canonical text; G016 split; standing `tests/test_spans.py`.
 - 2026-06-24 · M1-T1 · EDGAR ingestion adapter: `attest.ingest` (Document + content-hash I3, store with verify-on-load, isolated `edgar.py`). Apple FY2024 10-K ingested to `corpus/store/`; standing I3 tests (tamper rejected, deterministic normalization, evidence preserved). build_toy_corpus reuses the adapter's normalize.

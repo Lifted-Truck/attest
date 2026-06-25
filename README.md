@@ -112,11 +112,17 @@ architecture, invariants, and rationale live in
 Build order is **M0 → M5**, each milestone gated by the oracle:
 
 - **M0** — Audition rig: prove the risky core cheaply on the 20-item seed. ✅ *gate met — `python attest_rig.py`*
-- **M1** — Ingestion + retrieval + span store (immutable evidence layer). *(current)*
-- **M2** — Deterministic `verify` + `check_support`; Layer-0 / Layer-E evals go live.
+- **M1** — Ingestion + retrieval + span store (immutable evidence layer). ✅ *I3 hashing, span store + resolution invariant, reproducible retrieval*
+- **M2** — Deterministic `verify` + `check_support`; Layer-0 / Layer-E evals go live. *(current)*
 - **M3** — Append-only audit log (replayable; write-asymmetry enforced).
 - **M4** — MCP server + CLI (the primary v1 interface).
 - **M5** — Demo UI (replays from the audit log).
+
+EDGAR is the architecture-proving **reference build**. The first client engagement
+retargets the system to a **patent refresh-and-update** — a specialization of the same
+corpus-agnostic engine (cardinal rule sharpened to *locate & evidence, never adjudicate*),
+tracked separately in [`ROADMAP.md`](ROADMAP.md) and
+[`ATTEST_Patent_Tailoring_Consideration.md`](ATTEST_Patent_Tailoring_Consideration.md).
 
 **v2 (do not start):** API-wrapped service with inline entailment-gating, action-taking
 tools, multi-corpus, reranker upgrades, larger golden set.
