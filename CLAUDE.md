@@ -71,8 +71,8 @@ product.
 
 When ATTEST's tools are available, the agent is bound to this loop every session:
 
-1. `search_corpus` / `check_support` to retrieve candidate spans.
-2. **Draft only from returned spans.** Tag each sentence with the span id(s) it rests on.
+1. `search_corpus` / `check_support` to locate candidate spans; **read freely** with `get_span` / `get_document` to get the context the citation needs (D11). Retrieval is a navigational aid, not a cage.
+2. **Ground every sentence in a verified span** — compose from the corpus and tag each sentence with the span id(s) it rests on. (The constraint is on *output*: what you assert must bind to a real span; what you *read* is unrestricted.)
 3. If `check_support` returns `insufficient` → **abstain**: emit a structured refusal plus the closest spans found (show that you looked, and where).
 4. When multiple defensible answers exist, return them **plural and ranked**, each with its own evidence and the ranking basis stated — never silently collapse to one.
 5. Call `verify(answer)` before presenting; it confirms every cited span resolves and hash-matches, and flags any unbound sentence.

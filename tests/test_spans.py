@@ -52,6 +52,16 @@ def test_get_span_reverifies_doc_hash(store):
         bad_store.get_span(DOC_ID, 0, 10)
 
 
+def test_get_document_returns_full_verified_text(store):
+    """D11: the agent may read the whole document; it's hash-verified (I3)."""
+    text = store.get_document(DOC_ID)
+    assert text == store._docs[DOC_ID].canonical_text
+    assert len(text) > 100_000  # the full 10-K, not a snippet
+    drifted = Document(DOC_ID, text, "0" * 64, {})
+    with pytest.raises(HashMismatch):
+        SpanStore([drifted]).get_document(DOC_ID)
+
+
 def test_get_span_out_of_range_rejected(store):
     n = len(store._docs[DOC_ID].canonical_text)
     with pytest.raises(SpanError):

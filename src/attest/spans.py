@@ -76,6 +76,18 @@ class SpanStore:
         self._doc(doc_id)
         return self._spans[doc_id]
 
+    def get_document(self, doc_id: str) -> str:
+        """Full canonical text, hash-verified (I3).
+
+        The agent may read freely (D11) — grounding constrains *output* (every
+        asserted claim binds to a verified span), not *input*. Broad reading is
+        how the agent gets the context (section, units caption, temporal scope)
+        that makes its citations correct.
+        """
+        doc = self._doc(doc_id)
+        verify_document(doc)
+        return doc.canonical_text
+
     def get_span(self, doc_id: str, start: int, end: int) -> str:
         """Return canonical_text[start:end], re-verifying the doc hash first (I3)."""
         doc = self._doc(doc_id)
