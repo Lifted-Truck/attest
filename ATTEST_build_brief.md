@@ -41,6 +41,12 @@ Both are pre-filled with my recommended v1 defaults. Override in one line and th
 | **Corpus** | SEC EDGAR 10-K / 10-Q filings | Free public API, hallucination is obviously costly, strong freelance demand (analysts, IR, compliance, fintech), shareable demo with zero confidentiality risk | None structurally — ingestion adapter is the only corpus-specific module. Alternates: clinical guidelines, municipal code, regulatory text. |
 | **Agency** | Read-only (retrieve + answer + verify) | Faster to ship, easier to trust, much lower eval bar | Action-taking (write/act via MCP) is a documented v2 extension; raises the oracle's burden substantially. Do not pull it into v1. |
 
+> **Update (D10, 2026-06-25):** the **first paying engagement** retargets the corpus to a **patent
+> refresh-and-update** (`ATTEST_Patent_Tailoring_Consideration.md`). EDGAR stays the reference build.
+> Caveat to the Corpus row above: patents are **not** a clean one-file swap — they add a domain
+> *pack* (richer document model, typed provenance, structural checks) on top of the corpus-agnostic
+> engine. The patent-domain cardinal rule sharpens to **locate & evidence, never adjudicate**.
+
 ---
 
 ## §0 — Cardinal rule & invariants

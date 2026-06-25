@@ -2,7 +2,9 @@
 
 **This file is the single source of truth for status and sequencing.** Architecture, invariants, and rationale live in `ATTEST_build_brief.md`; this file references it by `§` rather than duplicating it. When the two disagree, the brief wins on *design* and this file wins on *what to do next*.
 
-**Cardinal rule:** Ground or abstain — never invent. (Invariants I1–I6: see brief §0.)
+**Cardinal rule:** Ground or abstain — never invent. (Invariants I1–I6: see brief §0.) In the patent domain this sharpens to **locate & evidence, never adjudicate** (D10).
+
+**Two tracks.** *EDGAR 10-K* (M0–M5) is the architecture-proving **reference build**. The first paying engagement is a **patent refresh-and-update** (D10), tracked under **Patent Engagement** below — a specialization of the same corpus-agnostic engine, not a rewrite. The engine is built EDGAR-first (it's shared); the patent domain pack layers on top once client intake resolves the open decisions.
 
 ### Status legend
 `TODO` · `WIP` · `BLOCKED` · `DONE` — task checkboxes mirror this (`- [ ]` / `- [x]`).
@@ -56,6 +58,7 @@
 | D7 | 2026-06-23 | **Golden schema = quote + locator** (not span IDs). A resolver binds `verbatim_quote → span_id` at M1 and must match each quote exactly once (resolution invariant). | Span IDs/offsets can't exist before M1 and depend on M1 normalization. Supersedes the brief's original §3 span-id schema (brief §3 now updated). Seed lives in `golden_seed.json`. | — |
 | D8 | 2026-06-24 | **Highlighted evidence-view GUI is pulled forward** to a small, server-less static-HTML renderer (`render_evidence_view`, new **M2-T7**) the moment `verify` exists; the polished React/audit-log replay app stays at **M5** and upgrades it. **Contract:** the agent drafts an answer with each sentence tagged by `span_id`(s) → `verify` confirms every tag resolves + hash-matches (I1/I3) → `log` records it (I5) → the renderer deterministically emits a two-pane page (canonical document left with `<mark>` highlights, answer right with click-to-source hyperlinks). The agent's tagged markdown is an *authoring surface that passes through verify/log* — never a hand-maintained source of truth; hyperlinks are generated, never asserted. Render the **normalized canonical text** (the hashed, cited text), not the original filing HTML. | Visual payoff is the conversion surface (brief §6) and worth pulling to mid-project, but faithful highlighting needs char-offset spans (M1-T2) + validated citations (M2-T1), so the earliest *honest* viewer is post-M2. Hand-authored citation links would reintroduce the exact unverified-claim failure ATTEST exists to prevent (I1). Refines brief §6. | If the React app at M5 fully subsumes the static renderer, retire the latter. |
 | D9 | 2026-06-24 | **Atom-resolver contract for `verify` / `check_claim`.** The agent decomposes an answer into **atoms** (load-bearing tokens: numbers, currency, %, dates, named entities) and binds each to a specific source location `(doc_id, content_hash, char_start, char_end)`. A **fixed, deterministic resolver** confirms the slice *at that offset* equals the atom **exactly** (literal match — defined whitespace normalization, word-boundary, accounting-`( )`-negative aware), hash-matches (I3), and lies within the **spans retrieved for this query** (no whole-corpus fishing). The agent **parameterizes** (supplies atoms + bindings); it **never authors** the resolver (oracle-is-sacred; extends D8's tag contract). Crucially, `verify` also runs its **own** atom extraction over the final answer and requires every detected load-bearing token to be bound — confabulation can't hide in untagged prose. **Derived** values (e.g. a computed delta) are not atoms: they declare operands (each an atom that resolves) + an operation the resolver recomputes. | Makes every figure/quote the agent ships **machine-checkable and located**, killing invented citations while keeping the checker deterministic and CI-gated. It is the user's "bounded lookup" idea, hardened. Existence ≠ support remains the runtime limit: right-number/wrong-line or a misphrased reading is caught offline (Layer-E), structurally in v2. Open implementation contingencies are tracked under **M2-T1**. | Revisit if the atom taxonomy proves too coarse, or when v2 pulls entailment inline. |
+| D10 | 2026-06-25 | **First client engagement retargets the corpus from EDGAR to a patent refresh-and-update** (see [`ATTEST_Patent_Tailoring_Consideration.md`](ATTEST_Patent_Tailoring_Consideration.md), [`ATTEST_Client_Intake_Questions.md`](ATTEST_Client_Intake_Questions.md)). EDGAR 10-K remains the **architecture-proving reference build** (M0–M5); patents are a **specialization of the same engine**, tracked in a new **Patent Engagement** section. The corpus-agnostic engine is shared and keeps being built EDGAR-first (current focus stays M1-T3). Patent-domain cardinal rule, sharpened: **locate & evidence, never adjudicate** — never conclude on novelty/obviousness/validity/infringement/FTO/definitive claim construction (refusal class + Layer-E *negative* evals; UPL boundary, professional in the loop). §10 open decisions (mechanism, jurisdiction, published/confidential, prior-art, output, portfolio) are **DO NOT INVENT** → routed to intake; the two blocking ones are mechanism (Q2) and confidentiality (Q17). Patent work that exceeds the shared engine (document model, typed provenance, structural checks) is a **domain pack**, not a one-file corpus swap. | EDGAR proved the core cheaply and its tests guard the shared engine; patents are the revenue target but most domain-specific choices are still unknown. Building the engine EDGAR-first then layering the patent domain pack reuses proven, tested primitives (Document/I3, SpanStore/D7, eval harness) and avoids rework while intake resolves the unknowns. | Reconcile again once intake answers land (esp. Q2 mechanism, Q17 confidentiality); revisit if a confidential/unpublished patent forces local-only handling that changes the engine. |
 
 ---
 
@@ -139,6 +142,41 @@
 
 ---
 
+## Patent Engagement (client track)  ·  `PLANNING`
+
+**First paying engagement** (D10). Specializes the shared engine for a single patent
+refresh-and-update. Design lives in [`ATTEST_Patent_Tailoring_Consideration.md`](ATTEST_Patent_Tailoring_Consideration.md)
+(provisional, subordinate to this file); open client decisions in
+[`ATTEST_Client_Intake_Questions.md`](ATTEST_Client_Intake_Questions.md).
+**Cardinal rule (sharpened):** locate & evidence, **never adjudicate** (§2 of the tailoring doc).
+Build order follows tailoring §11; steps PE-1…PE-5 are **mechanism- and confidentiality-agnostic**
+and may proceed in parallel with intake.
+
+**Gate (mechanism-agnostic core):** the four structural Layer-0 checks pass on the engagement
+patent; claim→spec support mapping returns ranked, plural, paragraph/figure-evidenced output;
+priority/effective-filing extractor correct on golden entries; **negative eval** confirms the
+agent refuses to adjudicate even when asked.
+
+**Blocked-until-intake (DO NOT INVENT, §10):** refresh mechanism (Q2), jurisdiction (Q5),
+published-vs-confidential (Q17), prior-art supplied-vs-assembled (Q10), output format (Q13/Q16),
+single-vs-portfolio (Q3). The two hard blockers are **Q2 (mechanism)** and **Q17 (confidentiality)**.
+
+- [ ] **PE-0** · `chore/patent-intake` — Send/curate intake; record answers; reuse audit of the prior `patent_reader` project (append-only annotation model + any USPTO wrappers — **needs a repo pointer**). Provision USPTO **Open Data Portal** API key early (§7). **AC:** §10 blockers resolved or explicitly parked.
+- [ ] **PE-1** · `feat/patent-docmodel` — Document model & addressability for a single base patent (tailoring §3, **minus** prosecution history): claims as discrete objects (independent/dependent, parsed `depends_on`, decomposed into limitations); spec paragraphs by native numbering (`[0042]`); reference numerals bound to figures + first/subsequent mentions; bibliographic front-matter; priority chain. Builds on the shared `Document`/`SpanStore`. **AC:** each object individually addressable with char-offset provenance carrying **document identity** (§4).
+- [ ] **PE-2** · `feat/patent-layer0` — The four deterministic structural checks as Layer-0 evals (tailoring §5): antecedent basis (§112(b)), claim-dependency integrity, element-numeral consistency, term-usage consistency. Fixtures from the engagement patent. **AC:** CI-blocking; no model in the loop.
+- [ ] **PE-3** · `feat/patent-support-map` — Claim-limitation → specification support mapping (tailoring §6.1) with **typed provenance edges** (§4: `CLAIM_TERM→SPEC_SUPPORT`, `SPEC→FIGURE`, `NUMERAL→ELEMENT`, …) and document-identity on every record. Ranked, plural, paragraph/figure-evidenced. **Surfaces support gaps; never concludes support is legally insufficient** (§2). **AC:** golden support-mapping items pass; cross-document answers keep provenance distinct.
+- [ ] **PE-4** · `feat/patent-priority-date` — Priority-chain → effective-filing-date → pre-AIA/AIA regime flag (tailoring §6.2). **AC:** correct on golden date entries; regime flag justified by cited priority docs.
+- [ ] **PE-5** · `feat/patent-golden` — Golden dataset seeded from the **engagement patent** (tailoring §8): counts/structure, dates/regime, support mapping, figure/numeral, **and a negative item whose only correct response is refusal-to-adjudicate** (anchors the §2 boundary in Layer-E).
+- [ ] **PE-6** · *Pause for client input* → then mechanism-specific layer (tailoring §9: continuation/CIP vs reissue vs amendment → prosecution-history ingestion) and multi-document / prior-art topology. **Do not build until Q2 confirmed.**
+
+> **Engine implications to carry while building EDGAR-first (accommodate, don't pre-build):**
+> the **abstention/refusal** path (I2) generalizes to the *adjudication refusal class*; the
+> **atom resolver** (D9) generalizes to patent atoms (claim terms, numerals, dates); **provenance**
+> gains a **document-identity** field for multi-document topology; the **evidence-view GUI** (D8/M2-T7)
+> is the natural surface for claim→spec highlighting. Keep these seams clean; don't hard-code EDGAR.
+
+---
+
 ## Backlog (v2) — do not start
 API-wrapped service with **inline entailment-gating** (the structural-interception design) · action-taking / write tools · multi-corpus support · reranker upgrades · golden set to 200+ items · auth + multi-tenant for client deployments.
 
@@ -156,6 +194,7 @@ API-wrapped service with **inline entailment-gating** (the structural-intercepti
 - 2026-06-24 · M0-T4 · Audition rig `attest_rig.py` clears the M0 gate (precision/recall/correctness 100%, hallucination 0%, abstention 100%). Standing gate test added. **M0 DONE** — advancing to M1.
 - 2026-06-24 · — · Added `demo.py` (guided M0 walkthrough) + README "See it run".
 - 2026-06-24 · — · D9: atom-resolver contract for `verify`/`check_claim` (agent supplies located atoms; fixed resolver checks exact literal at offset + hash + scope; independent re-extraction; derived-value operands). Open contingencies tracked under M2-T1; brief §5 updated.
+- 2026-06-25 · — · D10: reconciled the patent retarget into the roadmap. EDGAR reframed as the reference build; new **Patent Engagement** track (PE-0…PE-6, mechanism-agnostic core per tailoring §11) gated on client intake (blockers Q2 mechanism, Q17 confidentiality); locate-never-adjudicate boundary; CLAUDE.md hierarchy + brief alignment. Current focus unchanged (M1-T3, shared engine).
 - 2026-06-25 · M1-T2 · Span store (`attest.spans`): char-offset chunking, `get_span` with hash re-verify (I3), `resolve_quote` enforcing the resolution invariant (D7). All 21 golden quotes bound 1:1 to canonical text; G016 split; standing `tests/test_spans.py`.
 - 2026-06-24 · M1-T1 · EDGAR ingestion adapter: `attest.ingest` (Document + content-hash I3, store with verify-on-load, isolated `edgar.py`). Apple FY2024 10-K ingested to `corpus/store/`; standing I3 tests (tamper rejected, deterministic normalization, evidence preserved). build_toy_corpus reuses the adapter's normalize.
 - 2026-06-24 · — · D8: highlighted two-pane evidence-view GUI pulled forward to **M2-T7** (server-less static-HTML renderer on the verify result); M5 becomes its polished log-replay upgrade. Contract: agent tags spans → verify → log → deterministic render (hyperlinks are verified span refs, not hand-authored). Brief §6 + M5 reworded.

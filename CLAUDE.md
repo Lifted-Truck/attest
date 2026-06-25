@@ -15,6 +15,19 @@ and [`ATTEST_build_brief.md`](ATTEST_build_brief.md) for full architecture and r
 - [`ATTEST_build_brief.md`](ATTEST_build_brief.md) — architecture, invariants, rationale. **Wins on *design*.**
 - [`ROADMAP.md`](ROADMAP.md) — status and sequencing. **Wins on *what to do next*.** When the two disagree, that split holds.
 - [`golden_seed.json`](golden_seed.json) — the ground-truth eval set (20 items, Apple FY2024 10-K).
+- [`ATTEST_Patent_Tailoring_Consideration.md`](ATTEST_Patent_Tailoring_Consideration.md) — patent-domain specialization for the **first client engagement**. Provisional; **subordinate to `ROADMAP.md`**. Wins on patent-domain design where it doesn't conflict.
+- [`ATTEST_Client_Intake_Questions.md`](ATTEST_Client_Intake_Questions.md) — the open client decisions. Treat its unresolved items as **DO NOT INVENT** (see ROADMAP D10/§10).
+
+## Two corpora: EDGAR (reference) + patents (client)
+
+EDGAR 10-K is the **architecture-proving reference build** (M0–M5). The first paying
+engagement is a **patent refresh-and-update** — a *specialization* of the same engine,
+not a rewrite (ROADMAP **D10** + the patent track). The corpus-agnostic engine
+(ingestion+hash, span store, retrieval, verify, audit log, eval harness) is shared; the
+patent domain adds a richer document model, typed provenance, and structural checks.
+**Patent-domain cardinal rule (sharpened from "ground or abstain"): *locate & evidence,
+never adjudicate*** — never conclude on novelty, obviousness, validity, infringement, FTO,
+or definitive claim construction (a patent professional is in the loop; UPL boundary).
 
 ## How to pick up work
 
