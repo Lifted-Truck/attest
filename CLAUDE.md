@@ -67,16 +67,30 @@ All architectural ambition goes into the **eval harness**, where depth is the se
 Everywhere else, choose the boring, legible option. Legibility to a non-specialist is the
 product.
 
-## Runtime agent loop (once the tools exist, M2+)
+## Runtime agent loop (M2+)
 
-When ATTEST's tools are available, the agent is bound to this loop every session:
+### Tool contracts (as built; MCP names land at M4)
 
-1. `search_corpus` / `check_support` to locate candidate spans; **read freely** with `get_span` / `get_document` to get the context the citation needs (D11). Retrieval is a navigational aid, not a cage.
-2. **Ground every sentence in a verified span** — compose from the corpus and tag each sentence with the span id(s) it rests on. (The constraint is on *output*: what you assert must bind to a real span; what you *read* is unrestricted.)
-3. If `check_support` returns `insufficient` → **abstain**: emit a structured refusal plus the closest spans found (show that you looked, and where).
-4. When multiple defensible answers exist, return them **plural and ranked**, each with its own evidence and the ranking basis stated — never silently collapse to one.
-5. Call `verify(answer)` before presenting; it confirms every cited span resolves and hash-matches, and flags any unbound sentence.
-6. The verify/log result is appended to the audit log (I5). Present, or abstain.
+| Loop role | Python (today) | Returns | Notes |
+|---|---|---|---|
+| locate | `retrieval.Retriever.search(q, k)` → `search_corpus` | `list[Hit{span, score}]` | deterministic, ranked (I6) |
+| abstain-trigger | `support.check_support(q, retriever)` | `SupportResult{status, supporting[], closest[]}` | `insufficient` = content-absent abstain (D12) |
+| read | `spans.SpanStore.get_span(doc_id, s, e)` / `get_document(doc_id)` | `str` (hash-verified, I3) | **read freely** (D11) |
+| verify | `verify.verify(answer, store)` | `VerifyResult{ok, sentences[], unbound()}` | atom resolver (D9/I1) |
+| *(forthcoming)* | `check_claim` (M4), `get_audit_log` (M3/M4) | — | per brief §5 |
+
+`Answer` = `[Sentence{text, atoms:[AtomBinding{text, doc_id, char_start, char_end}], derived:[DerivedAtom]}]`.
+
+### The loop (every session)
+
+1. **Locate.** `check_support(question)` / `search_corpus`; **read freely** with `get_document` / `get_span` for the context a citation needs (D11) — retrieval is a navigational aid, not a cage.
+2. **Abstain when unsupported (two mechanisms, D12):**
+   - `check_support` → `insufficient` → **abstain**: structured refusal + the `closest` spans (show you looked, and where). *(deterministic, content-absence)*
+   - Even when spans clear the floor, abstain/partial/reject by **reasoning** when the content doesn't answer *this* question — wrong period, wrong entity, false premise. *(your judgment; measured at Layer-E)* For the patent corpus this includes the **refusal-to-adjudicate** class (D10): locate & evidence, never conclude on novelty/validity/infringement/claim construction.
+3. **Compose from the corpus, ground the output.** Bind each load-bearing atom (figure, date, entity) to its exact span; derived values declare operands, not a cited result (D9). The constraint is on *output*; reading is unrestricted.
+4. **Plural & ranked.** When multiple defensible answers exist, return them all, ranked, each with its own evidence — never collapse to one (brief §4).
+5. **`verify(answer)` before presenting.** It confirms every atom resolves at its offset + hash-matches (I1/I3), flags unbound figures, and recomputes derived values. If `not ok` → fix the binding or abstain. (`verify` confirms a citation is *real*, not that it *entails* — entailment is Layer-E.)
+6. The verify/support result is appended to the audit log (I5, from M3). Present, or abstain.
 
 ## Stack (start boring on purpose)
 
