@@ -8,12 +8,13 @@
 `TODO` · `WIP` · `BLOCKED` · `DONE` — task checkboxes mirror this (`- [ ]` / `- [x]`).
 
 ### ▶ Current focus
-**M1 · M1-T2** — span store: chunk + index the canonical document by char offset `(doc_id, start, end)`; `get_span` re-verifies against the doc hash. M1-T1 (ingestion + I3) is `DONE`.
+**M1 · M1-T3** — hybrid retrieval (BM25 + single embedding) over the span store, with a standing I6 reproducibility test. M1-T1 (ingestion/I3) and M1-T2 (span store + resolution invariant) are `DONE`.
 
-> **Carryover from M0:** the golden seed's `verbatim_quote`s are still `null` by
-> design — M1-T2's resolver fills them from the canonical text (`corpus/store/`)
-> and must bind each 1:1 (resolution invariant, D7). G008/G009 were grounded
-> against the filing during M0-T2; a broader human verification pass remains welcome.
+> **Golden set is now fully bound:** all 21 `verbatim_quote`s resolve 1:1 to the
+> canonical text (`scripts/resolve_golden_quotes.py`; guarded by `tests/test_spans.py`).
+> G016 was split into current/non-current term-debt entries to keep each quote
+> singly resolvable. A broader human verification pass remains welcome but the
+> seed is no longer `null`-quoted.
 
 > **Working mode:** single primary agent develops directly on `main` (no PR-per-task gate
 > in this repo). CI still runs on every push to `main`; a red gate or a violated invariant
@@ -75,7 +76,7 @@
 **Gate:** span hashes verify (I3); retrieval reproducible across two runs (I6); unit tests green.
 
 - [x] **M1-T1** · `branch: feat/m1-ingestion` — EDGAR adapter: fetch + normalize + **content-hash at ingest** (I3). Corpus-specific code lives *only* here. **AC:** every stored doc carries its hash; standing I3 hash test passes. **DONE** — `src/attest/ingest/` package: `document.py` (Document + sha256 content hash + `verify_document`, corpus-agnostic), `store.py` (on-disk store; re-verifies hash on every load), `edgar.py` (the *only* corpus-specific module — filing registry, fetch+cache, deterministic HTML→canonical-text normalization). Apple FY2024 10-K ingested to `corpus/store/` (219K chars, hash in `meta.json`) via `scripts/ingest_corpus.py`; M0's `build_toy_corpus.py` now reuses `edgar.normalize` (no duplicated corpus code). Standing I3 tests in `tests/test_ingest.py`: hash re-verifies, tamper (text or hash drift) rejected, normalization deterministic (I6), golden evidence preserved.
-- [ ] **M1-T2** · `branch: feat/m1-spanstore` — Chunk + span index by char offset `(doc_id, start, end)`. **AC:** `get_span` returns the exact slice and re-verifies against the doc hash; mismatch raises a hard failure.
+- [x] **M1-T2** · `branch: feat/m1-spanstore` — Chunk + span index by char offset `(doc_id, start, end)`. **AC:** `get_span` returns the exact slice and re-verifies against the doc hash; mismatch raises a hard failure. **DONE** — `src/attest/spans.py`: deterministic line-level `chunk_document` (exact offsets, `canonical_text[start:end] == span.text`), `SpanStore.get_span` (re-verifies doc hash via `verify_document` before serving; out-of-range → `SpanError`), and `resolve_quote` enforcing the **resolution invariant** (D7: exactly-once, else `ResolutionError`). All **21 golden `verbatim_quote`s bound 1:1** to the canonical text via `scripts/resolve_golden_quotes.py` (G016 split into current/non-current so each resolves singly; `source_status` → `grounded`). Standing tests in `tests/test_spans.py`: exact-slice, hash re-verify on drift, deterministic chunking (I6), resolution invariant, duplicate/missing quote rejected.
 - [ ] **M1-T3** · `branch: feat/m1-retrieval` — Hybrid retrieval (BM25 + single embedding model), deliberately simple (brief §8). **AC:** returns candidate spans with offsets; **standing I6 reproducibility test** passes (identical results, two seeded runs).
 
 ---
@@ -155,5 +156,6 @@ API-wrapped service with **inline entailment-gating** (the structural-intercepti
 - 2026-06-24 · M0-T4 · Audition rig `attest_rig.py` clears the M0 gate (precision/recall/correctness 100%, hallucination 0%, abstention 100%). Standing gate test added. **M0 DONE** — advancing to M1.
 - 2026-06-24 · — · Added `demo.py` (guided M0 walkthrough) + README "See it run".
 - 2026-06-24 · — · D9: atom-resolver contract for `verify`/`check_claim` (agent supplies located atoms; fixed resolver checks exact literal at offset + hash + scope; independent re-extraction; derived-value operands). Open contingencies tracked under M2-T1; brief §5 updated.
+- 2026-06-25 · M1-T2 · Span store (`attest.spans`): char-offset chunking, `get_span` with hash re-verify (I3), `resolve_quote` enforcing the resolution invariant (D7). All 21 golden quotes bound 1:1 to canonical text; G016 split; standing `tests/test_spans.py`.
 - 2026-06-24 · M1-T1 · EDGAR ingestion adapter: `attest.ingest` (Document + content-hash I3, store with verify-on-load, isolated `edgar.py`). Apple FY2024 10-K ingested to `corpus/store/`; standing I3 tests (tamper rejected, deterministic normalization, evidence preserved). build_toy_corpus reuses the adapter's normalize.
 - 2026-06-24 · — · D8: highlighted two-pane evidence-view GUI pulled forward to **M2-T7** (server-less static-HTML renderer on the verify result); M5 becomes its polished log-replay upgrade. Contract: agent tags spans → verify → log → deterministic render (hyperlinks are verified span refs, not hand-authored). Brief §6 + M5 reworded.
