@@ -86,7 +86,7 @@ The MCP server (and a CLI mirror) is the **only** interface in v1. There is no
 
 The oracle splits along the runtime boundary:
 
-- **Layer 0 — deterministic component evals** (block every PR; fast, stable). Span resolution 1:1, citation integrity (I3), retrieval recall + reproducibility (I6), abstention trigger 100% on unanswerable items, `verify` rejects planted ungrounded claims, invariant tests (I3–I6).
+- **Layer 0 — deterministic component evals** (block every push; fast, stable — 39 evals in <1s, no model calls). Span resolution 1:1, citation integrity (I3), retrieval recall + reproducibility (I6), abstention trigger on content-absent items, `verify` rejects planted ungrounded claims, plural-and-ranked. The gate table is [`docs/layer0_gate.md`](docs/layer0_gate.md); run it with `pytest -m layer0`.
 - **Layer E — agent end-to-end evals** (periodic, via headless Claude Code; non-blocking). Hallucination/entailment via LLM-as-judge, citation precision/recall, answer correctness, abstention correctness, and abstention **calibration** (Brier + reliability curve) — the metric almost no one measures, foregrounded here.
 
 ## Corpus
