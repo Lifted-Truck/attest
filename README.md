@@ -124,9 +124,9 @@ Build order is **M0 → M5**, each milestone gated by the oracle:
 
 - **M0** — Audition rig: prove the risky core cheaply on the 20-item seed. ✅ *gate met — `python attest_rig.py`*
 - **M1** — Ingestion + retrieval + span store (immutable evidence layer). ✅ *I3 hashing, span store + resolution invariant, reproducible retrieval*
-- **M2** — Deterministic `verify` + `check_support`; Layer-0 / Layer-E evals go live. *(current)*
-- **M3** — Append-only audit log (replayable; write-asymmetry enforced).
-- **M4** — MCP server + CLI (the primary v1 interface).
+- **M2** — Deterministic `verify` + `check_support`; Layer-0 gate live. ✅ *(Layer-E eval lands with M4)*
+- **M3** — Append-only audit log (replayable; write-asymmetry enforced). ✅
+- **M4** — MCP server + CLI (the primary v1 interface). *(current)*
 - **M5** — Demo UI (replays from the audit log).
 
 EDGAR is the architecture-proving **reference build**. The first client engagement

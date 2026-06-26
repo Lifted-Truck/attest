@@ -10,11 +10,16 @@
 `TODO` · `WIP` · `BLOCKED` · `DONE` — task checkboxes mirror this (`- [ ]` / `- [x]`; `- [~]` = partial / first-cut).
 
 ### ▶ Current focus
-**M2 · M2-T6** — Layer-E agent end-to-end eval (the hero): headless Claude Code over the golden set, LLM-judge entailment + abstention calibration. **Periodic, NOT a blocking gate.** M2-T1…T5 + **T7 (evidence-view GUI)** `DONE`; the Layer-0 blocking gate passes (43 evals). M2-T6 is the only piece left in M2 — *its own focused session (model-in-the-loop)*.
+**M4 · M4-T1** — MCP server + CLI scaffold (the primary v1 interface). **M3 is `DONE`** (audit log: append-only/tamper-evident, replay, I4). Layer-0 gate green (64 evals).
 
-> **Review the build yourself:** open `evidence_view.html` (regenerate with
-> `python scripts/build_evidence_view.py`) — grounded answers with click-to-source
-> highlights, abstentions, and false-premise rejection over the Apple 10-K.
+> **Deferred, with a dependency:** **M2-T6 (Layer-E)** drives the *real agent* over
+> the tools, which needs the **MCP interface from M4** — so it lands around **M4-T4**
+> (agent loop end-to-end), not before. **M2-T8** (constraint coverage) likewise
+> finishes when the live agent emits the question frame (M4). Both are tracked and
+> non-blocking.
+>
+> **Review the build yourself:** `python scripts/build_evidence_view.py` → open
+> `evidence_view.html` (grounded answers, click-to-source, coverage, abstentions).
 
 > **M2 builds the shared engine's grounding tools** (`verify`, `check_support`),
 > which both EDGAR and the patent track reuse. Carry the patent seams (D10): the
@@ -119,13 +124,14 @@
 
 ---
 
-## M3 — Audit log  ·  `TODO`
+## M3 — Audit log  ·  `DONE`
 **Goal:** subsystem 5 (brief §1; I4, I5).
 **Gate:** append-only + full-replay tests pass; write-asymmetry (I4) test passes.
+**Gate met (2026-06-26):** tamper-evident append-only log (`test_audit`), byte-identical replay (`test_session`), read/write asymmetry (`test_i4`) — all green; Layer-0 gate's I4/I5 rows now filled.
 
-- [ ] **M3-T1** · `branch: feat/m3-audit` — Append-only log of query / retrieval set / answer / citations / abstention / confidence (I5). **AC:** entries immutable; tampering test fails the build.
-- [ ] **M3-T2** · `branch: feat/m3-replay` — Reconstruct any past interaction from the log alone. **AC:** replayed interaction is byte-identical on the evidence path (I6).
-- [ ] **M3-T3** · `branch: feat/m3-asymmetry` — Enforce + test I4: agent can write **only** the log; corpus is read-only. **AC:** standing I4 test attempts a corpus write and is rejected.
+- [x] **M3-T1** · `branch: feat/m3-audit` — Append-only log of query / retrieval set / answer / citations / abstention / confidence (I5). **AC:** entries immutable; tampering test fails the build. **DONE** — `src/attest/audit.py`: `AuditLog`, a JSONL **hash-chained** log (`entry_hash` covers `seq+prev_hash+payload`); append-only API (no update/delete); `verify_chain()` detects edit/reorder/deletion → `TamperError`. Standing `tests/test_audit.py`.
+- [x] **M3-T2** · `branch: feat/m3-replay` — Reconstruct any past interaction from the log alone. **AC:** replayed interaction is byte-identical on the evidence path (I6). **DONE** — `src/attest/session.py`: canonical interaction records + `replay_support` re-derives the evidence path from the logged query alone; `replays_identically` confirms byte-identical reproduction. Standing `tests/test_session.py`.
+- [x] **M3-T3** · `branch: feat/m3-asymmetry` — Enforce + test I4: agent can write **only** the log; corpus is read-only. **AC:** standing I4 test attempts a corpus write and is rejected. **DONE** — `tests/test_i4.py`: the agent-facing read path (get_document/get_span/retrieval/check_support/verify) leaves the corpus byte-identical; read classes expose no mutator; `AuditLog.append` is the only append surface. (Full enforcement at the MCP tool boundary lands at M4-T3.)
 
 ---
 
@@ -203,6 +209,7 @@ API-wrapped service with **inline entailment-gating** (the structural-intercepti
 - 2026-06-24 · M0-T4 · Audition rig `attest_rig.py` clears the M0 gate (precision/recall/correctness 100%, hallucination 0%, abstention 100%). Standing gate test added. **M0 DONE** — advancing to M1.
 - 2026-06-24 · — · Added `demo.py` (guided M0 walkthrough) + README "See it run".
 - 2026-06-24 · — · D9: atom-resolver contract for `verify`/`check_claim` (agent supplies located atoms; fixed resolver checks exact literal at offset + hash + scope; independent re-extraction; derived-value operands). Open contingencies tracked under M2-T1; brief §5 updated.
+- 2026-06-26 · M3 · **Audit log DONE.** M3-T1 tamper-evident append-only hash-chain log (`attest.audit`); M3-T2 byte-identical replay (`attest.session`); M3-T3 I4 read/write-asymmetry test. Layer-0 gate's I4/I5 rows filled. 64 evals green. Focus → M4 (Layer-E/M2-T6 + M2-T8 finish around M4 when the agent drives the tools).
 - 2026-06-26 · M2-T8 (first cut) · D13 question-frame + constraint coverage: `attest.frame` (`check_coverage`, deterministic) + tests; evidence view shows a question-coverage strip incl. a *naive-citation* card where verify ✓ but coverage ✗ (wrong metric, real figure). Live-agent frame emission + verify-gate integration remain (M4).
 - 2026-06-26 · M2-T7+ · Review feedback on the GUI: (1) header now links each doc's SEC filing + canonical text; (2) **dates are now load-bearing atoms** — `verify` flags an ungrounded "as of <date>"; the demo binds the period to the cover line (extends D9); (3) each card shows a deterministic decision trace (scores/floor/verdicts). The chain-of-thought question is logged for M3 (agent rationale → audit log) — see response.
 - 2026-06-25 · M2-T7 · Evidence-view GUI (`attest.evidence_view`, D8): server-less two-pane HTML — answers with click-to-source highlights, unbound flagged, abstentions with closest spans. `scripts/build_evidence_view.py` → `evidence_view.html`; standing `tests/test_evidence_view.py`.

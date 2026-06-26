@@ -27,8 +27,8 @@ second with zero network or model calls.
 | 6 | **Provenance binding** — `get_span` returns the exact slice; atoms bind to real offsets | I1, I3 | `test_spans::test_get_span_returns_exact_slice`, `test_verify::test_clean_answer_passes` | ✅ |
 | 7 | **Plural & ranked** — multi-answer items surface all gold spans, ranked, uncollapsed | brief §4 | `test_support::test_plural_items_surface_all_gold_spans_ranked` | ✅ |
 | 8 | **Deterministic ingest/normalization** — same raw → same canonical text → same hash | I3, I6 | `test_ingest::test_normalization_is_deterministic`, `test_spans::test_chunking_is_deterministic` | ✅ |
-| — | **Corpus write rejected** | I4 | — | ⏳ M3 |
-| — | **Audit log append-only + complete** | I5 | — | ⏳ M3 |
+| 9 | **Read/write asymmetry** — reads never mutate the corpus; the read classes expose no mutator; the log is the only append surface | I4 | `test_i4` | ✅ |
+| 10 | **Audit log append-only + replayable** — tamper-evident hash chain (edit/reorder/delete detected); a logged interaction replays byte-identically | I5, I6 | `test_audit`, `test_session` | ✅ |
 
 **M0 carryover (still gated):** `test_rig` holds the M0 audition gate (citation
 precision / hallucination / abstention on the toy set); `test_toy_corpus` holds
