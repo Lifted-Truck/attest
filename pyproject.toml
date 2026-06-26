@@ -17,6 +17,12 @@ dev = [
   "pytest>=8.0",
   "ruff>=0.4",
 ]
+mcp = [
+  "mcp>=1.0",   # the MCP server adapter (mcp_server.py); not needed for the Layer-0 gate
+]
+
+[project.scripts]
+attest = "attest.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

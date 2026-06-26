@@ -1,0 +1,62 @@
+"""MCP server adapter (ROADMAP M4-T1, brief §5).
+
+Exposes the shared tool registry over the Model Context Protocol so Claude Code
+can call ATTEST. The `mcp` SDK is an *optional* dependency (`pip install
+".[mcp]"`) — it's imported lazily inside `build_server`, so this module never
+burdens the stdlib-only Layer-0 gate. The CLI (`cli.py`) is the dependency-free
+mirror of the same registry.
+
+Run:  python -m attest.mcp_server         # starts the server over stdio
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from .tools import default_registry
+
+
+def build_server(store_dir: Path | str = "corpus/store", audit_path: Path | str | None = None):
+    """Build an MCP Server exposing the ATTEST tools. Requires the `mcp` SDK."""
+    import mcp.types as types
+    from mcp.server import Server
+
+    registry = default_registry(store_dir, audit_path)
+    server = Server("attest")
+
+    @server.list_tools()
+    async def list_tools() -> list[types.Tool]:
+        return [
+            types.Tool(
+                name=t.name,
+                description=t.description,
+                inputSchema={"type": "object"},  # per-tool schemas land at M4-T2
+            )
+            for t in registry.values()
+        ]
+
+    @server.call_tool()
+    async def call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
+        result = registry[name].handler(arguments or {})
+        return [types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
+
+    return server
+
+
+def main() -> int:  # pragma: no cover - requires the mcp SDK + a stdio client
+    import anyio
+    from mcp.server.stdio import stdio_server
+
+    server = build_server()
+
+    async def _run() -> None:
+        async with stdio_server() as (read, write):
+            await server.run(read, write, server.create_initialization_options())
+
+    anyio.run(_run)
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

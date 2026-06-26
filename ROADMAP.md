@@ -10,7 +10,11 @@
 `TODO` · `WIP` · `BLOCKED` · `DONE` — task checkboxes mirror this (`- [ ]` / `- [x]`; `- [~]` = partial / first-cut).
 
 ### ▶ Current focus
-**M4 · M4-T1** — MCP server + CLI scaffold (the primary v1 interface). **M3 is `DONE`** (audit log: append-only/tamper-evident, replay, I4). Layer-0 gate green (64 evals).
+**M4 · M4-T2** — flesh out the tool contracts: add `verify(answer_with_tags)` + per-tool input schemas + contract tests (brief §5). **M4-T1 scaffold `DONE`** (registry + CLI + MCP adapter). Layer-0 gate green (72 evals).
+
+> **Offered:** the **parallel full-document view** (whole canonical doc, cited
+> spans highlighted in situ, scroll-to-on-click) is an upgrade to the static
+> evidence view — buildable now, not blocked by M4; say the word to slot it next.
 
 > **Deferred, with a dependency:** **M2-T6 (Layer-E)** drives the *real agent* over
 > the tools, which needs the **MCP interface from M4** — so it lands around **M4-T4**
@@ -139,7 +143,7 @@
 **Goal:** subsystem 8 (brief §1, §5). The only interface Claude Code uses. Read/write asymmetry enforced at the tool boundary.
 **Gate:** boundary asymmetry test; the documented agent loop runs end-to-end over the tools on the golden set.
 
-- [ ] **M4-T1** · `branch: feat/m4-mcp-scaffold` — Server + CLI mirror + tool registration. **AC:** server starts; tools enumerated; CLI invokes the same functions.
+- [x] **M4-T1** · `branch: feat/m4-mcp-scaffold` — Server + CLI mirror + tool registration. **AC:** server starts; tools enumerated; CLI invokes the same functions. **DONE** — `src/attest/tools.py` (`Tool` + `default_registry`: the single registry both interfaces share); `cli.py` + `python -m attest` (`list` / `call <tool> <json>`) wired to `search_corpus`/`get_span`/`get_document`/`check_support`/`check_claim` (+ `get_audit_log` when an audit path is given); `mcp_server.py` (`build_server`, **optional `mcp` dep**, lazily imported so the Layer-0 gate stays stdlib-only); `attest` console script. Standing `tests/test_tools.py` (registry enumerated, CLI invokes the same functions, MCP adapter builds — `importorskip`). Verified: `attest list` + `attest call get_span …` return real results; `build_server` constructs with the live SDK. `verify` tool + per-tool schemas land at M4-T2; log side-effects at M4-T3.
 - [ ] **M4-T2** · `branch: feat/m4-tools` — Expose `search_corpus`, `get_span`, `get_document` (read-freely, D11), `check_support`, `verify`, `check_claim`, `get_audit_log` (brief §5). **AC:** each tool's contract tested; `get_document` returns the full hash-verified text; `check_claim` resolves a user claim to supporting spans or none.
 - [ ] **M4-T3** · `branch: feat/m4-boundary` — Read tools have no side effects; `check_support` / `verify` / `check_claim` append to log only; corpus never writable (I4). **AC:** boundary test confirms read/write asymmetry.
 - [ ] **M4-T4** · `branch: feat/m4-agent-loop` — Run the actual Claude Code agent loop over the MCP tools on the golden set. **AC:** agent searches, drafts, calls `check_support` + `verify`, and abstains where required — end-to-end through MCP.
@@ -209,6 +213,7 @@ API-wrapped service with **inline entailment-gating** (the structural-intercepti
 - 2026-06-24 · M0-T4 · Audition rig `attest_rig.py` clears the M0 gate (precision/recall/correctness 100%, hallucination 0%, abstention 100%). Standing gate test added. **M0 DONE** — advancing to M1.
 - 2026-06-24 · — · Added `demo.py` (guided M0 walkthrough) + README "See it run".
 - 2026-06-24 · — · D9: atom-resolver contract for `verify`/`check_claim` (agent supplies located atoms; fixed resolver checks exact literal at offset + hash + scope; independent re-extraction; derived-value operands). Open contingencies tracked under M2-T1; brief §5 updated.
+- 2026-06-26 · M4-T1 · MCP server + CLI scaffold: shared `attest.tools` registry; `python -m attest` / `attest` CLI; guarded `mcp_server.build_server` (optional `mcp` dep). `tests/test_tools.py`; 72 evals green.
 - 2026-06-26 · M3 · **Audit log DONE.** M3-T1 tamper-evident append-only hash-chain log (`attest.audit`); M3-T2 byte-identical replay (`attest.session`); M3-T3 I4 read/write-asymmetry test. Layer-0 gate's I4/I5 rows filled. 64 evals green. Focus → M4 (Layer-E/M2-T6 + M2-T8 finish around M4 when the agent drives the tools).
 - 2026-06-26 · M2-T8 (first cut) · D13 question-frame + constraint coverage: `attest.frame` (`check_coverage`, deterministic) + tests; evidence view shows a question-coverage strip incl. a *naive-citation* card where verify ✓ but coverage ✗ (wrong metric, real figure). Live-agent frame emission + verify-gate integration remain (M4).
 - 2026-06-26 · M2-T7+ · Review feedback on the GUI: (1) header now links each doc's SEC filing + canonical text; (2) **dates are now load-bearing atoms** — `verify` flags an ungrounded "as of <date>"; the demo binds the period to the cover line (extends D9); (3) each card shows a deterministic decision trace (scores/floor/verdicts). The chain-of-thought question is logged for M3 (agent rationale → audit log) — see response.
