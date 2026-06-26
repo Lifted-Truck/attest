@@ -32,9 +32,16 @@ with their verbatim source spans, and structured refusals that show the system
 looked and where:
 
 ```bash
-python demo.py          # narrated tour of seven representative questions
-python attest_rig.py    # the full 20-item gate: precision, hallucination, abstention
+python demo.py                       # narrated tour of seven representative questions
+python attest_rig.py                 # the full 20-item gate: precision, hallucination, abstention
+python scripts/build_evidence_view.py && open evidence_view.html   # the GUI
 ```
+
+`evidence_view.html` is a self-contained, server-less **evidence view** (ROADMAP
+M2-T7): grounded answers with **click-to-source** highlights into the verbatim
+canonical text, derived values, plural answers, and abstentions/false-premise
+rejection. Click a figure to jump to its source span — your review job is the one
+thing v1 doesn't gate: does the cited span actually *support* the claim?
 
 The demo needs no install (pure standard library). It exercises the M0 audition
 rig — the deterministic evidence layer (retrieval → cite → verify → abstain). At

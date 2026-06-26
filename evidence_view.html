@@ -1,0 +1,49 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>ATTEST — evidence view</title><style>
+:root { --bg:#0f1115; --panel:#171a21; --ink:#e6e9ef; --muted:#8b93a3;
+  --line:#262b36; --mark:#3b2f12; --markb:#e0a32e; --ok:#3fb950; --bad:#f85149;
+  --chip:#1f6feb22; --chipb:#388bfd; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink);
+  font:15px/1.55 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+header { padding:20px 28px; border-bottom:1px solid var(--line); }
+header h1 { margin:0 0 4px; font-size:18px; }
+header p { margin:0; color:var(--muted); font-size:13px; }
+.card { border-bottom:1px solid var(--line); padding:22px 28px; }
+.q { font-weight:600; margin:0 0 2px; }
+.badge { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.04em;
+  padding:2px 8px; border-radius:999px; text-transform:uppercase; margin-bottom:12px; }
+.badge.answer { background:#11331c; color:var(--ok); }
+.badge.abstain, .badge.reject, .badge.partial { background:#3a1d1d; color:var(--bad); }
+.cols { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+@media (max-width:760px){ .cols{ grid-template-columns:1fr; } }
+.pane h3 { font-size:11px; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--muted); margin:0 0 8px; }
+.answer-text { background:var(--panel); border:1px solid var(--line); border-radius:8px;
+  padding:14px 16px; }
+.src { background:var(--panel); border:1px solid var(--line); border-radius:8px;
+  padding:10px 12px; margin-bottom:8px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:13px; white-space:pre-wrap; transition:background .15s,border-color .15s; }
+.src .prov { display:block; font-family:inherit; color:var(--muted); font-size:11px;
+  margin-bottom:4px; }
+.src.flash { background:#1d2740; border-color:var(--chipb); }
+mark { background:var(--mark); color:var(--markb); border-radius:3px; padding:0 2px;
+  font-weight:600; }
+.chip { background:var(--chip); border:1px solid var(--chipb); color:var(--ink);
+  border-radius:4px; padding:0 4px; cursor:pointer; font-weight:600; }
+.chip.derived { background:#2a1f3a; border-color:#a371f7; }
+.chip.bad { background:#3a1d1d; border-color:var(--bad); }
+.reason { color:var(--muted); margin:0 0 10px; }
+.foot { padding:14px 28px; color:var(--muted); font-size:12px; }
+.vstatus { font-size:12px; margin-top:8px; }
+.vstatus.ok { color:var(--ok); } .vstatus.bad { color:var(--bad); }
+</style></head><body><header><h1>ATTEST — evidence view</h1><p>Click a highlighted figure to jump to its verbatim source span. Your review job: does the cited span actually support the claim? (entailment — not gated in v1)</p></header><section class="card"><p class="q">What were Apple&#x27;s total assets as of September 28, 2024?</p><span class="badge answer">answer</span><p class="reason">A single figure, bound to its exact line.</p><div class="cols"><div class="pane"><h3>Answer</h3><div class="answer-text"><p>Apple&#x27;s total assets were $<span class="chip" data-target="src-0-0">364,980</span> million as of September 28, 2024.</p></div><div class="vstatus ok">✓ verify: every figure resolves to a cited span</div></div><div class="pane"><h3>Source (canonical text)</h3><div class="src" id="src-0-0"><span class="prov">AAPL-10K-FY2024 · chars 139998–140030</span>Total assets $ <mark>364,980</mark> $ 352,583</div></div></div></section><section class="card"><p class="q">Did Apple&#x27;s total assets increase from fiscal 2023 to 2024, and by how much?</p><span class="badge answer">answer</span><p class="reason">The $12,397M delta is recomputed from both operands, never cited as a fact.</p><div class="cols"><div class="pane"><h3>Answer</h3><div class="answer-text"><p>Total assets increased by $<span class="chip derived">12,397</span> million (from $<span class="chip" data-target="src-1-0">352,583</span>M to $<span class="chip" data-target="src-1-0">364,980</span>M).</p></div><div class="vstatus ok">✓ verify: every figure resolves to a cited span</div></div><div class="pane"><h3>Source (canonical text)</h3><div class="src" id="src-1-0"><span class="prov">AAPL-10K-FY2024 · chars 139998–140030</span>Total assets $ <mark>364,980</mark> $ <mark>352,583</mark></div></div></div></section><section class="card"><p class="q">How much term debt does Apple carry?</p><span class="badge answer">answer</span><p class="reason">One question, two valid figures — both surfaced and distinguished.</p><div class="cols"><div class="pane"><h3>Answer</h3><div class="answer-text"><p>Apple carries term debt in two portions: a current portion of $<span class="chip" data-target="src-2-0">10,912</span> million and a non-current portion of $<span class="chip" data-target="src-2-1">85,750</span> million.</p></div><div class="vstatus ok">✓ verify: every figure resolves to a cited span</div></div><div class="pane"><h3>Source (canonical text)</h3><div class="src" id="src-2-0"><span class="prov">AAPL-10K-FY2024 · chars 140236–140258</span>Term debt <mark>10,912</mark> 9,822</div><div class="src" id="src-2-1"><span class="prov">AAPL-10K-FY2024 · chars 140332–140355</span>Term debt <mark>85,750</mark> 95,281</div></div></div></section><section class="card"><p class="q">What was the total compensation of Apple&#x27;s CEO in fiscal 2024?</p><span class="badge abstain">abstain</span><div class="cols"><div class="pane"><h3>Answer</h3><p class="reason">check_support → insufficient: executive compensation is disclosed in the DEF 14A proxy, not the 10-K. No span cleared the relevance floor.</p></div><div class="pane"><h3>Source (canonical text)</h3><p class="reason">Closest spans it did find (shown to prove it looked):</p><div class="src"><span class="prov">AAPL-10K-FY2024 · chars 145288–145906 · score 8.4</span>The Company’s fiscal year is the 52- or 53-week period that ends on the last Saturday of September. An additional week is included in the first fiscal quarter every five or six years to realign the Company’s fiscal quarters with calendar quarters, which occurred in the first fiscal quarter of 2023. The Company’s fiscal years 2024 and 2022 spanned 52 weeks each, whereas fiscal year 2023 spanned 53 weeks. Unless otherwise stated, references to particular years, quarters, months and periods refer to the Company’s fiscal years ended in September and the associated quarters, months and periods of those fiscal years.</div><div class="src"><span class="prov">AAPL-10K-FY2024 · chars 118682–119081 · score 8.1</span>The Company’s fiscal year is the 52- or 53-week period that ends on the last Saturday of September. An additional week is included in the first fiscal quarter every five or six years to realign the Company’s fiscal quarters with calendar quarters, which occurred in the first quarter of 2023. The Company’s fiscal years 2024 and 2022 spanned 52 weeks each, whereas fiscal year 2023 spanned 53 weeks.</div><div class="src"><span class="prov">AAPL-10K-FY2024 · chars 118667–118680 · score 8.0</span>Fiscal Period</div></div></div></section><section class="card"><p class="q">What were Apple&#x27;s total assets as of December 28, 2024?</p><span class="badge abstain">abstain</span><div class="cols"><div class="pane"><h3>Answer</h3><p class="reason">The requested date (December 28, 2024) is outside this filing&#x27;s coverage (FY2024 ended September 28, 2024). The September figure is NOT the answer.</p></div><div class="pane"><h3>Source (canonical text)</h3><p class="reason">Closest spans it did find (shown to prove it looked):</p><div class="src"><span class="prov">AAPL-10K-FY2024 · chars 139998–140030 · score 21.6</span>Total assets $ 364,980 $ 352,583</div><div class="src"><span class="prov">AAPL-10K-FY2024 · chars 139763–139799 · score 10.1</span>Total current assets 152,987 143,566</div></div></div></section><section class="card"><p class="q">Why did Apple&#x27;s total assets decline in fiscal 2024?</p><span class="badge reject">reject</span><div class="cols"><div class="pane"><h3>Answer</h3><p class="reason">The premise is false: total assets rose, they did not decline.</p><p>Total assets increased from $352,583M (FY2023) to $364,980M (FY2024).</p></div><div class="pane"><h3>Source (canonical text)</h3><p class="reason">Closest spans it did find (shown to prove it looked):</p><div class="src"><span class="prov">AAPL-10K-FY2024 · chars 139998–140030 · score 21.6</span>Total assets $ 364,980 $ 352,583</div></div></div></section><p class="foot">Deterministic, server-less render of verified interactions (ROADMAP M2-T7 / D8). Source is the normalized canonical text ATTEST hashes and cites.</p><script>
+document.querySelectorAll('.chip[data-target]').forEach(c => {
+  c.addEventListener('click', () => {
+    const el = document.getElementById(c.dataset.target);
+    if (!el) return;
+    document.querySelectorAll('.src.flash').forEach(s => s.classList.remove('flash'));
+    el.classList.add('flash');
+    el.scrollIntoView({behavior:'smooth', block:'center'});
+  });
+});
+</script></body></html>
