@@ -1,17 +1,13 @@
-"""render_evidence_view — server-less two-pane evidence GUI (ROADMAP M2-T7, D8).
+"""render_evidence_view — parallel evidence GUI (ROADMAP M2-T7 / D8).
 
-Turns verified interactions into a single self-contained HTML page: the answer on
-the right, its source spans on the left, click-to-source highlights between them.
-Abstentions show the refusal plus the closest spans found. Read-only (I4) and
-deterministic — given the same interactions + store, the same bytes out.
+A self-contained HTML page: the **full canonical document** on the left with every
+cited range highlighted *in place*, and the interactions on the right. Click a
+figure in an answer (or a closest-span in an abstention) and the document pane
+scrolls to its highlight. Read-only (I4), deterministic, no server.
 
-This is the static precursor to the M5 React app. It renders the *normalized
-canonical text* (the hashed, cited text), not the original filing HTML — the thing
-ATTEST actually verifies (D8). The hyperlinks are generated from verified bindings,
-never hand-authored: a claim links to a span only if `verify` resolved it.
-
-The human reviewer's job here is the one thing v1 doesn't gate: click a claim,
-read its span, and judge whether it actually *supports* the claim (entailment).
+It renders the *normalized canonical text* ATTEST hashes and cites (D8) — so what
+you review is exactly what the system verifies. Your job is the un-gated one:
+does the highlighted span actually support the claim (entailment)?
 """
 
 from __future__ import annotations
@@ -34,8 +30,8 @@ class Interaction:
     reason: str = ""
     closest: list[Hit] = field(default_factory=list)
     note: str = ""
-    trace: str = ""  # the deterministic decision basis (scores / threshold / verdicts)
-    frame: QuestionFrame | None = None  # question constraints to cover (D13)
+    trace: str = ""
+    frame: QuestionFrame | None = None
 
 
 _CSS = """
@@ -45,161 +41,126 @@ _CSS = """
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--ink);
   font:15px/1.55 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-header { padding:20px 28px; border-bottom:1px solid var(--line); }
+header { padding:16px 24px; border-bottom:1px solid var(--line); }
 header h1 { margin:0 0 4px; font-size:18px; }
 header p { margin:0; color:var(--muted); font-size:13px; }
-.card { border-bottom:1px solid var(--line); padding:22px 28px; }
+header a { color:var(--chipb); }
+.layout { display:grid; grid-template-columns:1fr 1fr; gap:0; }
+@media (max-width:860px){ .layout{ grid-template-columns:1fr; }
+  .doc{ position:static!important; height:60vh!important; } }
+.doc { position:sticky; top:0; height:100vh; overflow:auto; border-right:1px solid var(--line);
+  padding:14px 18px; background:#0c0e12; }
+.doc h3, .cards-h { font-size:11px; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--muted); margin:0 0 8px; }
+.docbody { white-space:pre-wrap; word-break:break-word; font-size:12px; line-height:1.5;
+  font-family:ui-monospace,Menlo,monospace; color:#c6ccd8; margin:0; }
+.cards { overflow:auto; }
+.card { border-bottom:1px solid var(--line); padding:18px 24px; }
 .q { font-weight:600; margin:0 0 2px; }
 .badge { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.04em;
-  padding:2px 8px; border-radius:999px; text-transform:uppercase; margin-bottom:12px; }
+  padding:2px 8px; border-radius:999px; text-transform:uppercase; margin-bottom:10px; }
 .badge.answer { background:#11331c; color:var(--ok); }
 .badge.abstain, .badge.reject, .badge.partial { background:#3a1d1d; color:var(--bad); }
-.cols { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
-@media (max-width:760px){ .cols{ grid-template-columns:1fr; } }
-.pane h3 { font-size:11px; text-transform:uppercase; letter-spacing:.06em;
-  color:var(--muted); margin:0 0 8px; }
 .answer-text { background:var(--panel); border:1px solid var(--line); border-radius:8px;
-  padding:14px 16px; }
-.src { background:var(--panel); border:1px solid var(--line); border-radius:8px;
-  padding:10px 12px; margin-bottom:8px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-  font-size:13px; white-space:pre-wrap; transition:background .15s,border-color .15s; }
-.src .prov { display:block; font-family:inherit; color:var(--muted); font-size:11px;
-  margin-bottom:4px; }
-.src.flash { background:#1d2740; border-color:var(--chipb); }
-mark { background:var(--mark); color:var(--markb); border-radius:3px; padding:0 2px;
-  font-weight:600; }
+  padding:12px 14px; }
+.reason { color:var(--muted); margin:0 0 8px; }
+mark { background:var(--mark); color:var(--markb); border-radius:3px; padding:0 1px;
+  font-weight:600; scroll-margin-top:14px; }
+mark.flash { background:#1d2740; color:#cfe0ff; outline:1px solid var(--chipb); }
 .chip { background:var(--chip); border:1px solid var(--chipb); color:var(--ink);
   border-radius:4px; padding:0 4px; cursor:pointer; font-weight:600; }
 .chip.derived { background:#2a1f3a; border-color:#a371f7; }
-.chip.bad { background:#3a1d1d; border-color:var(--bad); }
-.reason { color:var(--muted); margin:0 0 10px; }
-.trace { color:var(--muted); font-size:12px; margin:12px 0 0;
-  font-family:ui-monospace,Menlo,monospace; }
-.trace b { color:var(--ink); font-weight:600; }
+.closest { font-family:ui-monospace,Menlo,monospace; font-size:12px; margin:6px 0 0; }
+.closest a { color:var(--chipb); cursor:pointer; text-decoration:none; }
+.vstatus { font-size:12px; margin-top:8px; }
+.vstatus.ok{ color:var(--ok); } .vstatus.bad{ color:var(--bad); }
 .cover { font-size:12px; margin:6px 0 0; display:flex; flex-wrap:wrap; gap:6px; }
 .cover span { border-radius:4px; padding:0 6px; border:1px solid var(--line); }
 .cov-ok { color:var(--ok); } .cov-bad { color:var(--bad); border-color:var(--bad)!important; }
-header a { color:var(--chipb); }
-.foot { padding:14px 28px; color:var(--muted); font-size:12px; }
-.vstatus { font-size:12px; margin-top:8px; }
-.vstatus.ok { color:var(--ok); } .vstatus.bad { color:var(--bad); }
+.trace { color:var(--muted); font-size:12px; margin:10px 0 0;
+  font-family:ui-monospace,Menlo,monospace; }
+.trace b { color:var(--ink); font-weight:600; }
 """
 
 _JS = """
-document.querySelectorAll('.chip[data-target]').forEach(c => {
-  c.addEventListener('click', () => {
-    const el = document.getElementById(c.dataset.target);
-    if (!el) return;
-    document.querySelectorAll('.src.flash').forEach(s => s.classList.remove('flash'));
-    el.classList.add('flash');
-    el.scrollIntoView({behavior:'smooth', block:'center'});
-  });
+function jump(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  document.querySelectorAll('mark.flash').forEach(m=>m.classList.remove('flash'));
+  el.classList.add('flash');
+  el.scrollIntoView({behavior:'smooth', block:'center'});
+}
+document.querySelectorAll('[data-target]').forEach(c=>{
+  c.addEventListener('click', ()=>jump(c.dataset.target));
+});
+window.addEventListener('load', ()=>{
+  const first = document.querySelector('.doc mark');
+  if(first){ const d=document.querySelector('.doc'); d.scrollTop = first.offsetTop - 120; }
 });
 """
+
+Range = tuple[str, int, int]  # (doc_id, char_start, char_end)
 
 
 def _esc(s: str) -> str:
     return html.escape(s, quote=True)
 
 
-def _source_links(store: SpanStore) -> str:
-    """Header line linking each corpus document: the original SEC filing + the
-    canonical text ATTEST actually cites (a reviewer asked for the doc to be linked)."""
-    parts = []
-    for doc_id, doc in store._docs.items():
-        m = doc.metadata
-        label = f"{m.get('company', doc_id)} {m.get('form', '')}".strip()
-        canon = f"corpus/store/{doc_id}/canonical.txt"
-        bits = [f"<b>{_esc(label)}</b>"]
-        if m.get("primary_url"):
-            url = _esc(m["primary_url"])
-            bits.append(f'<a href="{url}" target="_blank" rel="noopener">SEC filing ↗</a>')
-        bits.append(f'<a href="{_esc(canon)}">canonical text</a>')
-        parts.append(" · ".join(bits))
-    return "Source: " + " &nbsp;|&nbsp; ".join(parts)
+def _gather_ranges(interactions: list[Interaction]) -> list[Range]:
+    ranges: set[Range] = set()
+    for inter in interactions:
+        if inter.kind == "answer" and inter.answer is not None:
+            for s in inter.answer.sentences:
+                for a in s.atoms:
+                    ranges.add((a.doc_id, a.char_start, a.char_end))
+                for d in s.derived:
+                    for o in d.operands:
+                        ranges.add((o.doc_id, o.char_start, o.char_end))
+        for h in inter.closest:
+            ranges.add((h.span.doc_id, h.span.char_start, h.span.char_end))
+    return sorted(ranges)
 
 
-def _highlight(span_text: str, span_start: int, marks: list[tuple[int, int]]) -> str:
-    """Wrap atom ranges (absolute offsets) inside a span's text with <mark>."""
-    rel = sorted((s - span_start, e - span_start) for s, e in marks)
+def _merge(ranges: list[Range]) -> dict[str, list[tuple[int, int, str]]]:
+    """Merge overlapping ranges per doc → [(start, end, mark_id)], non-overlapping."""
+    by_doc: dict[str, list[tuple[int, int]]] = {}
+    for doc_id, s, e in ranges:
+        by_doc.setdefault(doc_id, []).append((s, e))
+    merged: dict[str, list[tuple[int, int, str]]] = {}
+    for di, (doc_id, spans) in enumerate(sorted(by_doc.items())):
+        out: list[tuple[int, int, str]] = []
+        for s, e in sorted(spans):
+            if out and s <= out[-1][1]:
+                ps, pe, mid = out[-1]
+                out[-1] = (ps, max(pe, e), mid)
+            else:
+                out.append((s, e, f"m{di}_{len(out)}"))
+        merged[doc_id] = out
+    return merged
+
+
+def _mark_id(merged: dict[str, list[tuple[int, int, str]]], r: Range) -> str:
+    doc_id, s, _e = r
+    for ms, me, mid in merged.get(doc_id, []):
+        if ms <= s < me:
+            return mid
+    return ""
+
+
+def _doc_pane(store: SpanStore, doc_id: str, merged: list[tuple[int, int, str]], label: str) -> str:
+    text = store.get_document(doc_id)
     out, cursor = [], 0
-    for s, e in rel:
+    for s, e, mid in merged:
         s, e = max(s, cursor), max(e, cursor)
-        out.append(_esc(span_text[cursor:s]))
-        out.append(f"<mark>{_esc(span_text[s:e])}</mark>")
+        out.append(_esc(text[cursor:s]))
+        out.append(f'<mark id="{mid}">{_esc(text[s:e])}</mark>')
         cursor = e
-    out.append(_esc(span_text[cursor:]))
-    return "".join(out)
-
-
-def _render_answer(inter: Interaction, store: SpanStore, idx: int) -> tuple[str, str]:
-    """Return (right-pane answer HTML, left-pane source HTML) for an answered interaction."""
-    # Collect every bound atom (direct + derived operands) → its enclosing span.
-    bindings = []
-    for s in inter.answer.sentences:
-        bindings += [(a, False) for a in s.atoms]
-        bindings += [(o, True) for d in s.derived for o in d.operands]
-
-    span_dom: dict[str, str] = {}      # enclosing span_id → dom id
-    span_marks: dict[str, tuple] = {}  # span_id → (Span, [ranges])
-    chip_target: dict[tuple, str] = {} # (literal, char_start) → dom id
-    for atom, _is_op in bindings:
-        sp = store.span_containing(atom.doc_id, atom.char_start)
-        if not sp:
-            continue
-        dom = span_dom.setdefault(sp.span_id, f"src-{idx}-{len(span_dom)}")
-        span, ranges = span_marks.setdefault(sp.span_id, (sp, []))
-        ranges.append((atom.char_start, atom.char_end))
-        chip_target[(atom.text, atom.char_start)] = dom
-
-    # Left pane: each enclosing span, atoms highlighted, with provenance.
-    left = []
-    for span_id, (sp, ranges) in span_marks.items():
-        text = store.get_span(sp.doc_id, sp.char_start, sp.char_end)
-        body = _highlight(text, sp.char_start, ranges)
-        prov = f"{sp.doc_id} · chars {sp.char_start}–{sp.char_end}"
-        left.append(
-            f'<div class="src" id="{span_dom[span_id]}">'
-            f'<span class="prov">{prov}</span>{body}</div>'
-        )
-
-    # Right pane: answer text with each atom literal turned into a click-to-source chip.
-    ok = inter.verify.ok if inter.verify else False
-    right = []
-    for s in inter.answer.sentences:
-        text = s.text
-        chips: list[tuple[str, str, str]] = []  # (literal, cls, target)
-        for a in s.atoms:
-            tgt = chip_target.get((a.text, a.char_start), "")
-            chips.append((a.text, "chip", tgt))
-        for d in s.derived:
-            chips.append((d.text, "chip derived", ""))
-            for o in d.operands:
-                chips.append((o.text, "chip", chip_target.get((o.text, o.char_start), "")))
-        right.append(_chip_sentence(text, chips))
-    vclass = "ok" if ok else "bad"
-    vtext = "✓ verify: every figure resolves to a cited span" if ok else \
-        f"✗ verify: unbound — {', '.join(inter.verify.unbound()) if inter.verify else '?'}"
-    cover_html = ""
-    if inter.frame is not None:
-        cov = check_coverage(inter.frame, [sp.text for sp, _ in span_marks.values()])
-        bits = [f'<span class="cov-ok">{_esc(c.role)} ✓ {_esc(c.text)}</span>' for c in cov.covered]
-        bits += [
-            f'<span class="cov-bad">{_esc(c.role)} ✗ {_esc(c.text)}</span>' for c in cov.missing
-        ]
-        head = "✓ question coverage" if cov.complete else "✗ question coverage — incomplete"
-        hcls = "ok" if cov.complete else "bad"
-        strip = " · ".join(bits)
-        cover_html = f'<div class="vstatus {hcls}">{head}</div><p class="cover">{strip}</p>'
-    answer_html = (
-        f'<div class="answer-text">{" ".join(right)}</div>'
-        f'<div class="vstatus {vclass}">{vtext}</div>{cover_html}'
-    )
-    return answer_html, "".join(left)
+    out.append(_esc(text[cursor:]))
+    body = "".join(out)
+    return f'<aside class="doc"><h3>{_esc(label)}</h3><div class="docbody">{body}</div></aside>'
 
 
 def _chip_sentence(text: str, chips: list[tuple[str, str, str]]) -> str:
-    """Escape sentence text, then swap each literal for a chip (first occurrence)."""
     placeholders: dict[str, str] = {}
     for i, (literal, cls, target) in enumerate(chips):
         token = f"\x00{i}\x00"
@@ -213,55 +174,103 @@ def _chip_sentence(text: str, chips: list[tuple[str, str, str]]) -> str:
     return f"<p>{out}</p>"
 
 
-def _render_abstain(inter: Interaction) -> tuple[str, str]:
-    right = f'<p class="reason">{_esc(inter.reason)}</p>'
-    if inter.kind in ("reject", "partial") and inter.note:
-        right += f"<p>{_esc(inter.note)}</p>"
-    left = []
+def _answer_card(inter: Interaction, store: SpanStore, mid_of) -> str:
+    right = []
+    cited_texts = []
+    for s in inter.answer.sentences:
+        chips: list[tuple[str, str, str]] = []
+        for a in s.atoms:
+            chips.append((a.text, "chip", mid_of((a.doc_id, a.char_start, a.char_end))))
+            sp = store.span_containing(a.doc_id, a.char_start)
+            if sp:
+                cited_texts.append(sp.text)
+        for d in s.derived:
+            chips.append((d.text, "chip derived", ""))
+            for o in d.operands:
+                chips.append((o.text, "chip", mid_of((o.doc_id, o.char_start, o.char_end))))
+                sp = store.span_containing(o.doc_id, o.char_start)
+                if sp:
+                    cited_texts.append(sp.text)
+        right.append(_chip_sentence(s.text, chips))
+
+    ok = inter.verify.ok if inter.verify else False
+    vtext = "✓ verify: every figure resolves to a cited span" if ok else \
+        f"✗ verify: unbound — {', '.join(inter.verify.unbound()) if inter.verify else '?'}"
+    parts = [f'<div class="answer-text">{" ".join(right)}</div>',
+             f'<div class="vstatus {"ok" if ok else "bad"}">{vtext}</div>']
+    if inter.frame is not None:
+        cov = check_coverage(inter.frame, cited_texts)
+        bits = [f'<span class="cov-ok">{_esc(c.role)} ✓ {_esc(c.text)}</span>' for c in cov.covered]
+        bits += [
+            f'<span class="cov-bad">{_esc(c.role)} ✗ {_esc(c.text)}</span>' for c in cov.missing
+        ]
+        head = "✓ question coverage" if cov.complete else "✗ question coverage — incomplete"
+        parts.append(f'<div class="vstatus {"ok" if cov.complete else "bad"}">{head}</div>')
+        parts.append(f'<p class="cover">{" · ".join(bits)}</p>')
+    return "".join(parts)
+
+
+def _abstain_card(inter: Interaction, mid_of) -> str:
+    parts = [f'<p class="reason">{_esc(inter.reason)}</p>']
+    if inter.note:
+        parts.append(f"<p>{_esc(inter.note)}</p>")
     for h in inter.closest:
-        sp = h.span
-        prov = f"{sp.doc_id} · chars {sp.char_start}–{sp.char_end} · score {h.score:.1f}"
-        left.append(
-            f'<div class="src"><span class="prov">{prov}</span>{_esc(sp.text)}</div>'
-        )
-    label = "Closest spans it did find (shown to prove it looked):" if left else ""
-    left_html = (f'<p class="reason">{label}</p>' + "".join(left)) if left else \
-        '<p class="reason">No span cleared the relevance floor.</p>'
-    return right, left_html
+        mid = mid_of((h.span.doc_id, h.span.char_start, h.span.char_end))
+        link = f'<a data-target="{mid}">{_esc(h.span.text)}</a>' if mid else _esc(h.span.text)
+        score = f'<span style="color:#8b93a3">(score {h.score:.0f})</span>'
+        parts.append(f'<p class="closest">▸ {link} {score}</p>')
+    return "".join(parts)
 
 
 def render_evidence_view(
     interactions: list[Interaction], store: SpanStore, *, title: str = "ATTEST — evidence view"
 ) -> str:
+    merged = _merge(_gather_ranges(interactions))
+
+    def mid_of(r: Range) -> str:
+        return _mark_id(merged, r)
+
+    # Document pane(s): one per doc that has any citation (else the first doc in the store).
+    doc_ids = list(merged) or list(store._docs)[:1]
+    panes = []
+    for doc_id in doc_ids:
+        m = store._docs[doc_id].metadata
+        label = f"{m.get('company', doc_id)} {m.get('form', '')}".strip() + " — canonical text"
+        panes.append(_doc_pane(store, doc_id, merged.get(doc_id, []), label))
+
     cards = []
-    for idx, inter in enumerate(interactions):
-        if inter.kind == "answer" and inter.answer is not None:
-            right, left = _render_answer(inter, store, idx)
-        else:
-            right, left = _render_abstain(inter)
-        show_note = inter.note and inter.kind == "answer"
-        note = f'<p class="reason">{_esc(inter.note)}</p>' if show_note else ""
+    for inter in interactions:
+        body = _answer_card(inter, store, mid_of) if (
+            inter.kind == "answer" and inter.answer is not None
+        ) else _abstain_card(inter, mid_of)
         trace = f'<p class="trace"><b>decision</b> · {_esc(inter.trace)}</p>' if inter.trace else ""
         cards.append(
             f'<section class="card"><p class="q">{_esc(inter.question)}</p>'
-            f'<span class="badge {inter.kind}">{inter.kind}</span>{note}'
-            f'<div class="cols">'
-            f'<div class="pane"><h3>Answer</h3>{right}</div>'
-            f'<div class="pane"><h3>Source (canonical text)</h3>{left}</div>'
-            f'</div>{trace}</section>'
+            f'<span class="badge {inter.kind}">{inter.kind}</span>{body}{trace}</section>'
         )
+
     return (
         "<!doctype html><html lang=en><head><meta charset=utf-8>"
         '<meta name=viewport content="width=device-width,initial-scale=1">'
         f"<title>{_esc(title)}</title><style>{_CSS}</style></head><body>"
-        f"<header><h1>{_esc(title)}</h1>"
-        f"<p>{_source_links(store)}</p>"
-        "<p>Click a highlighted figure to jump to its verbatim source span. "
-        "Your review job: does the cited span actually support the claim? "
-        "(entailment — not gated in v1)</p>"
-        "</header>"
-        + "".join(cards)
-        + '<p class="foot">Deterministic, server-less render of verified interactions '
-        "(ROADMAP M2-T7 / D8). Source is the normalized canonical text ATTEST hashes and cites.</p>"
+        f"<header><h1>{_esc(title)}</h1><p>{_source_links(store)}</p>"
+        "<p>Click a highlighted figure (or a closest span) to jump to it in the document. "
+        "Your review: does the highlighted span actually support the claim? "
+        "(entailment — not gated in v1)</p></header>"
+        f'<div class="layout">{"".join(panes)}'
+        f'<main class="cards">{"".join(cards)}</main></div>'
         f"<script>{_JS}</script></body></html>"
     )
+
+
+def _source_links(store: SpanStore) -> str:
+    parts = []
+    for doc_id, doc in store._docs.items():
+        m = doc.metadata
+        label = f"{m.get('company', doc_id)} {m.get('form', '')}".strip()
+        bits = [f"<b>{_esc(label)}</b>"]
+        if m.get("primary_url"):
+            url = _esc(m["primary_url"])
+            bits.append(f'<a href="{url}" target="_blank" rel="noopener">SEC filing ↗</a>')
+        parts.append(" · ".join(bits))
+    return "Source: " + " &nbsp;|&nbsp; ".join(parts)

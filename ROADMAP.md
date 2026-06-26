@@ -12,9 +12,9 @@
 ### ▶ Current focus
 **M4 · M4-T2** — flesh out the tool contracts: add `verify(answer_with_tags)` + per-tool input schemas + contract tests (brief §5). **M4-T1 scaffold `DONE`** (registry + CLI + MCP adapter). Layer-0 gate green (72 evals).
 
-> **Offered:** the **parallel full-document view** (whole canonical doc, cited
-> spans highlighted in situ, scroll-to-on-click) is an upgrade to the static
-> evidence view — buildable now, not blocked by M4; say the word to slot it next.
+> **Done:** the evidence view is now a **parallel full-document view** — the whole
+> canonical document on the left with cited ranges highlighted in place, click a
+> figure to scroll to it. `python scripts/build_evidence_view.py` → `evidence_view.html`.
 
 > **Deferred, with a dependency:** **M2-T6 (Layer-E)** drives the *real agent* over
 > the tools, which needs the **MCP interface from M4** — so it lands around **M4-T4**
@@ -213,6 +213,7 @@ API-wrapped service with **inline entailment-gating** (the structural-intercepti
 - 2026-06-24 · M0-T4 · Audition rig `attest_rig.py` clears the M0 gate (precision/recall/correctness 100%, hallucination 0%, abstention 100%). Standing gate test added. **M0 DONE** — advancing to M1.
 - 2026-06-24 · — · Added `demo.py` (guided M0 walkthrough) + README "See it run".
 - 2026-06-24 · — · D9: atom-resolver contract for `verify`/`check_claim` (agent supplies located atoms; fixed resolver checks exact literal at offset + hash + scope; independent re-extraction; derived-value operands). Open contingencies tracked under M2-T1; brief §5 updated.
+- 2026-06-26 · M2-T7+ · Evidence view upgraded to a **parallel full-document view**: whole canonical doc on the left with cited ranges marked in situ (overlap-merged), interactions on the right, click-to-scroll; auto-scrolls to the first highlight. `tests/test_evidence_view.py` updated.
 - 2026-06-26 · M4-T1 · MCP server + CLI scaffold: shared `attest.tools` registry; `python -m attest` / `attest` CLI; guarded `mcp_server.build_server` (optional `mcp` dep). `tests/test_tools.py`; 72 evals green.
 - 2026-06-26 · M3 · **Audit log DONE.** M3-T1 tamper-evident append-only hash-chain log (`attest.audit`); M3-T2 byte-identical replay (`attest.session`); M3-T3 I4 read/write-asymmetry test. Layer-0 gate's I4/I5 rows filled. 64 evals green. Focus → M4 (Layer-E/M2-T6 + M2-T8 finish around M4 when the agent drives the tools).
 - 2026-06-26 · M2-T8 (first cut) · D13 question-frame + constraint coverage: `attest.frame` (`check_coverage`, deterministic) + tests; evidence view shows a question-coverage strip incl. a *naive-citation* card where verify ✓ but coverage ✗ (wrong metric, real figure). Live-agent frame emission + verify-gate integration remain (M4).

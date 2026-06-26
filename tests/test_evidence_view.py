@@ -1,8 +1,8 @@
-"""Standing tests for the evidence-view renderer (ROADMAP M2-T7, D8).
+"""Standing tests for the parallel evidence view (ROADMAP M2-T7, D8).
 
-AC: a cited claim hyperlinks to its exact highlighted span; an unbound claim is
-shown flagged (never silently linked); the render is deterministic and
-self-contained (no server/network).
+The full canonical document renders on the left with cited ranges marked; a
+cited claim links (data-target) to a real mark id; unbound claims are flagged not
+linked; the render is deterministic and self-contained.
 """
 
 import re
@@ -40,13 +40,19 @@ def _clean(store) -> Interaction:
     return Interaction("Total assets?", "answer", answer=ans, verify=verify(ans, store))
 
 
-def test_cited_claim_links_to_its_highlighted_span(store):
+def test_full_document_renders_with_marked_citation(store):
     html = render_evidence_view([_clean(store)], store)
     assert html.startswith("<!doctype html")
-    assert "<mark>364,980</mark>" in html              # highlighted in the source pane
-    target = re.search(r'data-target="([^"]+)"', html)  # the clickable chip
+    assert 'class="docbody"' in html
+    assert len(html) > 100_000  # the whole canonical doc is in the pane
+    assert re.search(r'<mark id="[^"]+">364,980</mark>', html)  # cited figure highlighted in situ
+
+
+def test_cited_claim_links_to_a_real_mark(store):
+    html = render_evidence_view([_clean(store)], store)
+    target = re.search(r'data-target="([^"]+)"', html)
     assert target, "no click-to-source chip rendered"
-    assert f'id="{target.group(1)}"' in html            # ...points to a real span element
+    assert f'id="{target.group(1)}"' in html  # the chip points at a real mark
     assert "✓ verify" in html
 
 
@@ -55,7 +61,7 @@ def test_unbound_claim_is_flagged_not_linked(store):
     inter = Interaction("Total assets?", "answer", answer=ans, verify=verify(ans, store))
     html = render_evidence_view([inter], store)
     assert "✗ verify" in html and "999,999" in html
-    assert 'data-target=' not in html  # nothing to link — the figure is unbound
+    assert "data-target=" not in html  # nothing to link — the figure is unbound
 
 
 def test_abstention_shows_closest_spans(store):

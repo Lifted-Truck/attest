@@ -37,11 +37,13 @@ python attest_rig.py                 # the full 20-item gate: precision, halluci
 python scripts/build_evidence_view.py && open evidence_view.html   # the GUI
 ```
 
-`evidence_view.html` is a self-contained, server-less **evidence view** (ROADMAP
-M2-T7): grounded answers with **click-to-source** highlights into the verbatim
-canonical text, derived values, plural answers, and abstentions/false-premise
-rejection. Click a figure to jump to its source span — your review job is the one
-thing v1 doesn't gate: does the cited span actually *support* the claim?
+`evidence_view.html` is a self-contained, server-less **parallel evidence view**
+(ROADMAP M2-T7): the **full canonical document** on the left with every cited range
+highlighted in place, and the interactions on the right — grounded answers,
+derived values, plural answers, abstentions, false-premise rejection, and
+per-answer question-coverage. **Click a figure to scroll the document to its
+highlight.** Your review job is the one thing v1 doesn't gate: does the
+highlighted span actually *support* the claim?
 
 These scripts run with **plain `python` from the repo root — no install needed**
 (they put `src/` on the path themselves). For the dev loop (tests + lint) install
