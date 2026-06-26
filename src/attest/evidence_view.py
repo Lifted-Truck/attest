@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from .frame import QuestionFrame, check_coverage
 from .retrieval import Hit
 from .spans import SpanStore
-from .verify import Answer, VerifyResult
+from .verify import Answer, VerifyResult, equation
 
 
 @dataclass
@@ -81,6 +81,9 @@ mark.flash { background:#1d2740; color:#cfe0ff; outline:1px solid var(--chipb); 
 .cover { font-size:12px; margin:6px 0 0; display:flex; flex-wrap:wrap; gap:6px; }
 .cover span { border-radius:4px; padding:0 6px; border:1px solid var(--line); }
 .cov-ok { color:var(--ok); } .cov-bad { color:var(--bad); border-color:var(--bad)!important; }
+.deriv { font-family:ui-monospace,Menlo,monospace; font-size:12px; margin:6px 0 0; color:#c6ccd8; }
+.deriv .ok { color:var(--ok); } .deriv .bad { color:var(--bad); }
+.chip.derived { cursor:help; }
 .trace { color:var(--muted); font-size:12px; margin:10px 0 0;
   font-family:ui-monospace,Menlo,monospace; }
 .trace b { color:var(--ink); font-weight:600; }
@@ -196,14 +199,15 @@ def _doc_pane(store: SpanStore, doc_id: str, merged: list[tuple[int, int, str]],
     )
 
 
-def _chip_sentence(text: str, chips: list[tuple[str, str, str]]) -> str:
+def _chip_sentence(text: str, chips: list[tuple[str, str, str, str]]) -> str:
     placeholders: dict[str, str] = {}
-    for i, (literal, cls, target) in enumerate(chips):
+    for i, (literal, cls, target, title) in enumerate(chips):
         token = f"\x00{i}\x00"
         if literal in text and literal not in placeholders:
             text = text.replace(literal, token, 1)
             attr = f' data-target="{target}"' if target else ""
-            placeholders[token] = f'<span class="{cls}"{attr}>{_esc(literal)}</span>'
+            tip = f' title="{_esc(title)}"' if title else ""
+            placeholders[token] = f'<span class="{cls}"{attr}{tip}>{_esc(literal)}</span>'
     out = _esc(text)
     for token, chip in placeholders.items():
         out = out.replace(_esc(token), chip)
@@ -213,17 +217,21 @@ def _chip_sentence(text: str, chips: list[tuple[str, str, str]]) -> str:
 def _answer_card(inter: Interaction, store: SpanStore, mid_of) -> str:
     right = []
     cited_texts = []
-    for s in inter.answer.sentences:
-        chips: list[tuple[str, str, str]] = []
+    derivations = []  # (equation, ok) for the decision section
+    for si, s in enumerate(inter.answer.sentences):
+        oks = inter.verify.sentences[si].derived_ok if inter.verify else []
+        chips: list[tuple[str, str, str, str]] = []
         for a in s.atoms:
-            chips.append((a.text, "chip", mid_of((a.doc_id, a.char_start, a.char_end))))
+            chips.append((a.text, "chip", mid_of((a.doc_id, a.char_start, a.char_end)), ""))
             sp = store.span_containing(a.doc_id, a.char_start)
             if sp:
                 cited_texts.append(sp.text)
-        for d in s.derived:
-            chips.append((d.text, "chip derived", ""))
+        for di, d in enumerate(s.derived):
+            eq = equation(d)
+            chips.append((d.text, "chip derived", "", eq))  # eq shows on hover
+            derivations.append((eq, oks[di] if di < len(oks) else False))
             for o in d.operands:
-                chips.append((o.text, "chip", mid_of((o.doc_id, o.char_start, o.char_end))))
+                chips.append((o.text, "chip", mid_of((o.doc_id, o.char_start, o.char_end)), ""))
                 sp = store.span_containing(o.doc_id, o.char_start)
                 if sp:
                     cited_texts.append(sp.text)
@@ -234,6 +242,9 @@ def _answer_card(inter: Interaction, store: SpanStore, mid_of) -> str:
         f"✗ verify: unbound — {', '.join(inter.verify.unbound()) if inter.verify else '?'}"
     parts = [f'<div class="answer-text">{" ".join(right)}</div>',
              f'<div class="vstatus {"ok" if ok else "bad"}">{vtext}</div>']
+    for eq, deq_ok in derivations:
+        parts.append(f'<p class="deriv">ƒ {_esc(eq)} <span class="{"ok" if deq_ok else "bad"}">'
+                     f'{"✓ recomputed" if deq_ok else "✗ mismatch"}</span></p>')
     if inter.frame is not None:
         cov = check_coverage(inter.frame, cited_texts)
         bits = [f'<span class="cov-ok">{_esc(c.role)} ✓ {_esc(c.text)}</span>' for c in cov.covered]

@@ -79,7 +79,7 @@ def main() -> int:
         q2, "answer", answer=a2, verify=verify(a2, store),
         note="The $12,397M delta is recomputed from both operands, never cited as a fact.",
         trace=f"check_support top {top(q2):.0f} ≥ floor {THRESHOLD:.0f} → supported · "
-              f"verify: derived 364,980 − 352,583 = 12,397 recomputed from bound operands",
+              f"the delta is recomputed from bound operands (see derivation ƒ below)",
         frame=QuestionFrame(q2, [Constraint("metric", "Total assets")]),
     ))
 

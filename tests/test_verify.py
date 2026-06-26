@@ -113,6 +113,13 @@ def test_wrong_derived_value_is_flagged(store):
     assert not result.ok
 
 
+def test_equation_renders_the_derivation(store):
+    from attest.verify import DerivedAtom, equation
+    d = DerivedAtom("12,397", "subtract",
+                    [bind(store, "364,980", TOTAL_ASSETS), bind(store, "352,583", TOTAL_ASSETS)])
+    assert equation(d) == "364,980 − 352,583 = 12,397"
+
+
 COVER_PERIOD = "For the fiscal year ended September 28, 2024"
 
 

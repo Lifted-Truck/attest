@@ -82,6 +82,16 @@ class DerivedAtom:
     operands: list[AtomBinding]
 
 
+_OP_SYMBOL = {"subtract": " − ", "sum": " + "}
+
+
+def equation(d: DerivedAtom) -> str:
+    """Human-readable derivation, e.g. '364,980 − 352,583 = 12,397'."""
+    sym = _OP_SYMBOL.get(d.operation, f" {d.operation} ")
+    lhs = sym.join(o.text for o in d.operands)
+    return f"{lhs} = {d.text}"
+
+
 @dataclass(frozen=True)
 class Sentence:
     text: str

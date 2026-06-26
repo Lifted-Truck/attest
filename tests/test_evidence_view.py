@@ -73,6 +73,22 @@ def test_abstention_shows_closest_spans(store):
     assert "abstain" in html and "insufficient" in html
 
 
+def test_derived_value_shows_its_equation(store):
+    from attest.verify import DerivedAtom
+    sent = Sentence(
+        "Total assets rose by $12,397 million (from $352,583M to $364,980M).",
+        derived=[DerivedAtom("12,397", "subtract",
+                             [_bind(store, "364,980", TOTAL_ASSETS),
+                              _bind(store, "352,583", TOTAL_ASSETS)])],
+    )
+    ans = Answer([sent])
+    inter = Interaction("delta?", "answer", answer=ans, verify=verify(ans, store))
+    html = render_evidence_view([inter], store)
+    assert "364,980 − 352,583 = 12,397" in html       # shown in the decision section
+    assert 'title="364,980 − 352,583 = 12,397"' in html  # and on hover over the chip
+    assert "✓ recomputed" in html
+
+
 def test_render_is_deterministic(store):
     a = render_evidence_view([_clean(store)], store)
     b = render_evidence_view([_clean(store)], store)
