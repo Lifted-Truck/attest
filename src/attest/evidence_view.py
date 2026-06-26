@@ -19,6 +19,7 @@ from __future__ import annotations
 import html
 from dataclasses import dataclass, field
 
+from .frame import QuestionFrame, check_coverage
 from .retrieval import Hit
 from .spans import SpanStore
 from .verify import Answer, VerifyResult
@@ -34,6 +35,7 @@ class Interaction:
     closest: list[Hit] = field(default_factory=list)
     note: str = ""
     trace: str = ""  # the deterministic decision basis (scores / threshold / verdicts)
+    frame: QuestionFrame | None = None  # question constraints to cover (D13)
 
 
 _CSS = """
@@ -74,6 +76,9 @@ mark { background:var(--mark); color:var(--markb); border-radius:3px; padding:0 
 .trace { color:var(--muted); font-size:12px; margin:12px 0 0;
   font-family:ui-monospace,Menlo,monospace; }
 .trace b { color:var(--ink); font-weight:600; }
+.cover { font-size:12px; margin:6px 0 0; display:flex; flex-wrap:wrap; gap:6px; }
+.cover span { border-radius:4px; padding:0 6px; border:1px solid var(--line); }
+.cov-ok { color:var(--ok); } .cov-bad { color:var(--bad); border-color:var(--bad)!important; }
 header a { color:var(--chipb); }
 .foot { padding:14px 28px; color:var(--muted); font-size:12px; }
 .vstatus { font-size:12px; margin-top:8px; }
@@ -175,9 +180,20 @@ def _render_answer(inter: Interaction, store: SpanStore, idx: int) -> tuple[str,
     vclass = "ok" if ok else "bad"
     vtext = "✓ verify: every figure resolves to a cited span" if ok else \
         f"✗ verify: unbound — {', '.join(inter.verify.unbound()) if inter.verify else '?'}"
+    cover_html = ""
+    if inter.frame is not None:
+        cov = check_coverage(inter.frame, [sp.text for sp, _ in span_marks.values()])
+        bits = [f'<span class="cov-ok">{_esc(c.role)} ✓ {_esc(c.text)}</span>' for c in cov.covered]
+        bits += [
+            f'<span class="cov-bad">{_esc(c.role)} ✗ {_esc(c.text)}</span>' for c in cov.missing
+        ]
+        head = "✓ question coverage" if cov.complete else "✗ question coverage — incomplete"
+        hcls = "ok" if cov.complete else "bad"
+        strip = " · ".join(bits)
+        cover_html = f'<div class="vstatus {hcls}">{head}</div><p class="cover">{strip}</p>'
     answer_html = (
         f'<div class="answer-text">{" ".join(right)}</div>'
-        f'<div class="vstatus {vclass}">{vtext}</div>'
+        f'<div class="vstatus {vclass}">{vtext}</div>{cover_html}'
     )
     return answer_html, "".join(left)
 

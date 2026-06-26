@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from attest.evidence_view import Interaction, render_evidence_view
+from attest.frame import Constraint, QuestionFrame
 from attest.ingest import DocumentStore
 from attest.retrieval import Retriever
 from attest.spans import SpanStore
@@ -26,6 +27,7 @@ DOC = "AAPL-10K-FY2024"
 OUT = ROOT / "evidence_view.html"
 
 TOTAL_ASSETS = "Total assets $ 364,980 $ 352,583"
+LIAB_EQUITY = "Total liabilities and shareholders’ equity $ 364,980 $ 352,583"
 TERM_CUR = "Term debt 10,912 9,822"
 TERM_NON = "Term debt 85,750 95,281"
 COVER_PERIOD = "For the fiscal year ended September 28, 2024"
@@ -57,6 +59,11 @@ def main() -> int:
         note="The figure and the period ('as of …') are each bound to a span.",
         trace=f"check_support top {top(q1):.0f} ≥ floor {THRESHOLD:.0f} → supported · "
               f"verify: 2/2 atoms resolved (figure + date)",
+        frame=QuestionFrame(q1, [
+            Constraint("metric", "Total assets"),
+            Constraint("period", "September 28, 2024"),
+            Constraint("entity", "Apple", required=False),
+        ]),
     ))
 
     # 2. Derived answer — operands cited, the delta recomputed (not cited).
@@ -71,6 +78,7 @@ def main() -> int:
         note="The $12,397M delta is recomputed from both operands, never cited as a fact.",
         trace=f"check_support top {top(q2):.0f} ≥ floor {THRESHOLD:.0f} → supported · "
               f"verify: derived 364,980 − 352,583 = 12,397 recomputed from bound operands",
+        frame=QuestionFrame(q2, [Constraint("metric", "Total assets")]),
     ))
 
     # 3. Plural & ranked — both term-debt portions surfaced.
@@ -85,6 +93,24 @@ def main() -> int:
         note="One question, two valid figures — both surfaced and distinguished.",
         trace=f"check_support top {top(q3):.0f} ≥ floor {THRESHOLD:.0f} → supported · "
               f"two term-debt spans clear the floor (plural, ranked)",
+        frame=QuestionFrame(q3, [Constraint("metric", "term debt")]),
+    ))
+
+    # 3b. The point of D13: verify can PASS while coverage FAILS. This answer cites a
+    # span that really contains 364,980 — but it's the liabilities+equity total, not
+    # assets. The figure is real; the cited span doesn't establish the question's metric.
+    a_naive = Answer([Sentence(
+        "Apple's total assets were $364,980 million.",
+        atoms=[bind("364,980", LIAB_EQUITY)],
+    )])
+    interactions.append(Interaction(
+        "What were Apple's total assets? (naive citation)",
+        "answer", answer=a_naive, verify=verify(a_naive, store),
+        note="The figure $364,980 is real and resolves — but the cited line is "
+             "'Total liabilities and shareholders’ equity', not 'Total assets'.",
+        trace="verify ✓ (364,980 resolves) BUT coverage ✗ — the cited span does not "
+              "carry the question's metric. This is the gap D13 closes.",
+        frame=QuestionFrame("total assets?", [Constraint("metric", "Total assets")]),
     ))
 
     # 4. Abstain — content absent (deterministic, D12).
