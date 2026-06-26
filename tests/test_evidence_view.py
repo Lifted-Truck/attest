@@ -45,7 +45,20 @@ def test_full_document_renders_with_marked_citation(store):
     assert html.startswith("<!doctype html")
     assert 'class="docbody"' in html
     assert len(html) > 100_000  # the whole canonical doc is in the pane
-    assert re.search(r'<mark id="[^"]+">364,980</mark>', html)  # cited figure highlighted in situ
+    assert re.search(r'<mark class="fig" id="[^"]+">364,980</mark>', html)  # figure in situ
+
+
+def test_question_label_highlighted_near_figure(store):
+    """D13 visualized: the question's label term is highlighted beside the figure."""
+    from attest.frame import Constraint, QuestionFrame
+    ans = Answer([Sentence("Total assets were $364,980 million.",
+                           atoms=[_bind(store, "364,980", TOTAL_ASSETS)])])
+    frame = QuestionFrame("q", [Constraint("metric", "Total assets")])
+    inter = Interaction("Total assets?", "answer", answer=ans, verify=verify(ans, store),
+                        frame=frame)
+    html = render_evidence_view([inter], store)
+    assert re.search(r'<mark class="lbl"[^>]*>Total assets</mark>', html)  # label highlighted
+    assert re.search(r'<mark class="fig"[^>]*>364,980</mark>', html)       # figure highlighted
 
 
 def test_cited_claim_links_to_a_real_mark(store):

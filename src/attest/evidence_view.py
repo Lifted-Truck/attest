@@ -68,9 +68,11 @@ header a { color:var(--chipb); }
 .answer-text { background:var(--panel); border:1px solid var(--line); border-radius:8px;
   padding:12px 14px; }
 .reason { color:var(--muted); margin:0 0 8px; }
-mark { background:var(--mark); color:var(--markb); border-radius:3px; padding:0 1px;
-  font-weight:600; scroll-margin-top:14px; }
-mark.flash { background:#1d2740; color:#cfe0ff; outline:1px solid var(--chipb); }
+mark { border-radius:3px; padding:0 1px; scroll-margin-top:14px; }
+mark.fig { background:var(--mark); color:var(--markb); font-weight:600; }  /* figure */
+mark.lbl { background:#0e3a36; color:#5fe0c4; }  /* question label term */
+mark.cls { background:#23262e; color:#c6ccd8; }  /* abstention closest span */
+mark.flash { outline:2px solid var(--chipb); }
 .chip { background:var(--chip); border:1px solid var(--chipb); color:var(--ink);
   border-radius:4px; padding:0 4px; cursor:pointer; font-weight:600; }
 .chip.derived { background:#2a1f3a; border-color:#a371f7; }
@@ -106,50 +108,68 @@ window.addEventListener('load', ()=>{
 });
 """
 
-Range = tuple[str, int, int]  # (doc_id, char_start, char_end)
-
 
 def _esc(s: str) -> str:
     return html.escape(s, quote=True)
 
 
-def _gather_ranges(interactions: list[Interaction]) -> list[Range]:
-    ranges: set[Range] = set()
+# Highlight kinds (D13 substantiation made visual): the cited figure, the
+# question's label/constraint terms beside it, and abstention's closest spans.
+# When ranges overlap, the higher priority wins per character.
+_PRIORITY = {"figure": 3, "label": 2, "closest": 1}
+_KIND_CLASS = {"figure": "fig", "label": "lbl", "closest": "cls"}
+Segment = tuple[int, int, str, str]  # (start, end, kind, mark_id)
+
+
+def _gather(
+    interactions: list[Interaction], store: SpanStore
+) -> dict[str, list[tuple[int, int, str]]]:
+    raw: dict[str, list[tuple[int, int, str]]] = {}
+
+    def add(doc_id: str, s: int, e: int, kind: str) -> None:
+        raw.setdefault(doc_id, []).append((s, e, kind))
+
     for inter in interactions:
         if inter.kind == "answer" and inter.answer is not None:
-            for s in inter.answer.sentences:
-                for a in s.atoms:
-                    ranges.add((a.doc_id, a.char_start, a.char_end))
-                for d in s.derived:
-                    for o in d.operands:
-                        ranges.add((o.doc_id, o.char_start, o.char_end))
+            cons = inter.frame.constraints if inter.frame else []
+            for sent in inter.answer.sentences:
+                atoms = list(sent.atoms) + [o for d in sent.derived for o in d.operands]
+                for a in atoms:
+                    add(a.doc_id, a.char_start, a.char_end, "figure")
+                    sp = store.span_containing(a.doc_id, a.char_start)
+                    if sp is None:
+                        continue
+                    low = sp.text.lower()
+                    for c in cons:  # the question's label terms, beside the figure
+                        i = low.find(c.text.lower())
+                        if i != -1:
+                            start = sp.char_start + i
+                            add(sp.doc_id, start, start + len(c.text), "label")
         for h in inter.closest:
-            ranges.add((h.span.doc_id, h.span.char_start, h.span.char_end))
-    return sorted(ranges)
+            add(h.span.doc_id, h.span.char_start, h.span.char_end, "closest")
+    return raw
 
 
-def _merge(ranges: list[Range]) -> dict[str, list[tuple[int, int, str]]]:
-    """Merge overlapping ranges per doc → [(start, end, mark_id)], non-overlapping."""
-    by_doc: dict[str, list[tuple[int, int]]] = {}
-    for doc_id, s, e in ranges:
-        by_doc.setdefault(doc_id, []).append((s, e))
-    merged: dict[str, list[tuple[int, int, str]]] = {}
-    for di, (doc_id, spans) in enumerate(sorted(by_doc.items())):
-        out: list[tuple[int, int, str]] = []
-        for s, e in sorted(spans):
-            if out and s <= out[-1][1]:
-                ps, pe, mid = out[-1]
-                out[-1] = (ps, max(pe, e), mid)
-            else:
-                out.append((s, e, f"m{di}_{len(out)}"))
-        merged[doc_id] = out
-    return merged
+def _paint(ranges: list[tuple[int, int, str]]) -> list[Segment]:
+    """Resolve overlapping (start, end, kind) into non-overlapping segments; the
+    highest-priority kind wins each character. Adjacent same-kind runs merge."""
+    points = sorted({p for s, e, _ in ranges for p in (s, e)})
+    segs: list[tuple[int, int, str]] = []
+    for a, b in zip(points, points[1:], strict=False):
+        covering = [k for s, e, k in ranges if s <= a and e >= b]
+        if not covering:
+            continue
+        kind = max(covering, key=lambda k: _PRIORITY[k])
+        if segs and segs[-1][1] == a and segs[-1][2] == kind:
+            segs[-1] = (segs[-1][0], b, kind)
+        else:
+            segs.append((a, b, kind))
+    return [(s, e, k, f"m{i}") for i, (s, e, k) in enumerate(segs)]
 
 
-def _mark_id(merged: dict[str, list[tuple[int, int, str]]], r: Range) -> str:
-    doc_id, s, _e = r
-    for ms, me, mid in merged.get(doc_id, []):
-        if ms <= s < me:
+def _seg_id(painted: list[Segment], pos: int) -> str:
+    for s, e, _k, mid in painted:
+        if s <= pos < e:
             return mid
     return ""
 
@@ -172,19 +192,19 @@ def _classify(line: str) -> str:
     return "ln"
 
 
-def _doc_pane(store: SpanStore, doc_id: str, merged: list[tuple[int, int, str]], label: str) -> str:
+def _doc_pane(store: SpanStore, doc_id: str, painted: list[Segment], label: str) -> str:
     """Render the document line-by-line with light hierarchy; marks spliced in situ."""
     text = store.get_document(doc_id)
-    marks = sorted(merged)
+    marks = sorted(painted)
     lines, offset, mi = [], 0, 0
     for raw in text.split("\n"):
         line_end = offset + len(raw)
         segs, cursor = [], offset
         while mi < len(marks) and marks[mi][0] < line_end:
-            s, e, mid = marks[mi]
+            s, e, kind, mid = marks[mi]
             s, e = max(s, cursor), min(e, line_end)
             segs.append(_esc(text[cursor:s]))
-            segs.append(f'<mark id="{mid}">{_esc(text[s:e])}</mark>')
+            segs.append(f'<mark class="{_KIND_CLASS[kind]}" id="{mid}">{_esc(text[s:e])}</mark>')
             cursor = e
             mi += 1
         segs.append(_esc(text[cursor:line_end]))
@@ -214,7 +234,7 @@ def _chip_sentence(text: str, chips: list[tuple[str, str, str, str]]) -> str:
     return f"<p>{out}</p>"
 
 
-def _answer_card(inter: Interaction, store: SpanStore, mid_of) -> str:
+def _answer_card(inter: Interaction, store: SpanStore, seg_id) -> str:
     right = []
     cited_texts = []
     derivations = []  # (equation, ok) for the decision section
@@ -222,7 +242,7 @@ def _answer_card(inter: Interaction, store: SpanStore, mid_of) -> str:
         oks = inter.verify.sentences[si].derived_ok if inter.verify else []
         chips: list[tuple[str, str, str, str]] = []
         for a in s.atoms:
-            chips.append((a.text, "chip", mid_of((a.doc_id, a.char_start, a.char_end)), ""))
+            chips.append((a.text, "chip", seg_id(a.doc_id, a.char_start), ""))
             sp = store.span_containing(a.doc_id, a.char_start)
             if sp:
                 cited_texts.append(sp.text)
@@ -231,7 +251,7 @@ def _answer_card(inter: Interaction, store: SpanStore, mid_of) -> str:
             chips.append((d.text, "chip derived", "", eq))  # eq shows on hover
             derivations.append((eq, oks[di] if di < len(oks) else False))
             for o in d.operands:
-                chips.append((o.text, "chip", mid_of((o.doc_id, o.char_start, o.char_end)), ""))
+                chips.append((o.text, "chip", seg_id(o.doc_id, o.char_start), ""))
                 sp = store.span_containing(o.doc_id, o.char_start)
                 if sp:
                     cited_texts.append(sp.text)
@@ -257,12 +277,12 @@ def _answer_card(inter: Interaction, store: SpanStore, mid_of) -> str:
     return "".join(parts)
 
 
-def _abstain_card(inter: Interaction, mid_of) -> str:
+def _abstain_card(inter: Interaction, seg_id) -> str:
     parts = [f'<p class="reason">{_esc(inter.reason)}</p>']
     if inter.note:
         parts.append(f"<p>{_esc(inter.note)}</p>")
     for h in inter.closest:
-        mid = mid_of((h.span.doc_id, h.span.char_start, h.span.char_end))
+        mid = seg_id(h.span.doc_id, h.span.char_start)
         link = f'<a data-target="{mid}">{_esc(h.span.text)}</a>' if mid else _esc(h.span.text)
         score = f'<span style="color:#8b93a3">(score {h.score:.0f})</span>'
         parts.append(f'<p class="closest">▸ {link} {score}</p>')
@@ -272,24 +292,24 @@ def _abstain_card(inter: Interaction, mid_of) -> str:
 def render_evidence_view(
     interactions: list[Interaction], store: SpanStore, *, title: str = "ATTEST — evidence view"
 ) -> str:
-    merged = _merge(_gather_ranges(interactions))
+    painted = {doc_id: _paint(rs) for doc_id, rs in _gather(interactions, store).items()}
 
-    def mid_of(r: Range) -> str:
-        return _mark_id(merged, r)
+    def seg_id(doc_id: str, pos: int) -> str:
+        return _seg_id(painted.get(doc_id, []), pos)
 
     # Document pane(s): one per doc that has any citation (else the first doc in the store).
-    doc_ids = list(merged) or list(store._docs)[:1]
+    doc_ids = list(painted) or list(store._docs)[:1]
     panes = []
     for doc_id in doc_ids:
         m = store._docs[doc_id].metadata
         label = f"{m.get('company', doc_id)} {m.get('form', '')}".strip() + " — canonical text"
-        panes.append(_doc_pane(store, doc_id, merged.get(doc_id, []), label))
+        panes.append(_doc_pane(store, doc_id, painted.get(doc_id, []), label))
 
     cards = []
     for inter in interactions:
-        body = _answer_card(inter, store, mid_of) if (
+        body = _answer_card(inter, store, seg_id) if (
             inter.kind == "answer" and inter.answer is not None
-        ) else _abstain_card(inter, mid_of)
+        ) else _abstain_card(inter, seg_id)
         trace = f'<p class="trace"><b>decision</b> · {_esc(inter.trace)}</p>' if inter.trace else ""
         cards.append(
             f'<section class="card"><p class="q">{_esc(inter.question)}</p>'
