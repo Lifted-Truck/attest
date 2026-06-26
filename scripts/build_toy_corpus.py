@@ -22,6 +22,8 @@ import json
 import sys
 from pathlib import Path
 
+import _bootstrap  # noqa: F401  (puts src/ on sys.path)
+
 from attest.ingest.edgar import FILINGS, fetch_html, normalize
 
 ROOT = Path(__file__).resolve().parent.parent

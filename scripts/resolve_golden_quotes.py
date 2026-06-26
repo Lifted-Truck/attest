@@ -18,6 +18,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import _bootstrap  # noqa: F401  (puts src/ on sys.path)
+
 from attest.ingest import DocumentStore
 from attest.spans import SpanStore
 

@@ -43,6 +43,10 @@ canonical text, derived values, plural answers, and abstentions/false-premise
 rejection. Click a figure to jump to its source span — your review job is the one
 thing v1 doesn't gate: does the cited span actually *support* the claim?
 
+These scripts run with **plain `python` from the repo root — no install needed**
+(they put `src/` on the path themselves). For the dev loop (tests + lint) install
+the package: `pip install -e ".[dev]"`, then `pytest -m layer0`.
+
 The demo needs no install (pure standard library). It exercises the M0 audition
 rig — the deterministic evidence layer (retrieval → cite → verify → abstain). At
 M2+ the Claude Code agent drafts the prose, calling these same tools; the demo's

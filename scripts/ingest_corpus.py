@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import _bootstrap  # noqa: F401  (puts src/ on sys.path)
+
 from attest.ingest import DocumentStore
 from attest.ingest.edgar import FILINGS, ingest
 

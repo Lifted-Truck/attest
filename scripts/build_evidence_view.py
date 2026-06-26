@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import _bootstrap  # noqa: F401  (puts src/ on sys.path)
+
 from attest.evidence_view import Interaction, render_evidence_view
 from attest.frame import Constraint, QuestionFrame
 from attest.ingest import DocumentStore
