@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from attest.audit import AuditLog
 from attest.cli import main as cli_main
 from attest.tools import default_registry
 
@@ -26,10 +27,89 @@ def registry():
     return default_registry(STORE, audit_path=None)
 
 
+def _bind_total_assets(registry, literal: str = "364,980") -> dict:
+    """JSON atom binding a figure to its exact offset on the 'Total assets' line."""
+    start, end = TOTAL_ASSETS_SPAN
+    text = registry["get_span"].handler({"doc_id": DOC_ID, "start": start, "end": end})["text"]
+    off = start + text.index(literal)
+    return {"text": literal, "doc_id": DOC_ID, "char_start": off, "char_end": off + len(literal)}
+
+
 def test_expected_tools_are_enumerated(registry):
-    assert {"search_corpus", "get_span", "get_document", "check_support", "check_claim"} <= set(
-        registry
+    assert {
+        "search_corpus", "get_span", "get_document", "check_support", "check_claim", "verify"
+    } <= set(registry)
+
+
+def test_every_tool_advertises_an_object_schema(registry):
+    """The on-the-wire contract: each tool carries a JSON-Schema the MCP adapter serves."""
+    for tool in registry.values():
+        assert tool.input_schema["type"] == "object"
+        assert "properties" in tool.input_schema
+
+
+# --- M4-T2 contract tests: verify / check_claim / get_audit_log ---
+
+
+def test_verify_flags_an_unbound_claim(registry):
+    """(a) A figure asserted with no binding cannot pass verify through the tool."""
+    answer = {"sentences": [{"text": "Apple's total assets were $999,999 million.", "atoms": []}]}
+    out = registry["verify"].handler({"answer": answer})
+    assert out["ok"] is False
+    assert "999,999" in out["unbound"]
+
+
+def test_verify_passes_a_bound_claim(registry):
+    """A real binding round-trips JSON → Answer → verify and resolves ok (I1/I3)."""
+    answer = {
+        "sentences": [
+            {
+                "text": "Apple's total assets were $364,980 million.",
+                "atoms": [_bind_total_assets(registry)],
+            }
+        ]
+    }
+    out = registry["verify"].handler({"answer": answer})
+    assert out["ok"] is True
+    assert out["sentences"][0]["atoms"][0]["status"] == "ok"
+    assert not out["unbound"]
+
+
+def test_check_claim_resolves_to_spans_or_empty(registry):
+    """(b) A backed claim returns supporting spans; an unbacked one returns none."""
+    backed = registry["check_claim"].handler(
+        {"claim": "Apple's total assets were $364,980 million."}
     )
+    assert backed["status"] == "supported" and backed["supporting"]
+
+    unbacked = registry["check_claim"].handler({"claim": "Apple's customer churn rate is 4%."})
+    assert unbacked["status"] == "insufficient" and unbacked["supporting"] == []
+
+
+def test_get_audit_log_replays_without_side_effects(tmp_path):
+    """(c) Reading the log returns the entries and mutates nothing (I4/I5)."""
+    if not (STORE / DOC_ID).exists():
+        pytest.skip("corpus not ingested")
+    audit_path = tmp_path / "audit.jsonl"
+    log = AuditLog(audit_path)
+    log.append({"kind": "check_support", "query": "total assets", "status": "supported"})
+    log.append({"kind": "verify", "ok": True})
+
+    before = audit_path.read_bytes()
+    registry = default_registry(STORE, audit_path)
+
+    first = registry["get_audit_log"].handler({})
+    assert [e["seq"] for e in first["entries"]] == [0, 1]
+    assert first["entries"][0]["payload"]["query"] == "total assets"
+
+    # No side effects: the bytes are untouched, the chain still verifies, and a
+    # second read is byte-identical to the first (pure replay).
+    assert audit_path.read_bytes() == before
+    log.verify_chain()
+    assert registry["get_audit_log"].handler({}) == first
+
+    # offset is honoured (replay a suffix of the log).
+    assert [e["seq"] for e in registry["get_audit_log"].handler({"offset": 1})["entries"]] == [1]
 
 
 def test_search_corpus_returns_offsets(registry):

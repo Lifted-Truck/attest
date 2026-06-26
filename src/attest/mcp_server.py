@@ -31,7 +31,7 @@ def build_server(store_dir: Path | str = "corpus/store", audit_path: Path | str 
             types.Tool(
                 name=t.name,
                 description=t.description,
-                inputSchema={"type": "object"},  # per-tool schemas land at M4-T2
+                inputSchema=t.input_schema,  # per-tool contract (M4-T2)
             )
             for t in registry.values()
         ]
