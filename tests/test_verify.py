@@ -111,3 +111,30 @@ def test_wrong_derived_value_is_flagged(store):
     )
     result = verify(Answer([sent]), store)
     assert not result.ok
+
+
+COVER_PERIOD = "For the fiscal year ended September 28, 2024"
+
+
+def test_unbound_date_is_flagged(store):
+    """A period ('as of <date>') is load-bearing — an ungrounded date is flagged."""
+    sent = Sentence(
+        "Total assets as of September 28, 2024 were $364,980 million.",
+        atoms=[bind(store, "364,980", TOTAL_ASSETS)],  # figure bound, date is NOT
+    )
+    result = verify(Answer([sent]), store)
+    assert not result.ok
+    assert "September 28, 2024" in result.unbound()
+
+
+def test_bound_date_passes(store):
+    sent = Sentence(
+        "Total assets as of September 28, 2024 were $364,980 million.",
+        atoms=[
+            bind(store, "364,980", TOTAL_ASSETS),
+            bind(store, "September 28, 2024", COVER_PERIOD),
+        ],
+    )
+    result = verify(Answer([sent]), store)
+    assert result.ok
+    assert not result.unbound()

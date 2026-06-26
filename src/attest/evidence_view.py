@@ -33,6 +33,7 @@ class Interaction:
     reason: str = ""
     closest: list[Hit] = field(default_factory=list)
     note: str = ""
+    trace: str = ""  # the deterministic decision basis (scores / threshold / verdicts)
 
 
 _CSS = """
@@ -70,6 +71,10 @@ mark { background:var(--mark); color:var(--markb); border-radius:3px; padding:0 
 .chip.derived { background:#2a1f3a; border-color:#a371f7; }
 .chip.bad { background:#3a1d1d; border-color:var(--bad); }
 .reason { color:var(--muted); margin:0 0 10px; }
+.trace { color:var(--muted); font-size:12px; margin:12px 0 0;
+  font-family:ui-monospace,Menlo,monospace; }
+.trace b { color:var(--ink); font-weight:600; }
+header a { color:var(--chipb); }
 .foot { padding:14px 28px; color:var(--muted); font-size:12px; }
 .vstatus { font-size:12px; margin-top:8px; }
 .vstatus.ok { color:var(--ok); } .vstatus.bad { color:var(--bad); }
@@ -90,6 +95,23 @@ document.querySelectorAll('.chip[data-target]').forEach(c => {
 
 def _esc(s: str) -> str:
     return html.escape(s, quote=True)
+
+
+def _source_links(store: SpanStore) -> str:
+    """Header line linking each corpus document: the original SEC filing + the
+    canonical text ATTEST actually cites (a reviewer asked for the doc to be linked)."""
+    parts = []
+    for doc_id, doc in store._docs.items():
+        m = doc.metadata
+        label = f"{m.get('company', doc_id)} {m.get('form', '')}".strip()
+        canon = f"corpus/store/{doc_id}/canonical.txt"
+        bits = [f"<b>{_esc(label)}</b>"]
+        if m.get("primary_url"):
+            url = _esc(m["primary_url"])
+            bits.append(f'<a href="{url}" target="_blank" rel="noopener">SEC filing ↗</a>')
+        bits.append(f'<a href="{_esc(canon)}">canonical text</a>')
+        parts.append(" · ".join(bits))
+    return "Source: " + " &nbsp;|&nbsp; ".join(parts)
 
 
 def _highlight(span_text: str, span_start: int, marks: list[tuple[int, int]]) -> str:
@@ -203,19 +225,21 @@ def render_evidence_view(
             right, left = _render_abstain(inter)
         show_note = inter.note and inter.kind == "answer"
         note = f'<p class="reason">{_esc(inter.note)}</p>' if show_note else ""
+        trace = f'<p class="trace"><b>decision</b> · {_esc(inter.trace)}</p>' if inter.trace else ""
         cards.append(
             f'<section class="card"><p class="q">{_esc(inter.question)}</p>'
             f'<span class="badge {inter.kind}">{inter.kind}</span>{note}'
             f'<div class="cols">'
             f'<div class="pane"><h3>Answer</h3>{right}</div>'
             f'<div class="pane"><h3>Source (canonical text)</h3>{left}</div>'
-            f'</div></section>'
+            f'</div>{trace}</section>'
         )
     return (
         "<!doctype html><html lang=en><head><meta charset=utf-8>"
         '<meta name=viewport content="width=device-width,initial-scale=1">'
         f"<title>{_esc(title)}</title><style>{_CSS}</style></head><body>"
         f"<header><h1>{_esc(title)}</h1>"
+        f"<p>{_source_links(store)}</p>"
         "<p>Click a highlighted figure to jump to its verbatim source span. "
         "Your review job: does the cited span actually support the claim? "
         "(entailment — not gated in v1)</p>"

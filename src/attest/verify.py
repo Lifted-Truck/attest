@@ -27,13 +27,23 @@ from dataclasses import dataclass, field
 from .ingest.document import content_hash
 from .spans import SpanError, SpanStore
 
-# A load-bearing figure: comma-grouped number (optionally parenthesized-negative)
-# or a percentage. Lookarounds prevent matching inside a larger number ("100" in
-# "100,544"). Bare years / single integers are not *required* to be bound in v1
-# (dates & named entities are verified when bound; full independent extraction for
-# them is a documented gap → patent domain pack adds claim-term/numeral extractors).
+# Load-bearing atoms that MUST be bound (extending D9's taxonomy):
+#  - figures: comma-grouped numbers (optionally parenthesized-negative) or percentages.
+#    Lookarounds keep "100" from matching inside "100,544".
+#  - dates: "Month DD, YYYY" — the period a financial fact is "as of" is itself a
+#    claim and must be grounded (a reviewer caught an ungrounded "as of <date>").
+# Bare years / single integers and named entities remain not-independently-required
+# (verified when bound); the patent domain pack adds claim-term/numeral extractors.
 _FIGURE = re.compile(r"\(?\d{1,3}(?:,\d{3})+\)?|\b\d+(?:\.\d+)?%")
+_DATE = re.compile(r"\b[A-Z][a-z]+ \d{1,2}, \d{4}\b")
 _NUM = re.compile(r"-?\d+(?:\.\d+)?")
+
+
+def salient_tokens(text: str) -> set[str]:
+    """The load-bearing atoms in a string: figures (parens stripped) + full dates."""
+    toks = {m.group(0).strip("()") for m in _FIGURE.finditer(text)}
+    toks |= {m.group(0) for m in _DATE.finditer(text)}
+    return toks
 
 
 def numeric_core(text: str) -> str | None:
@@ -150,12 +160,16 @@ def verify(answer: Answer, store: SpanStore) -> VerifyResult:
             except ValueError:
                 derived_ok.append(False)
 
-        # Independent extraction: every figure in the prose must be covered.
-        covered = {numeric_core(a.text) for a in sent.atoms}
-        covered |= {numeric_core(d.text) for d in sent.derived}
-        covered |= {numeric_core(o.text) for d in sent.derived for o in d.operands}
-        detected = {m.group(0).strip("()") for m in _FIGURE.finditer(sent.text)}
-        unbound = sorted(detected - covered)
+        # Independent extraction: every load-bearing atom (figure or date) in the
+        # prose must be covered by a binding/derivation, or it is flagged unbound.
+        covered: set[str] = set()
+        for a in sent.atoms:
+            covered |= salient_tokens(a.text)
+        for d in sent.derived:
+            covered |= salient_tokens(d.text)
+            for o in d.operands:
+                covered |= salient_tokens(o.text)
+        unbound = sorted(salient_tokens(sent.text) - covered)
 
         ok = (
             all(v.status == "ok" for v in atom_verdicts)
