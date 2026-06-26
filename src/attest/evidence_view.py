@@ -13,6 +13,7 @@ does the highlighted span actually support the claim (entailment)?
 from __future__ import annotations
 
 import html
+import re
 from dataclasses import dataclass, field
 
 from .frame import QuestionFrame, check_coverage
@@ -52,8 +53,11 @@ header a { color:var(--chipb); }
   padding:14px 18px; background:#0c0e12; }
 .doc h3, .cards-h { font-size:11px; text-transform:uppercase; letter-spacing:.06em;
   color:var(--muted); margin:0 0 8px; }
-.docbody { white-space:pre-wrap; word-break:break-word; font-size:12px; line-height:1.5;
-  font-family:ui-monospace,Menlo,monospace; color:#c6ccd8; margin:0; }
+.docbody { font-size:12px; line-height:1.5; font-family:ui-monospace,Menlo,monospace; margin:0; }
+.docln { white-space:pre-wrap; word-break:break-word; color:#aab2c0; }
+.docln.h { color:var(--ink); font-weight:700; font-size:13px; margin-top:12px; }
+.docln.sub { color:#c6ccd8; font-weight:600; margin-top:4px; }
+.docln.blank { height:8px; }
 .cards { overflow:auto; }
 .card { border-bottom:1px solid var(--line); padding:18px 24px; }
 .q { font-weight:600; margin:0 0 2px; }
@@ -147,17 +151,49 @@ def _mark_id(merged: dict[str, list[tuple[int, int, str]]], r: Range) -> str:
     return ""
 
 
+_FIG = re.compile(r"\d{1,3}(?:,\d{3})+")
+
+
+def _classify(line: str) -> str:
+    """Light display hierarchy from a flat line (no canonical change)."""
+    s = line.strip()
+    if not s:
+        return "blank"
+    letters = [c for c in s if c.isalpha()]
+    if letters and s == s.upper() and len(s) <= 90:
+        return "h"  # ALL-CAPS heading (e.g. CONSOLIDATED BALANCE SHEETS, ASSETS:)
+    if re.match(r"(PART |Item |ITEM )", s):
+        return "h"
+    if s.endswith(":") and len(s) <= 60 and not _FIG.search(s):
+        return "sub"  # subsection (e.g. "Current assets:")
+    return "ln"
+
+
 def _doc_pane(store: SpanStore, doc_id: str, merged: list[tuple[int, int, str]], label: str) -> str:
+    """Render the document line-by-line with light hierarchy; marks spliced in situ."""
     text = store.get_document(doc_id)
-    out, cursor = [], 0
-    for s, e, mid in merged:
-        s, e = max(s, cursor), max(e, cursor)
-        out.append(_esc(text[cursor:s]))
-        out.append(f'<mark id="{mid}">{_esc(text[s:e])}</mark>')
-        cursor = e
-    out.append(_esc(text[cursor:]))
-    body = "".join(out)
-    return f'<aside class="doc"><h3>{_esc(label)}</h3><div class="docbody">{body}</div></aside>'
+    marks = sorted(merged)
+    lines, offset, mi = [], 0, 0
+    for raw in text.split("\n"):
+        line_end = offset + len(raw)
+        segs, cursor = [], offset
+        while mi < len(marks) and marks[mi][0] < line_end:
+            s, e, mid = marks[mi]
+            s, e = max(s, cursor), min(e, line_end)
+            segs.append(_esc(text[cursor:s]))
+            segs.append(f'<mark id="{mid}">{_esc(text[s:e])}</mark>')
+            cursor = e
+            mi += 1
+        segs.append(_esc(text[cursor:line_end]))
+        cls = _classify(raw)
+        content = "".join(segs)
+        lines.append(f'<div class="docln {cls}">{content}</div>' if cls != "blank"
+                     else '<div class="docln blank"></div>')
+        offset = line_end + 1  # account for the stripped "\n"
+    return (
+        f'<aside class="doc"><h3>{_esc(label)}</h3>'
+        f'<div class="docbody">{"".join(lines)}</div></aside>'
+    )
 
 
 def _chip_sentence(text: str, chips: list[tuple[str, str, str]]) -> str:
