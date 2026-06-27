@@ -31,13 +31,28 @@ or definitive claim construction (a patent professional is in the loop; UPL boun
 
 ## How to pick up work
 
-1. Read **▶ Current focus** in [`ROADMAP.md`](ROADMAP.md). Take the topmost unchecked task in that milestone.
-2. Branch per the task's `branch:` field — `feat/<milestone>-<slug>`, `fix/…`, `chore/…`. **One subsystem per branch.**
-3. Implement to the task's **acceptance criteria (AC)**. State which invariants (I1–I6) the PR touches and how its tests cover them.
-4. Open a small, single-purpose PR. The **Layer-0 deterministic component evals** run as required CI. **No merge on a red gate or a violated invariant.**
-5. On green: merge, check the box, append a line to the **Changelog**, advance **Current focus**.
-6. A milestone is `DONE` only when its **Gate** passes. Do not begin the next milestone until then.
-7. **Never start anything under Backlog (v2).**
+1. Read **▶ Current focus** in [`ROADMAP.md`](ROADMAP.md). Take the topmost unchecked task in that milestone. **Read the Decisions log (D1–D14)** — they are binding; don't contradict them.
+2. Implement to the task's **acceptance criteria (AC)**. State which invariants (I1–I6) it touches and how its tests cover them.
+3. A milestone is `DONE` only when its **Gate** passes. Don't begin the next milestone — or **anything under Backlog (v2)** — until then.
+
+### Working mode (single primary agent on `main`)
+
+- **Commit directly to `main`** in small, single-purpose commits. There is **no PR gate** in this repo; CI runs on every push to `main`. If you do use a `feat/…` branch, **fast-forward merge it to `main` when done** — never leave finished work stranded on a branch.
+- **Run the gate before every commit:** `ruff check . && pytest -m layer0`. **Never mask the exit code** (don't pipe `pytest` through `tail`/`head` in an `&&` chain — a failure will look like success). A red gate or violated invariant means *not done*.
+- **Definition of done — do every item, every time** (a second agent skipped this and it had to be back-filled):
+  1. `[x]` the task box in ROADMAP with a one-line **DONE** note (what + which tests).
+  2. Append a **Changelog** line: `YYYY-MM-DD · M#-T# · short note`.
+  3. Advance **▶ Current focus** to the next task.
+  4. `git push` and confirm CI is green.
+- **New design decisions get a new `D#` row** in the ROADMAP Decisions table with rationale. The Decisions log and the golden oracle are append-only and binding — don't quietly change behavior that a `D#` established.
+
+## Setup, the gate, and where things live
+
+- **Dev install:** `pip install -e ".[dev]"` (ruff + pytest). Optional MCP server: `pip install -e ".[mcp]"`.
+- **The gate:** `pytest -m layer0` — the blocking Layer-0 deterministic evals ([`docs/layer0_gate.md`](docs/layer0_gate.md)); fast, seeded, **no model calls**. CI = `ruff check .` + this.
+- **Scripts** run with plain `python scripts/<x>.py` from the repo root (they bootstrap `src/`). The **CLI** needs the install: `attest list` / `attest call <tool> '<json>'`.
+- **Committed artifacts:** corpus at `corpus/store/` (regen: `python scripts/ingest_corpus.py`); golden quotes bound by `scripts/resolve_golden_quotes.py`; the review GUI via `python scripts/build_evidence_view.py` → `evidence_view.html`.
+- **Module map** (`src/attest/`): `ingest/` = Document + content-hash (I3), `DocumentStore`, **`edgar.py` (the only corpus-specific file)**; `spans.py` = char-offset spans + resolution invariant (D7); `retrieval.py` = BM25 (I6); `support.py` = `check_support` / abstention (I2, D12); `verify.py` = atom resolver (D9/I1); `frame.py` = question frame + coverage (D13); `audit.py` = append-only log (I5); `session.py` = record/replay; `tools.py`/`cli.py`/`mcp_server.py` = the MCP+CLI surface; `evidence_view.py` = the review GUI. `attest_rig.py` (M0 audition rig) lives at the repo root.
 
 ## Invariants — non-negotiable
 
@@ -94,6 +109,6 @@ product.
 
 ## Stack (start boring on purpose)
 
-- **Python** for ATTEST tools (MCP server + CLI) and the rig.
-- **TypeScript/React** for the demo UI.
+- **Python** for ATTEST tools (MCP server + CLI), the rig, and the current GUI (a deterministic, server-less static HTML **evidence view**, `evidence_view.py`).
+- **TypeScript/React** is the **M5** upgrade of that GUI (audit-log replay); not built yet — don't assume a React app exists.
 - **Retrieval v1:** BM25 + a single embedding model, hybrid. Storage: sqlite (+ vector ext) or in-memory. No managed vector DB until the eval says you need it.
