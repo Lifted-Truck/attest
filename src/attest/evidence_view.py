@@ -46,16 +46,23 @@ _CSS = """
   --line:#262b36; --markb:#e0a32e; --ok:#3fb950; --bad:#f85149;
   --chip:#1f6feb22; --chipb:#388bfd; --teal:#5fe0c4; }
 * { box-sizing:border-box; }
-body { margin:0; background:var(--bg); color:var(--ink);
+body { margin:0; background:var(--bg); color:var(--ink); height:100vh; overflow:hidden;
+  display:flex; flex-direction:column;
   font:15px/1.55 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-header { padding:16px 24px; border-bottom:1px solid var(--line); }
+header { padding:16px 24px; border-bottom:1px solid var(--line); flex:0 0 auto; }
 header h1 { margin:0 0 4px; font-size:18px; }
 header p { margin:0; color:var(--muted); font-size:13px; }
 header a { color:var(--chipb); }
-.layout { display:grid; grid-template-columns:1fr 1fr; }
-@media (max-width:860px){ .layout{ grid-template-columns:1fr; }
-  .doc{ position:static!important; height:60vh!important; } }
-.doc { position:sticky; top:0; height:100vh; overflow:auto; border-right:1px solid var(--line);
+/* two panes, each scrolling INDEPENDENTLY inside the viewport below the header —
+   the document's scroll extent must not depend on the answers column's length */
+.layout { display:grid; grid-template-columns:1fr 1fr; flex:1 1 auto; min-height:0;
+  overflow:hidden; }
+@media (max-width:860px){
+  body{ height:auto; overflow:visible; display:block; }
+  .layout{ grid-template-columns:1fr; overflow:visible; }
+  .doc{ height:60vh!important; }
+  .cards{ height:auto!important; overflow:visible!important; } }
+.doc { height:100%; min-height:0; overflow:auto; border-right:1px solid var(--line);
   padding:14px 18px; background:#0c0e12; }
 .doc h3 { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
   margin:0 0 8px; }
@@ -82,7 +89,7 @@ mark.m.on.k-fig { background:#3b2f12; color:var(--markb); font-weight:600; }
 mark.m.on.k-lbl { background:#0e3a36; color:var(--teal); }
 mark.m.on.k-cls { background:#23262e; color:#c6ccd8; }
 mark.flash { outline:2px solid var(--chipb); }
-.cards { overflow:auto; }
+.cards { height:100%; min-height:0; overflow:auto; }
 .card { border-bottom:1px solid var(--line); padding:18px 24px; cursor:pointer;
   border-left:3px solid transparent; }
 .card.active { border-left-color:var(--chipb); background:#10131a; }

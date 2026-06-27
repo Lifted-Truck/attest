@@ -57,20 +57,21 @@ TREND = ROOT / "audit_log" / "layer_e_results.jsonl"
 
 # Headless agent invocation. The agent reads the project CLAUDE.md (the runtime
 # loop) and reaches ATTEST via .mcp.json; tools are auto-approved for the run.
-CLAUDE_CMD = [
-    "claude", "-p",
+# The prompt is the value of -p; flags follow.
+CLAUDE_FLAGS = [
     "--mcp-config", str(ROOT / ".mcp.json"),
+    "--permission-mode", "bypassPermissions",
     "--allowedTools", "mcp__attest__search_corpus,mcp__attest__get_span,"
     "mcp__attest__get_document,mcp__attest__check_support,mcp__attest__verify,"
     "mcp__attest__check_claim",
 ]
 
 
-def run_agent(question: str, timeout: int = 180) -> str:
-    proc = subprocess.run(  # noqa: S603
-        [*CLAUDE_CMD, question], cwd=ROOT, capture_output=True, text=True, timeout=timeout
+def run_agent(question: str, timeout: int = 180) -> subprocess.CompletedProcess:
+    return subprocess.run(  # noqa: S603
+        ["claude", "-p", question, *CLAUDE_FLAGS], cwd=ROOT, capture_output=True,
+        text=True, stdin=subprocess.DEVNULL, timeout=timeout
     )
-    return proc.stdout
 
 
 def main() -> int:
@@ -87,7 +88,7 @@ def main() -> int:
     if not ns.live:
         print("DRY RUN — would drive the agent over", len(items), "golden items.")
         print("per-item command:")
-        print("  " + " ".join(CLAUDE_CMD) + ' "<question>"')
+        print('  claude -p "<question>" ' + " ".join(CLAUDE_FLAGS))
         print("\nRe-run with --live to execute (billed, non-deterministic). Scoring reads")
         print(f"the audit log ({AUDIT.relative_to(ROOT)}) and writes a trend to "
               f"{TREND.relative_to(ROOT)}.")
@@ -98,11 +99,23 @@ def main() -> int:
     log = AuditLog(AUDIT)
     store = SpanStore.from_store(DocumentStore(ROOT / "corpus" / "store"))
 
-    scores, entailed_items, calib = [], [], []
+    scores, entailed_items, calib, errored = [], [], [], []
     for item in items:
         before = len(log.entries())
-        stdout = run_agent(item["question"])
+        proc = run_agent(item["question"])
+        stdout = proc.stdout
         segment = [e.payload for e in log.entries()[before:]]
+
+        # An agent that called NO tools didn't actually run the loop (auth/MCP
+        # failure, refusal to use tools). That is an ERROR, not an abstention —
+        # surface it loudly instead of silently scoring presented=False.
+        if proc.returncode != 0 or not segment:
+            errored.append(item["id"])
+            why = (stdout or proc.stderr or "(no output)").strip().splitlines()
+            snip = (why[0] if why else "")[:80]
+            print(f"  ⚠ {item['id']:<5} agent error / no tool calls — {snip}")
+            continue
+
         s = score_item(item, segment)
         scores.append(s)
         mark = "✓" if s.abstention_correct else "✗"
@@ -124,6 +137,13 @@ def main() -> int:
             if conf is not None:
                 calib.append((conf, item_ok))
 
+    if not scores:
+        print("\nNo items scored — the agent produced no tool calls on any item.")
+        print("Check headless Claude Code: a 401 means the spawned `claude -p` is not")
+        print("authenticated (set ANTHROPIC_API_KEY or run in an authenticated env), and")
+        print("confirm the ATTEST MCP server starts (.venv has attest + mcp installed).")
+        return 1
+
     summary = {
         "timestamp": ns.timestamp,
         **aggregate(scores),
@@ -132,6 +152,8 @@ def main() -> int:
         "brier": brier_score(calib),
         "reliability": reliability(calib),
         "n_calibrated": len(calib),
+        "n_errored": len(errored),
+        "errored": errored,
     }
     TREND.parent.mkdir(parents=True, exist_ok=True)
     with TREND.open("a", encoding="utf-8") as f:
