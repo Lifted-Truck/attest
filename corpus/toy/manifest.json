@@ -24,8 +24,8 @@
       "covers_golden": [
         "G010"
       ],
-      "char_len": 8658,
-      "sha256": "6dd4ccf77101d17ce1da690df84ad31d0c6e3b2fa908044ced51cbb6a6e2188f"
+      "char_len": 8638,
+      "sha256": "80aa56e8d4c997d0eec1e1a9e7b64579b96057114e8140896e477d0d39d3305c"
     },
     {
       "excerpt_id": "AAPL-10K-FY2024::02_statements_of_operations",
@@ -36,7 +36,7 @@
         "distractor"
       ],
       "char_len": 1201,
-      "sha256": "200aa1cafffc5360859be214ef15282039c0d460cd45ba26aa28729a9595495a"
+      "sha256": "dbdd50e18238fbc8e131169adfde0304d92c5e77dd2af5d835945047019ace84"
     },
     {
       "excerpt_id": "AAPL-10K-FY2024::03_balance_sheets",
@@ -48,7 +48,7 @@
         "G016-G020"
       ],
       "char_len": 1641,
-      "sha256": "5a14d80199cc2fa19a475fdf1d7ea0f24dc6c8e6b2d6ca37e66c08644f2fe029"
+      "sha256": "1abab367c93ed9b7cd2eddf07639b2696474d210f91a16acbaa8111006567ee5"
     },
     {
       "excerpt_id": "AAPL-10K-FY2024::04_statements_of_cash_flows",
@@ -59,7 +59,7 @@
         "distractor"
       ],
       "char_len": 2259,
-      "sha256": "6828ebabc52e2a2be35d642e5a46b2973f5a50d7947cf9aac3e80dd71a13891f"
+      "sha256": "3f02c17cd69b43c3cf339fb0be93b13af463ab4deea27837d3c0d4e1f904092d"
     },
     {
       "excerpt_id": "AAPL-10K-FY2024::05_auditor_report",
@@ -69,8 +69,8 @@
       "covers_golden": [
         "G009"
       ],
-      "char_len": 5823,
-      "sha256": "f68ac70a803e79377596176f06818d94ab62217ad0a127b0e102a467f50f6ee4"
+      "char_len": 5821,
+      "sha256": "711e9e77a112432159d8f0d536628ec082f71142b51051947c68b8dfa5c01c6c"
     }
   ]
 }

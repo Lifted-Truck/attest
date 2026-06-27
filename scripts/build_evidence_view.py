@@ -32,17 +32,26 @@ TOTAL_ASSETS = "Total assets $ 364,980 $ 352,583"
 LIAB_EQUITY = "Total liabilities and shareholders’ equity $ 364,980 $ 352,583"
 TERM_CUR = "Term debt 10,912 9,822"
 TERM_NON = "Term debt 85,750 95,281"
-COVER_PERIOD = "For the fiscal year ended September 28, 2024"
 
 
 def main() -> int:
     store = SpanStore.from_store(DocumentStore(ROOT / "corpus" / "store"))
     retriever = Retriever(store)
+    canonical = store.get_document(DOC)
 
     def bind(literal: str, line: str) -> AtomBinding:
         start, _ = store.resolve_quote(DOC, line)
         i = line.index(literal)
         return AtomBinding(literal, DOC, start + i, start + i + len(literal))
+
+    def bind_nearest(literal: str, near: int) -> AtomBinding:
+        """Bind to the occurrence of `literal` nearest `near` (D14 nearest substantiation)."""
+        offs, i = [], canonical.find(literal)
+        while i != -1:
+            offs.append(i)
+            i = canonical.find(literal, i + 1)
+        best = min(offs, key=lambda o: abs(o - near))
+        return AtomBinding(literal, DOC, best, best + len(literal))
 
     def top(q: str) -> float:
         hits = retriever.search(q, 1)
@@ -50,11 +59,13 @@ def main() -> int:
 
     interactions: list[Interaction] = []
 
-    # 1. Clean grounded lookup — figure AND the "as of" date are both bound.
+    # 1. Clean grounded lookup — figure AND the "as of" date are both bound; the date
+    #    binds to the balance-sheet column header right above the figure (D14), not the cover.
     q1 = "What were Apple's total assets as of September 28, 2024?"
+    fig = bind("364,980", TOTAL_ASSETS)
     a1 = Answer([Sentence(
         "Apple's total assets were $364,980 million as of September 28, 2024.",
-        atoms=[bind("364,980", TOTAL_ASSETS), bind("September 28, 2024", COVER_PERIOD)],
+        atoms=[fig, bind_nearest("September 28, 2024", fig.char_start)],
     )])
     interactions.append(Interaction(
         q1, "answer", answer=a1, verify=verify(a1, store),

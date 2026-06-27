@@ -42,26 +42,42 @@ FILINGS: dict[str, dict] = {
 
 
 class _TextExtractor(HTMLParser):
-    """Minimal, dependency-free HTML → text. Preserves visible words verbatim."""
+    """Minimal, dependency-free HTML → text. Preserves visible words verbatim.
+
+    **Cell-coherent:** inside a table cell (`td`/`th`), block breaks (`div`/`br`/`p`)
+    become spaces, not newlines — so a value split across elements (e.g. a header
+    date `September 28,<br>2024`) stays on one line and a table row + its header
+    row stay coherent. Row/table boundaries (`tr`/`table`) always break.
+    """
+
+    _BREAK = ("p", "div", "br", "h1", "h2", "h3", "li")
 
     def __init__(self) -> None:
         super().__init__()
         self.parts: list[str] = []
         self._skip = 0
+        self._cell = 0  # table-cell nesting depth
 
     def handle_starttag(self, tag, attrs):
         if tag in ("script", "style"):
             self._skip += 1
-        if tag in ("p", "div", "tr", "br", "table", "h1", "h2", "h3", "li"):
-            self.parts.append("\n")
-        if tag == "td":
+        elif tag in ("td", "th"):
+            self._cell += 1
             self.parts.append(" ")
+        elif tag in ("tr", "table"):
+            self.parts.append("\n")
+        elif tag in self._BREAK:
+            self.parts.append(" " if self._cell else "\n")
 
     def handle_endtag(self, tag):
         if tag in ("script", "style") and self._skip:
             self._skip -= 1
-        if tag in ("p", "div", "tr", "table"):
+        elif tag in ("td", "th"):
+            self._cell = max(0, self._cell - 1)
+        elif tag in ("tr", "table"):
             self.parts.append("\n")
+        elif tag in ("p", "div"):
+            self.parts.append(" " if self._cell else "\n")
 
     def handle_data(self, data):
         if not self._skip:

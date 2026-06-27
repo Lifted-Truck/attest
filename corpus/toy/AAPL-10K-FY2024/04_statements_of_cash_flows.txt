@@ -4,13 +4,9 @@ CONSOLIDATED STATEMENTS OF CASH FLOWS
 
 Years ended
 
-September 28,
-2024 September 30,
-2023 September 24,
-2022
+September 28, 2024 September 30, 2023 September 24, 2022
 
-Cash, cash equivalents, and restricted cash and cash equivalents, beginning balances
-$ 30,737 $ 24,977 $ 35,929 
+Cash, cash equivalents, and restricted cash and cash equivalents, beginning balances $ 30,737 $ 24,977 $ 35,929 
 
 Operating activities: 
 
@@ -74,8 +70,7 @@ Cash used in financing activities (121,983) (108,488) (110,749)
 
 Increase/(Decrease) in cash, cash equivalents, and restricted cash and cash equivalents (794) 5,760 (10,952) 
 
-Cash, cash equivalents, and restricted cash and cash equivalents, ending balances
-$ 29,943 $ 30,737 $ 24,977 
+Cash, cash equivalents, and restricted cash and cash equivalents, ending balances $ 29,943 $ 30,737 $ 24,977 
 
 Supplemental cash flow disclosure: 
 

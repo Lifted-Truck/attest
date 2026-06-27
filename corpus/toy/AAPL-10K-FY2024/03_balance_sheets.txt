@@ -2,9 +2,7 @@ CONSOLIDATED BALANCE SHEETS
 
 (In millions, except number of shares, which are reflected in thousands, and par value)
 
-September 28,
-2024 September 30,
-2023
+September 28, 2024 September 30, 2023
 
 ASSETS:
 
@@ -66,8 +64,7 @@ Commitments and contingencies
 
 Shareholders’ equity: 
 
-Common stock and additional paid-in capital, $0.00001 par value: 50,400,000 shares authorized; 15,116,786 and 15,550,061 shares issued and outstanding, respectively
-83,276 73,812 
+Common stock and additional paid-in capital, $0.00001 par value: 50,400,000 shares authorized; 15,116,786 and 15,550,061 shares issued and outstanding, respectively 83,276 73,812 
 
 Accumulated deficit (19,154) (214) 
 
