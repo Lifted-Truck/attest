@@ -65,6 +65,11 @@ header a { color:var(--chipb); }
 .docln.h { color:var(--ink); font-weight:700; font-size:13px; margin-top:12px; }
 .docln.sub { color:#c6ccd8; font-weight:600; margin-top:4px; }
 .docln.blank { height:8px; }
+/* financial rows: label left, numeric columns right-aligned + aligned across rows */
+.docln.trow { display:flex; gap:10px; align-items:baseline; }
+.trow .tlabel { flex:1 1 auto; min-width:0; }
+.trow .tnums { display:flex; gap:18px; flex:0 0 auto; }
+.trow .tnum { min-width:90px; text-align:right; white-space:pre; }
 /* bounding box around an active interaction's evidence cluster */
 .docln.bx { border-left-color:var(--chipb); border-right-color:var(--chipb); background:#12243f55; }
 .docln.bx-top { border-top:2px solid var(--chipb); border-top-left-radius:5px;
@@ -149,6 +154,11 @@ document.querySelectorAll('.card').forEach(card=>card.addEventListener('click', 
 _PRIORITY = {"figure": 3, "label": 2, "closest": 1}
 _KIND_CLASS = {"figure": "k-fig", "label": "k-lbl", "closest": "k-cls"}
 _FIG = re.compile(r"\d{1,3}(?:,\d{3})+")
+# A numeric table cell (optional $, optional parenthesised-negative, comma-grouped).
+_CELLPAT = r"\$?\s?\(?\d{1,3}(?:,\d{3})+\)?"
+_CELL = re.compile(_CELLPAT)
+# A financial row: a label followed by a trailing run of numeric cells to end-of-line.
+_ROW = re.compile(rf"((?:\s*{_CELLPAT})+)\s*$")
 
 
 def _esc(s: str) -> str:
@@ -265,25 +275,49 @@ def _line_starts(text: str) -> list[int]:
     return starts
 
 
+def _splice(text: str, a: int, b: int, marks) -> str:
+    """HTML for text[a:b], wrapping any marks (absolute, sorted) that fall inside it."""
+    out, cur = [], a
+    for s, e, kind, iids, mid in marks:
+        if e <= a or s >= b:
+            continue
+        s, e = max(s, a), min(e, b)
+        out.append(_esc(text[cur:s]))
+        out.append(f'<mark class="m {_KIND_CLASS[kind]}" id="{mid}" '
+                   f'data-int="{" ".join(iids)}">{_esc(text[s:e])}</mark>')
+        cur = e
+    out.append(_esc(text[cur:b]))
+    return "".join(out)
+
+
 def _doc_pane(store: SpanStore, doc_id: str, painted, label: str) -> str:
     text = store.get_document(doc_id)
     marks = sorted(painted)
     lines, offset, mi = [], 0, 0
     for n, raw in enumerate(text.split("\n")):
         line_end = offset + len(raw)
-        segs, cursor = [], offset
+        lmarks = []
         while mi < len(marks) and marks[mi][0] < line_end:
-            s, e, kind, iids, mid = marks[mi]
-            s, e = max(s, cursor), min(e, line_end)
-            segs.append(_esc(text[cursor:s]))
-            segs.append(f'<mark class="m {_KIND_CLASS[kind]}" id="{mid}" '
-                        f'data-int="{" ".join(iids)}">{_esc(text[s:e])}</mark>')
-            cursor = e
+            lmarks.append(marks[mi])
             mi += 1
-        segs.append(_esc(text[cursor:line_end]))
         cls = _classify(raw)
-        body = "".join(segs) if cls != "blank" else ""
-        lines.append(f'<div class="docln {cls}" id="L{n}">{body}</div>')
+        row = _ROW.search(raw) if cls == "ln" else None
+        if row and row.start(1) > 0 and any(c.isalpha() for c in raw[: row.start(1)]):
+            # Financial row → label + right-aligned numeric cells (display-only alignment).
+            block = offset + row.start(1)
+            label_html = _splice(text, offset, block, lmarks)
+            cell_htmls = []
+            for cm in _CELL.finditer(raw, row.start(1)):
+                inner = _splice(text, offset + cm.start(), offset + cm.end(), lmarks)
+                cell_htmls.append(f'<span class="tnum">{inner}</span>')
+            body = (f'<span class="tlabel">{label_html}</span>'
+                    f'<span class="tnums">{"".join(cell_htmls)}</span>')
+            lines.append(f'<div class="docln ln trow" id="L{n}">{body}</div>')
+        elif cls == "blank":
+            lines.append(f'<div class="docln blank" id="L{n}"></div>')
+        else:
+            lines.append(f'<div class="docln {cls}" id="L{n}">'
+                         f'{_splice(text, offset, line_end, lmarks)}</div>')
         offset = line_end + 1
     return (
         f'<aside class="doc"><h3>{_esc(label)}</h3>'
