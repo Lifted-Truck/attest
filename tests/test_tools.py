@@ -17,7 +17,6 @@ from attest.tools import default_registry
 ROOT = Path(__file__).resolve().parent.parent
 STORE = ROOT / "corpus" / "store"
 DOC_ID = "AAPL-10K-FY2024"
-TOTAL_ASSETS_SPAN = (139998, 140030)  # the "Total assets ..." line offsets
 
 
 @pytest.fixture(scope="module")
@@ -27,9 +26,16 @@ def registry():
     return default_registry(STORE, audit_path=None)
 
 
+def _ta_span(registry) -> tuple[int, int]:
+    """Locate the 'Total assets' line's offsets at runtime (robust to re-normalization)."""
+    hits = registry["search_corpus"].handler({"query": "total assets", "k": 8})["hits"]
+    h = next(x for x in hits if x["text"].startswith("Total assets $"))
+    return h["char_start"], h["char_end"]
+
+
 def _bind_total_assets(registry, literal: str = "364,980") -> dict:
     """JSON atom binding a figure to its exact offset on the 'Total assets' line."""
-    start, end = TOTAL_ASSETS_SPAN
+    start, end = _ta_span(registry)
     text = registry["get_span"].handler({"doc_id": DOC_ID, "start": start, "end": end})["text"]
     off = start + text.index(literal)
     return {"text": literal, "doc_id": DOC_ID, "char_start": off, "char_end": off + len(literal)}
@@ -118,7 +124,7 @@ def test_search_corpus_returns_offsets(registry):
 
 
 def test_get_span_round_trips(registry):
-    start, end = TOTAL_ASSETS_SPAN
+    start, end = _ta_span(registry)
     out = registry["get_span"].handler({"doc_id": DOC_ID, "start": start, "end": end})
     assert "364,980" in out["text"]
 

@@ -20,10 +20,16 @@ from attest.tools import default_registry
 ROOT = Path(__file__).resolve().parent.parent
 STORE = ROOT / "corpus" / "store"
 DOC_ID = "AAPL-10K-FY2024"
-TOTAL_ASSETS_SPAN = (139998, 140030)
 
 READ_TOOLS = {"search_corpus", "get_span", "get_document", "get_audit_log"}
 WRITE_TOOLS = {"check_support", "check_claim", "verify"}
+
+
+def _ta_span(registry) -> tuple[int, int]:
+    """The 'Total assets' line offsets, derived at runtime (robust to re-normalization)."""
+    hits = registry["search_corpus"].handler({"query": "total assets", "k": 8})["hits"]
+    h = next(x for x in hits if x["text"].startswith("Total assets $"))
+    return h["char_start"], h["char_end"]
 
 
 @pytest.fixture
@@ -35,7 +41,7 @@ def registry(tmp_path):
 
 def _read_call(registry, name):
     """Exercise one read tool with valid args."""
-    start, end = TOTAL_ASSETS_SPAN
+    start, end = _ta_span(registry)
     args = {
         "search_corpus": {"query": "total assets", "k": 3},
         "get_span": {"doc_id": DOC_ID, "start": start, "end": end},
@@ -47,7 +53,7 @@ def _read_call(registry, name):
 
 def _write_call(registry, name):
     """Exercise one write tool with valid args."""
-    start, end = TOTAL_ASSETS_SPAN
+    start, end = _ta_span(registry)
     text = registry["get_span"].handler({"doc_id": DOC_ID, "start": start, "end": end})["text"]
     off = start + text.index("364,980")
     atom = {"text": "364,980", "doc_id": DOC_ID, "char_start": off, "char_end": off + 7}
