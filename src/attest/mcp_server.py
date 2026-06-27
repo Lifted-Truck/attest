@@ -45,10 +45,16 @@ def build_server(store_dir: Path | str = "corpus/store", audit_path: Path | str 
 
 
 def main() -> int:  # pragma: no cover - requires the mcp SDK + a stdio client
+    import os
+
     import anyio
     from mcp.server.stdio import stdio_server
 
-    server = build_server()
+    # Log interactions so a session is auditable/replayable (I5) and Layer-E can
+    # score from the audit log. Configurable for tests/CI.
+    store_dir = os.environ.get("ATTEST_STORE", "corpus/store")
+    audit_path = os.environ.get("ATTEST_AUDIT", "audit_log/agent.jsonl")
+    server = build_server(store_dir, audit_path)
 
     async def _run() -> None:
         async with stdio_server() as (read, write):

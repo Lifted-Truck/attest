@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "attest": {
+      "command": ".venv/bin/python",
+      "args": ["-m", "attest.mcp_server"],
+      "env": {
+        "ATTEST_STORE": "corpus/store",
+        "ATTEST_AUDIT": "audit_log/agent.jsonl"
+      }
+    }
+  }
+}
