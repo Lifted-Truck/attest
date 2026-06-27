@@ -1,19 +1,25 @@
-"""render_evidence_view — parallel evidence GUI (ROADMAP M2-T7 / D8).
+"""render_evidence_view — interactive parallel evidence GUI (ROADMAP M2-T7 / D8, D15).
 
-A self-contained HTML page: the **full canonical document** on the left with every
-cited range highlighted *in place*, and the interactions on the right. Click a
-figure in an answer (or a closest-span in an abstention) and the document pane
-scrolls to its highlight. Read-only (I4), deterministic, no server.
+A self-contained HTML page: the full canonical document on the left, the
+interactions on the right. The document is **clean by default** — nothing
+highlighted. **Click an interaction's card** and only *that* interaction's
+evidence lights up: its figures + question-label terms highlight in both panes, a
+tight bounding box is drawn around each contiguous evidence cluster, and the
+document scrolls to it. Clicking a figure also scrolls to it; clicking the active
+card again clears. This keeps "which highlight belongs to which query"
+unambiguous (D15).
 
-It renders the *normalized canonical text* ATTEST hashes and cites (D8) — so what
-you review is exactly what the system verifies. Your job is the un-gated one:
-does the highlighted span actually support the claim (entailment)?
+Read-only (I4), deterministic, no server. Renders the normalized canonical text
+ATTEST hashes and cites (D8). Your review is the un-gated step: does the
+highlighted span actually support the claim (entailment)?
 """
 
 from __future__ import annotations
 
 import html
+import json
 import re
+from bisect import bisect_right
 from dataclasses import dataclass, field
 
 from .frame import QuestionFrame, check_coverage
@@ -37,8 +43,8 @@ class Interaction:
 
 _CSS = """
 :root { --bg:#0f1115; --panel:#171a21; --ink:#e6e9ef; --muted:#8b93a3;
-  --line:#262b36; --mark:#3b2f12; --markb:#e0a32e; --ok:#3fb950; --bad:#f85149;
-  --chip:#1f6feb22; --chipb:#388bfd; }
+  --line:#262b36; --markb:#e0a32e; --ok:#3fb950; --bad:#f85149;
+  --chip:#1f6feb22; --chipb:#388bfd; --teal:#5fe0c4; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--ink);
   font:15px/1.55 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
@@ -46,20 +52,36 @@ header { padding:16px 24px; border-bottom:1px solid var(--line); }
 header h1 { margin:0 0 4px; font-size:18px; }
 header p { margin:0; color:var(--muted); font-size:13px; }
 header a { color:var(--chipb); }
-.layout { display:grid; grid-template-columns:1fr 1fr; gap:0; }
+.layout { display:grid; grid-template-columns:1fr 1fr; }
 @media (max-width:860px){ .layout{ grid-template-columns:1fr; }
   .doc{ position:static!important; height:60vh!important; } }
 .doc { position:sticky; top:0; height:100vh; overflow:auto; border-right:1px solid var(--line);
   padding:14px 18px; background:#0c0e12; }
-.doc h3, .cards-h { font-size:11px; text-transform:uppercase; letter-spacing:.06em;
-  color:var(--muted); margin:0 0 8px; }
+.doc h3 { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
+  margin:0 0 8px; }
 .docbody { font-size:12px; line-height:1.5; font-family:ui-monospace,Menlo,monospace; margin:0; }
-.docln { white-space:pre-wrap; word-break:break-word; color:#aab2c0; }
+.docln { white-space:pre-wrap; word-break:break-word; color:#aab2c0; padding:0 6px;
+  border-left:2px solid transparent; border-right:2px solid transparent; }
 .docln.h { color:var(--ink); font-weight:700; font-size:13px; margin-top:12px; }
 .docln.sub { color:#c6ccd8; font-weight:600; margin-top:4px; }
 .docln.blank { height:8px; }
+/* bounding box around an active interaction's evidence cluster */
+.docln.bx { border-left-color:var(--chipb); border-right-color:var(--chipb); background:#12243f55; }
+.docln.bx-top { border-top:2px solid var(--chipb); border-top-left-radius:5px;
+  border-top-right-radius:5px; }
+.docln.bx-bot { border-bottom:2px solid var(--chipb); border-bottom-left-radius:5px;
+  border-bottom-right-radius:5px; }
+/* document marks: plain by default; lit only for the active interaction */
+mark.m { background:none; color:inherit; border-radius:3px; padding:0 1px; scroll-margin-top:16px; }
+mark.m.on.k-fig { background:#3b2f12; color:var(--markb); font-weight:600; }
+mark.m.on.k-lbl { background:#0e3a36; color:var(--teal); }
+mark.m.on.k-cls { background:#23262e; color:#c6ccd8; }
+mark.flash { outline:2px solid var(--chipb); }
 .cards { overflow:auto; }
-.card { border-bottom:1px solid var(--line); padding:18px 24px; }
+.card { border-bottom:1px solid var(--line); padding:18px 24px; cursor:pointer;
+  border-left:3px solid transparent; }
+.card.active { border-left-color:var(--chipb); background:#10131a; }
+.card .hint { color:var(--muted); font-size:11px; } .card.active .hint { color:var(--chipb); }
 .q { font-weight:600; margin:0 0 2px; }
 .badge { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.04em;
   padding:2px 8px; border-radius:999px; text-transform:uppercase; margin-bottom:10px; }
@@ -68,14 +90,12 @@ header a { color:var(--chipb); }
 .answer-text { background:var(--panel); border:1px solid var(--line); border-radius:8px;
   padding:12px 14px; }
 .reason { color:var(--muted); margin:0 0 8px; }
-mark { border-radius:3px; padding:0 1px; scroll-margin-top:14px; }
-mark.fig { background:var(--mark); color:var(--markb); font-weight:600; }  /* figure */
-mark.lbl { background:#0e3a36; color:#5fe0c4; }  /* question label term */
-mark.cls { background:#23262e; color:#c6ccd8; }  /* abstention closest span */
-mark.flash { outline:2px solid var(--chipb); }
-.chip { background:var(--chip); border:1px solid var(--chipb); color:var(--ink);
-  border-radius:4px; padding:0 4px; cursor:pointer; font-weight:600; }
-.chip.derived { background:#2a1f3a; border-color:#a371f7; }
+/* response-column label terms: plain until the card is active (then teal, matching the doc) */
+mark.qlbl { background:none; color:inherit; border-radius:3px; padding:0 1px; }
+.card.active mark.qlbl { background:#0e3a36; color:var(--teal); }
+.chip { background:var(--chip); border:1px solid var(--chipb); color:var(--ink); border-radius:4px;
+  padding:0 4px; cursor:pointer; font-weight:600; }
+.chip.derived { background:#2a1f3a; border-color:#a371f7; cursor:help; }
 .closest { font-family:ui-monospace,Menlo,monospace; font-size:12px; margin:6px 0 0; }
 .closest a { color:var(--chipb); cursor:pointer; text-decoration:none; }
 .vstatus { font-size:12px; margin-top:8px; }
@@ -85,145 +105,72 @@ mark.flash { outline:2px solid var(--chipb); }
 .cov-ok { color:var(--ok); } .cov-bad { color:var(--bad); border-color:var(--bad)!important; }
 .deriv { font-family:ui-monospace,Menlo,monospace; font-size:12px; margin:6px 0 0; color:#c6ccd8; }
 .deriv .ok { color:var(--ok); } .deriv .bad { color:var(--bad); }
-.chip.derived { cursor:help; }
 .trace { color:var(--muted); font-size:12px; margin:10px 0 0;
   font-family:ui-monospace,Menlo,monospace; }
 .trace b { color:var(--ink); font-weight:600; }
 """
 
 _JS = """
-function jump(id){
-  const el = document.getElementById(id);
-  if(!el) return;
+const CLUSTERS = %s;
+function clearAll(){
+  document.querySelectorAll('.card.active').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('mark.m.on').forEach(m=>m.classList.remove('on'));
   document.querySelectorAll('mark.flash').forEach(m=>m.classList.remove('flash'));
-  el.classList.add('flash');
-  el.scrollIntoView({behavior:'smooth', block:'center'});
+  document.querySelectorAll('.docln.bx,.docln.bx-top,.docln.bx-bot')
+    .forEach(e=>e.classList.remove('bx','bx-top','bx-bot'));
 }
-document.querySelectorAll('[data-target]').forEach(c=>{
-  c.addEventListener('click', ()=>jump(c.dataset.target));
-});
-window.addEventListener('load', ()=>{
-  const first = document.querySelector('.doc mark');
-  if(first){ const d=document.querySelector('.doc'); d.scrollTop = first.offsetTop - 120; }
-});
+function light(id){
+  const card=document.getElementById(id); if(card) card.classList.add('active');
+  document.querySelectorAll('mark.m').forEach(m=>{
+    if((m.dataset.int||'').split(' ').includes(id)) m.classList.add('on');
+  });
+  (CLUSTERS[id]||[]).forEach(lines=>lines.forEach((lid,i)=>{
+    const e=document.getElementById(lid); if(!e) return;
+    e.classList.add('bx');
+    if(i===0) e.classList.add('bx-top');
+    if(i===lines.length-1) e.classList.add('bx-bot');
+  }));
+}
+function flashTo(markId){
+  const el=document.getElementById(markId); if(!el) return;
+  document.querySelectorAll('mark.flash').forEach(m=>m.classList.remove('flash'));
+  el.classList.add('flash'); el.scrollIntoView({behavior:'smooth', block:'center'});
+}
+document.querySelectorAll('.card').forEach(card=>card.addEventListener('click', e=>{
+  const chip=e.target.closest('[data-target]');
+  const active=card.classList.contains('active');
+  if(chip){ if(!active){ clearAll(); light(card.id); } flashTo(chip.dataset.target); return; }
+  if(active){ clearAll(); return; }
+  clearAll(); light(card.id);
+  const c=CLUSTERS[card.id]; if(c&&c.length&&c[0].length) flashTo(c[0][0]);
+}));
 """
+
+_PRIORITY = {"figure": 3, "label": 2, "closest": 1}
+_KIND_CLASS = {"figure": "k-fig", "label": "k-lbl", "closest": "k-cls"}
+_FIG = re.compile(r"\d{1,3}(?:,\d{3})+")
 
 
 def _esc(s: str) -> str:
     return html.escape(s, quote=True)
 
 
-# Highlight kinds (D13 substantiation made visual): the cited figure, the
-# question's label/constraint terms beside it, and abstention's closest spans.
-# When ranges overlap, the higher priority wins per character.
-_PRIORITY = {"figure": 3, "label": 2, "closest": 1}
-_KIND_CLASS = {"figure": "fig", "label": "lbl", "closest": "cls"}
-Segment = tuple[int, int, str, str]  # (start, end, kind, mark_id)
-
-
-def _gather(
-    interactions: list[Interaction], store: SpanStore
-) -> dict[str, list[tuple[int, int, str]]]:
-    raw: dict[str, list[tuple[int, int, str]]] = {}
-
-    def add(doc_id: str, s: int, e: int, kind: str) -> None:
-        raw.setdefault(doc_id, []).append((s, e, kind))
-
-    for inter in interactions:
-        if inter.kind == "answer" and inter.answer is not None:
-            cons = inter.frame.constraints if inter.frame else []
-            for sent in inter.answer.sentences:
-                atoms = list(sent.atoms) + [o for d in sent.derived for o in d.operands]
-                for a in atoms:
-                    add(a.doc_id, a.char_start, a.char_end, "figure")
-                    sp = store.span_containing(a.doc_id, a.char_start)
-                    if sp is None:
-                        continue
-                    low = sp.text.lower()
-                    for c in cons:  # the question's label terms, beside the figure
-                        i = low.find(c.text.lower())
-                        if i != -1:
-                            start = sp.char_start + i
-                            add(sp.doc_id, start, start + len(c.text), "label")
-        for h in inter.closest:
-            add(h.span.doc_id, h.span.char_start, h.span.char_end, "closest")
-    return raw
-
-
-def _paint(ranges: list[tuple[int, int, str]]) -> list[Segment]:
-    """Resolve overlapping (start, end, kind) into non-overlapping segments; the
-    highest-priority kind wins each character. Adjacent same-kind runs merge."""
-    points = sorted({p for s, e, _ in ranges for p in (s, e)})
-    segs: list[tuple[int, int, str]] = []
-    for a, b in zip(points, points[1:], strict=False):
-        covering = [k for s, e, k in ranges if s <= a and e >= b]
-        if not covering:
-            continue
-        kind = max(covering, key=lambda k: _PRIORITY[k])
-        if segs and segs[-1][1] == a and segs[-1][2] == kind:
-            segs[-1] = (segs[-1][0], b, kind)
-        else:
-            segs.append((a, b, kind))
-    return [(s, e, k, f"m{i}") for i, (s, e, k) in enumerate(segs)]
-
-
-def _seg_id(painted: list[Segment], pos: int) -> str:
-    for s, e, _k, mid in painted:
-        if s <= pos < e:
-            return mid
-    return ""
-
-
-_FIG = re.compile(r"\d{1,3}(?:,\d{3})+")
-
-
 def _classify(line: str) -> str:
-    """Light display hierarchy from a flat line (no canonical change)."""
     s = line.strip()
     if not s:
         return "blank"
-    letters = [c for c in s if c.isalpha()]
-    if letters and s == s.upper() and len(s) <= 90:
-        return "h"  # ALL-CAPS heading (e.g. CONSOLIDATED BALANCE SHEETS, ASSETS:)
+    if [c for c in s if c.isalpha()] and s == s.upper() and len(s) <= 90:
+        return "h"
     if re.match(r"(PART |Item |ITEM )", s):
         return "h"
     if s.endswith(":") and len(s) <= 60 and not _FIG.search(s):
-        return "sub"  # subsection (e.g. "Current assets:")
+        return "sub"
     return "ln"
 
 
-def _doc_pane(store: SpanStore, doc_id: str, painted: list[Segment], label: str) -> str:
-    """Render the document line-by-line with light hierarchy; marks spliced in situ."""
-    text = store.get_document(doc_id)
-    marks = sorted(painted)
-    lines, offset, mi = [], 0, 0
-    for raw in text.split("\n"):
-        line_end = offset + len(raw)
-        segs, cursor = [], offset
-        while mi < len(marks) and marks[mi][0] < line_end:
-            s, e, kind, mid = marks[mi]
-            s, e = max(s, cursor), min(e, line_end)
-            segs.append(_esc(text[cursor:s]))
-            segs.append(f'<mark class="{_KIND_CLASS[kind]}" id="{mid}">{_esc(text[s:e])}</mark>')
-            cursor = e
-            mi += 1
-        segs.append(_esc(text[cursor:line_end]))
-        cls = _classify(raw)
-        content = "".join(segs)
-        lines.append(f'<div class="docln {cls}">{content}</div>' if cls != "blank"
-                     else '<div class="docln blank"></div>')
-        offset = line_end + 1  # account for the stripped "\n"
-    return (
-        f'<aside class="doc"><h3>{_esc(label)}</h3>'
-        f'<div class="docbody">{"".join(lines)}</div></aside>'
-    )
-
-
 def _render_text(text: str, chips: tuple = (), label_terms: tuple = ()) -> str:
-    """Escape `text`, wrapping figure chips (by literal) and the question's label
-    terms (case-insensitive) as non-overlapping spans. Label terms use the same
-    `lbl` mark as the document, so "term debt" reads as the same thing in both
-    columns (the cross-column association the reviewer asked for)."""
+    """Escape `text`, wrapping figure chips (by literal) + the question's label terms
+    (case-insensitive, as `qlbl` marks — lit when the card is active) as non-overlapping spans."""
     spans: list[tuple[int, int, str]] = []
 
     def claim(literal: str, make_html, ci: bool) -> None:
@@ -232,7 +179,7 @@ def _render_text(text: str, chips: tuple = (), label_terms: tuple = ()) -> str:
         i = hay.find(needle)
         while i != -1:
             s, e = i, i + len(literal)
-            if all(e <= os or s >= oe for os, oe, _ in spans):  # skip if it overlaps a claimed span
+            if all(e <= os or s >= oe for os, oe, _ in spans):
                 spans.append((s, e, make_html(text[s:e])))
                 return
             i = hay.find(needle, i + 1)
@@ -243,7 +190,7 @@ def _render_text(text: str, chips: tuple = (), label_terms: tuple = ()) -> str:
         claim(literal, lambda t, c=cls, a=attr, p=tip: f'<span class="{c}"{a}{p}>{_esc(t)}</span>',
               ci=False)
     for term in label_terms:
-        claim(term, lambda t: f'<mark class="lbl">{_esc(t)}</mark>', ci=True)
+        claim(term, lambda t: f'<mark class="qlbl">{_esc(t)}</mark>', ci=True)
 
     out, cursor = [], 0
     for s, e, h in sorted(spans):
@@ -254,10 +201,117 @@ def _render_text(text: str, chips: tuple = (), label_terms: tuple = ()) -> str:
     return "".join(out)
 
 
+# --- document marking: kinded, interaction-owned ranges → painted segments ---
+
+
+def _gather(interactions, store) -> dict[str, list[tuple[int, int, str, str]]]:
+    """Per doc: (start, end, kind, interaction_id) ranges — figures, label terms, closest."""
+    raw: dict[str, list[tuple[int, int, str, str]]] = {}
+
+    def add(doc_id, s, e, kind, iid):
+        raw.setdefault(doc_id, []).append((s, e, kind, iid))
+
+    for idx, inter in enumerate(interactions):
+        iid = f"i{idx}"
+        if inter.kind == "answer" and inter.answer is not None:
+            cons = inter.frame.constraints if inter.frame else []
+            for sent in inter.answer.sentences:
+                atoms = list(sent.atoms) + [o for d in sent.derived for o in d.operands]
+                for a in atoms:
+                    add(a.doc_id, a.char_start, a.char_end, "figure", iid)
+                    sp = store.span_containing(a.doc_id, a.char_start)
+                    if sp is None:
+                        continue
+                    low = sp.text.lower()
+                    for c in cons:
+                        i = low.find(c.text.lower())
+                        if i != -1:
+                            add(sp.doc_id, sp.char_start + i, sp.char_start + i + len(c.text),
+                                "label", iid)
+        for h in inter.closest:
+            add(h.span.doc_id, h.span.char_start, h.span.char_end, "closest", iid)
+    return raw
+
+
+def _paint(ranges: list[tuple[int, int, str, str]]) -> list[tuple[int, int, str, list[str], str]]:
+    """Overlapping (start,end,kind,iid) → non-overlapping (start,end,kind,iids,mark_id)."""
+    points = sorted({p for s, e, _k, _i in ranges for p in (s, e)})
+    segs: list[tuple[int, int, str, list[str]]] = []
+    for a, b in zip(points, points[1:], strict=False):
+        cover = [(k, i) for s, e, k, i in ranges if s <= a and e >= b]
+        if not cover:
+            continue
+        kind = max((k for k, _ in cover), key=lambda k: _PRIORITY[k])
+        iids = sorted({i for _, i in cover})
+        if segs and segs[-1][1] == a and segs[-1][2] == kind and segs[-1][3] == iids:
+            segs[-1] = (segs[-1][0], b, kind, iids)
+        else:
+            segs.append((a, b, kind, iids))
+    return [(s, e, k, i, f"m{n}") for n, (s, e, k, i) in enumerate(segs)]
+
+
+def _seg_id(painted, pos: int) -> str:
+    for s, e, _k, _i, mid in painted:
+        if s <= pos < e:
+            return mid
+    return ""
+
+
+def _line_starts(text: str) -> list[int]:
+    starts, off = [], 0
+    for raw in text.split("\n"):
+        starts.append(off)
+        off += len(raw) + 1
+    return starts
+
+
+def _doc_pane(store: SpanStore, doc_id: str, painted, label: str) -> str:
+    text = store.get_document(doc_id)
+    marks = sorted(painted)
+    lines, offset, mi = [], 0, 0
+    for n, raw in enumerate(text.split("\n")):
+        line_end = offset + len(raw)
+        segs, cursor = [], offset
+        while mi < len(marks) and marks[mi][0] < line_end:
+            s, e, kind, iids, mid = marks[mi]
+            s, e = max(s, cursor), min(e, line_end)
+            segs.append(_esc(text[cursor:s]))
+            segs.append(f'<mark class="m {_KIND_CLASS[kind]}" id="{mid}" '
+                        f'data-int="{" ".join(iids)}">{_esc(text[s:e])}</mark>')
+            cursor = e
+            mi += 1
+        segs.append(_esc(text[cursor:line_end]))
+        cls = _classify(raw)
+        body = "".join(segs) if cls != "blank" else ""
+        lines.append(f'<div class="docln {cls}" id="L{n}">{body}</div>')
+        offset = line_end + 1
+    return (
+        f'<aside class="doc"><h3>{_esc(label)}</h3>'
+        f'<div class="docbody">{"".join(lines)}</div></aside>'
+    )
+
+
+def _clusters(raw_for_doc, starts: list[int]) -> dict[str, list[list[str]]]:
+    """Per interaction: contiguous runs of document line-ids covering its ranges."""
+    by_int: dict[str, set[int]] = {}
+    for s, _e, _k, iid in raw_for_doc:
+        by_int.setdefault(iid, set()).add(bisect_right(starts, s) - 1)
+    out: dict[str, list[list[str]]] = {}
+    for iid, line_set in by_int.items():
+        runs, run = [], []
+        for ln in sorted(line_set):
+            if run and ln - run[-1] > 2:  # > one blank line between → new cluster
+                runs.append(run)
+                run = []
+            run.append(ln)
+        if run:
+            runs.append(run)
+        out[iid] = [[f"L{n}" for n in range(r[0], r[-1] + 1)] for r in runs]
+    return out
+
+
 def _answer_card(inter: Interaction, store: SpanStore, seg_id) -> str:
-    right = []
-    cited_texts = []
-    derivations = []  # (equation, ok) for the decision section
+    right, cited_texts, derivations = [], [], []
     label_terms = tuple(c.text for c in inter.frame.constraints) if inter.frame else ()
     for si, s in enumerate(inter.answer.sentences):
         oks = inter.verify.sentences[si].derived_ok if inter.verify else []
@@ -269,7 +323,7 @@ def _answer_card(inter: Interaction, store: SpanStore, seg_id) -> str:
                 cited_texts.append(sp.text)
         for di, d in enumerate(s.derived):
             eq = equation(d)
-            chips.append((d.text, "chip derived", "", eq))  # eq shows on hover
+            chips.append((d.text, "chip derived", "", eq))
             derivations.append((eq, oks[di] if di < len(oks) else False))
             for o in d.operands:
                 chips.append((o.text, "chip", seg_id(o.doc_id, o.char_start), ""))
@@ -299,44 +353,48 @@ def _answer_card(inter: Interaction, store: SpanStore, seg_id) -> str:
 
 
 def _abstain_card(inter: Interaction, seg_id) -> str:
-    parts = [f'<p class="reason">{_esc(inter.reason)}</p>']
+    label_terms = tuple(c.text for c in inter.frame.constraints) if inter.frame else ()
+    parts = [f'<p class="reason">{_render_text(inter.reason, label_terms=label_terms)}</p>']
     if inter.note:
         parts.append(f"<p>{_esc(inter.note)}</p>")
     for h in inter.closest:
         mid = seg_id(h.span.doc_id, h.span.char_start)
         link = f'<a data-target="{mid}">{_esc(h.span.text)}</a>' if mid else _esc(h.span.text)
-        score = f'<span style="color:#8b93a3">(score {h.score:.0f})</span>'
-        parts.append(f'<p class="closest">▸ {link} {score}</p>')
+        parts.append(f'<p class="closest">▸ {link} '
+                     f'<span style="color:#8b93a3">(score {h.score:.0f})</span></p>')
     return "".join(parts)
 
 
 def render_evidence_view(
     interactions: list[Interaction], store: SpanStore, *, title: str = "ATTEST — evidence view"
 ) -> str:
-    painted = {doc_id: _paint(rs) for doc_id, rs in _gather(interactions, store).items()}
+    raw = _gather(interactions, store)
+    painted = {doc_id: _paint(rs) for doc_id, rs in raw.items()}
 
     def seg_id(doc_id: str, pos: int) -> str:
         return _seg_id(painted.get(doc_id, []), pos)
 
-    # Document pane(s): one per doc that has any citation (else the first doc in the store).
     doc_ids = list(painted) or list(store._docs)[:1]
+    clusters: dict[str, list[list[str]]] = {}
     panes = []
     for doc_id in doc_ids:
         m = store._docs[doc_id].metadata
         label = f"{m.get('company', doc_id)} {m.get('form', '')}".strip() + " — canonical text"
         panes.append(_doc_pane(store, doc_id, painted.get(doc_id, []), label))
+        clusters.update(_clusters(raw.get(doc_id, []), _line_starts(store.get_document(doc_id))))
 
     cards = []
-    for inter in interactions:
+    for idx, inter in enumerate(interactions):
         body = _answer_card(inter, store, seg_id) if (
             inter.kind == "answer" and inter.answer is not None
         ) else _abstain_card(inter, seg_id)
         trace = f'<p class="trace"><b>decision</b> · {_esc(inter.trace)}</p>' if inter.trace else ""
         terms = tuple(c.text for c in inter.frame.constraints) if inter.frame else ()
-        q_html = _render_text(inter.question, label_terms=terms)  # label terms shared with the doc
+        q_html = _render_text(inter.question, label_terms=terms)
         cards.append(
-            f'<section class="card"><p class="q">{q_html}</p>'
-            f'<span class="badge {inter.kind}">{inter.kind}</span>{body}{trace}</section>'
+            f'<section class="card" id="i{idx}"><p class="q">{q_html}</p>'
+            f'<span class="badge {inter.kind}">{inter.kind}</span> '
+            f'<span class="hint">click to show evidence</span>{body}{trace}</section>'
         )
 
     return (
@@ -344,12 +402,12 @@ def render_evidence_view(
         '<meta name=viewport content="width=device-width,initial-scale=1">'
         f"<title>{_esc(title)}</title><style>{_CSS}</style></head><body>"
         f"<header><h1>{_esc(title)}</h1><p>{_source_links(store)}</p>"
-        "<p>Click a highlighted figure (or a closest span) to jump to it in the document. "
-        "Your review: does the highlighted span actually support the claim? "
+        "<p>Document is clean until you <b>click a card</b> — then only that query's evidence "
+        "lights up and is boxed. Your review: does the highlighted span support the claim? "
         "(entailment — not gated in v1)</p></header>"
         f'<div class="layout">{"".join(panes)}'
         f'<main class="cards">{"".join(cards)}</main></div>'
-        f"<script>{_JS}</script></body></html>"
+        f"<script>{_JS % json.dumps(clusters)}</script></body></html>"
     )
 
 

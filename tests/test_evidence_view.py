@@ -1,8 +1,10 @@
-"""Standing tests for the parallel evidence view (ROADMAP M2-T7, D8).
+"""Standing tests for the interactive parallel evidence view (ROADMAP M2-T7, D8, D15).
 
-The full canonical document renders on the left with cited ranges marked; a
-cited claim links (data-target) to a real mark id; unbound claims are flagged not
-linked; the render is deterministic and self-contained.
+The document is clean by default; clicking a card lights only that interaction's
+evidence (highlights in both panes + per-cluster boxes). Tests pin the static
+structure the JS drives: kinded doc marks own an interaction (data-int), the same
+label reads in both panes, cluster data + card ids are wired, and a cited claim
+links to a real mark.
 """
 
 import re
@@ -11,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from attest.evidence_view import Interaction, render_evidence_view
+from attest.frame import Constraint, QuestionFrame
 from attest.ingest import DocumentStore
 from attest.spans import SpanStore
 from attest.verify import Answer, AtomBinding, Sentence, verify
@@ -34,44 +37,49 @@ def _bind(store, literal, line):
     return AtomBinding(literal, DOC, start + i, start + i + len(literal))
 
 
-def _clean(store) -> Interaction:
+def _clean(store, frame=None) -> Interaction:
     ans = Answer([Sentence("Total assets were $364,980 million.",
                            atoms=[_bind(store, "364,980", TOTAL_ASSETS)])])
-    return Interaction("Total assets?", "answer", answer=ans, verify=verify(ans, store))
+    return Interaction("Total assets?", "answer", answer=ans, verify=verify(ans, store),
+                       frame=frame)
 
 
-def test_full_document_renders_with_marked_citation(store):
+def test_full_document_renders_with_kinded_marks(store):
     html = render_evidence_view([_clean(store)], store)
     assert html.startswith("<!doctype html")
     assert 'class="docbody"' in html
     assert len(html) > 100_000  # the whole canonical doc is in the pane
-    assert re.search(r'<mark class="fig" id="[^"]+">364,980</mark>', html)  # figure in situ
+    assert re.search(r'<mark class="m k-fig" id="[^"]+" data-int="i0">364,980</mark>', html)
 
 
-def test_question_label_highlighted_near_figure(store):
-    """D13 visualized: the question's label term is highlighted beside the figure."""
-    from attest.frame import Constraint, QuestionFrame
-    ans = Answer([Sentence("Total assets were $364,980 million.",
-                           atoms=[_bind(store, "364,980", TOTAL_ASSETS)])])
-    frame = QuestionFrame("q", [Constraint("metric", "Total assets")])
-    inter = Interaction("Total assets?", "answer", answer=ans, verify=verify(ans, store),
-                        frame=frame)
-    html = render_evidence_view([inter], store)
-    assert re.search(r'<mark class="lbl"[^>]*>Total assets</mark>', html)  # label highlighted
-    assert re.search(r'<mark class="fig"[^>]*>364,980</mark>', html)       # figure highlighted
-    # Cross-column association: the same label mark appears in the document AND the
-    # response column (question + answer), so "Total assets" reads as one thing.
-    doc, _, cards = html.partition('<main class="cards">')
-    assert re.search(r'<mark class="lbl" id="[^"]+">Total assets</mark>', doc)  # left (has id)
-    assert '<mark class="lbl">Total assets</mark>' in cards                     # right (no id)
+def test_document_is_clean_by_default(store):
+    """Nothing is lit or boxed until a card is clicked (no static `on`/`bx`)."""
+    html = render_evidence_view([_clean(store)], store)
+    assert "mark.m.on" in html  # the CSS rule exists
+    assert 'class="m k-fig on"' not in html and "docln bx" not in html  # but nothing lit yet
+
+
+def test_interaction_wiring_is_present(store):
+    html = render_evidence_view([_clean(store)], store)
+    assert "const CLUSTERS = " in html               # cluster data for the box JS
+    assert '<section class="card" id="i0">' in html    # card carries the interaction id
+    assert 'data-int="i0"' in html                     # marks own their interaction
 
 
 def test_cited_claim_links_to_a_real_mark(store):
     html = render_evidence_view([_clean(store)], store)
     target = re.search(r'data-target="([^"]+)"', html)
-    assert target, "no click-to-source chip rendered"
-    assert f'id="{target.group(1)}"' in html  # the chip points at a real mark
+    assert target and f'id="{target.group(1)}"' in html
     assert "✓ verify" in html
+
+
+def test_question_label_highlighted_in_both_panes(store):
+    """D13 visualized + cross-column: the label marks the document AND the response."""
+    frame = QuestionFrame("q", [Constraint("metric", "Total assets")])
+    html = render_evidence_view([_clean(store, frame)], store)
+    doc, _, cards = html.partition('<main class="cards">')
+    assert re.search(r'<mark class="m k-lbl"[^>]*>Total assets</mark>', doc)   # left
+    assert '<mark class="qlbl">Total assets</mark>' in cards                   # right
 
 
 def test_unbound_claim_is_flagged_not_linked(store):
@@ -79,7 +87,7 @@ def test_unbound_claim_is_flagged_not_linked(store):
     inter = Interaction("Total assets?", "answer", answer=ans, verify=verify(ans, store))
     html = render_evidence_view([inter], store)
     assert "✗ verify" in html and "999,999" in html
-    assert "data-target=" not in html  # nothing to link — the figure is unbound
+    assert "data-target=" not in html
 
 
 def test_abstention_shows_closest_spans(store):
@@ -102,8 +110,8 @@ def test_derived_value_shows_its_equation(store):
     ans = Answer([sent])
     inter = Interaction("delta?", "answer", answer=ans, verify=verify(ans, store))
     html = render_evidence_view([inter], store)
-    assert "364,980 − 352,583 = 12,397" in html       # shown in the decision section
-    assert 'title="364,980 − 352,583 = 12,397"' in html  # and on hover over the chip
+    assert "364,980 − 352,583 = 12,397" in html
+    assert 'title="364,980 − 352,583 = 12,397"' in html
     assert "✓ recomputed" in html
 
 
