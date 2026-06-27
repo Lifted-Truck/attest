@@ -219,25 +219,46 @@ def _doc_pane(store: SpanStore, doc_id: str, painted: list[Segment], label: str)
     )
 
 
-def _chip_sentence(text: str, chips: list[tuple[str, str, str, str]]) -> str:
-    placeholders: dict[str, str] = {}
-    for i, (literal, cls, target, title) in enumerate(chips):
-        token = f"\x00{i}\x00"
-        if literal in text and literal not in placeholders:
-            text = text.replace(literal, token, 1)
-            attr = f' data-target="{target}"' if target else ""
-            tip = f' title="{_esc(title)}"' if title else ""
-            placeholders[token] = f'<span class="{cls}"{attr}{tip}>{_esc(literal)}</span>'
-    out = _esc(text)
-    for token, chip in placeholders.items():
-        out = out.replace(_esc(token), chip)
-    return f"<p>{out}</p>"
+def _render_text(text: str, chips: tuple = (), label_terms: tuple = ()) -> str:
+    """Escape `text`, wrapping figure chips (by literal) and the question's label
+    terms (case-insensitive) as non-overlapping spans. Label terms use the same
+    `lbl` mark as the document, so "term debt" reads as the same thing in both
+    columns (the cross-column association the reviewer asked for)."""
+    spans: list[tuple[int, int, str]] = []
+
+    def claim(literal: str, make_html, ci: bool) -> None:
+        hay = text.lower() if ci else text
+        needle = literal.lower() if ci else literal
+        i = hay.find(needle)
+        while i != -1:
+            s, e = i, i + len(literal)
+            if all(e <= os or s >= oe for os, oe, _ in spans):  # skip if it overlaps a claimed span
+                spans.append((s, e, make_html(text[s:e])))
+                return
+            i = hay.find(needle, i + 1)
+
+    for literal, cls, target, title in chips:
+        attr = f' data-target="{target}"' if target else ""
+        tip = f' title="{_esc(title)}"' if title else ""
+        claim(literal, lambda t, c=cls, a=attr, p=tip: f'<span class="{c}"{a}{p}>{_esc(t)}</span>',
+              ci=False)
+    for term in label_terms:
+        claim(term, lambda t: f'<mark class="lbl">{_esc(t)}</mark>', ci=True)
+
+    out, cursor = [], 0
+    for s, e, h in sorted(spans):
+        out.append(_esc(text[cursor:s]))
+        out.append(h)
+        cursor = e
+    out.append(_esc(text[cursor:]))
+    return "".join(out)
 
 
 def _answer_card(inter: Interaction, store: SpanStore, seg_id) -> str:
     right = []
     cited_texts = []
     derivations = []  # (equation, ok) for the decision section
+    label_terms = tuple(c.text for c in inter.frame.constraints) if inter.frame else ()
     for si, s in enumerate(inter.answer.sentences):
         oks = inter.verify.sentences[si].derived_ok if inter.verify else []
         chips: list[tuple[str, str, str, str]] = []
@@ -255,7 +276,7 @@ def _answer_card(inter: Interaction, store: SpanStore, seg_id) -> str:
                 sp = store.span_containing(o.doc_id, o.char_start)
                 if sp:
                     cited_texts.append(sp.text)
-        right.append(_chip_sentence(s.text, chips))
+        right.append(f"<p>{_render_text(s.text, tuple(chips), label_terms)}</p>")
 
     ok = inter.verify.ok if inter.verify else False
     vtext = "✓ verify: every figure resolves to a cited span" if ok else \
@@ -311,8 +332,10 @@ def render_evidence_view(
             inter.kind == "answer" and inter.answer is not None
         ) else _abstain_card(inter, seg_id)
         trace = f'<p class="trace"><b>decision</b> · {_esc(inter.trace)}</p>' if inter.trace else ""
+        terms = tuple(c.text for c in inter.frame.constraints) if inter.frame else ()
+        q_html = _render_text(inter.question, label_terms=terms)  # label terms shared with the doc
         cards.append(
-            f'<section class="card"><p class="q">{_esc(inter.question)}</p>'
+            f'<section class="card"><p class="q">{q_html}</p>'
             f'<span class="badge {inter.kind}">{inter.kind}</span>{body}{trace}</section>'
         )
 
