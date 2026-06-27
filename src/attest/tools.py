@@ -7,10 +7,11 @@ can never drift. Each `Tool` is a name + description + a JSON-Schema `input_sche
 schema is the tool's contract on the wire — the MCP adapter advertises it verbatim
 (M4-T2), so the agent sees the same shape the CLI accepts.
 
-Read/write asymmetry (I4) is declared per tool (`read_only`) and enforced at the
-boundary in M4-T3, which also wires the log side-effects on `check_support` /
-`check_claim` / `verify`. Stdlib-only — the MCP dependency lives in
-`mcp_server.py`, kept out of the Layer-0 gate.
+Read/write asymmetry (I4) is structural: only the three write tools
+(`check_support` / `check_claim` / `verify`, `read_only=False`) close over the
+audit log and append a replayable record (I5); read tools hold no log reference,
+so they cannot write even by mistake (M4-T3). Stdlib-only — the MCP dependency
+lives in `mcp_server.py`, kept out of the Layer-0 gate.
 """
 
 from __future__ import annotations
@@ -22,17 +23,10 @@ from pathlib import Path
 from .audit import AuditLog
 from .ingest import DocumentStore
 from .retrieval import Hit, Retriever
-from .session import support_record
+from .session import support_record, verify_record
 from .spans import SpanStore
 from .support import check_support
-from .verify import (
-    Answer,
-    AtomBinding,
-    DerivedAtom,
-    Sentence,
-    VerifyResult,
-    verify,
-)
+from .verify import answer_from_json, result_to_json, verify
 
 
 @dataclass(frozen=True)
@@ -119,66 +113,21 @@ def _hit(h: Hit) -> dict:
     }
 
 
-# --- verify: JSON args <-> the structured Answer model, and the result back to JSON ---
-
-def _atom_from(d: dict) -> AtomBinding:
-    return AtomBinding(
-        text=d["text"],
-        doc_id=d["doc_id"],
-        char_start=d["char_start"],
-        char_end=d["char_end"],
-        content_hash=d.get("content_hash"),
-    )
-
-
-def _answer_from(a: dict) -> Answer:
-    sentences: list[Sentence] = []
-    for s in a["sentences"]:
-        atoms = [_atom_from(x) for x in s.get("atoms", [])]
-        derived = [
-            DerivedAtom(
-                text=d["text"],
-                operation=d["operation"],
-                operands=[_atom_from(o) for o in d["operands"]],
-            )
-            for d in s.get("derived", [])
-        ]
-        sentences.append(Sentence(text=s["text"], atoms=atoms, derived=derived))
-    return Answer(sentences)
-
-
-def _verify_result(r: VerifyResult) -> dict:
-    return {
-        "ok": r.ok,
-        "unbound": r.unbound(),
-        "sentences": [
-            {
-                "text": s.text,
-                "ok": s.ok,
-                "unbound_figures": s.unbound_figures,
-                "atoms": [
-                    {
-                        "text": v.binding.text,
-                        "doc_id": v.binding.doc_id,
-                        "char_start": v.binding.char_start,
-                        "char_end": v.binding.char_end,
-                        "status": v.status,
-                        "found": v.found,
-                    }
-                    for v in s.atom_verdicts
-                ],
-                "derived_ok": s.derived_ok,
-            }
-            for s in r.sentences
-        ],
-    }
-
-
 def default_registry(
     store_dir: Path | str, audit_path: Path | str | None = None
 ) -> dict[str, Tool]:
     span_store = SpanStore.from_store(DocumentStore(store_dir))
     retriever = Retriever(span_store)
+    # The audit log is the single writable surface (I4); it is the *only* thing the
+    # write tools below close over. The read tools never receive it, so the
+    # read/write asymmetry is structural — a read handler cannot append even by
+    # mistake, because it holds no reference to a log. (M4-T3)
+    log = AuditLog(audit_path) if audit_path is not None else None
+
+    def _append(payload: dict) -> None:
+        if log is not None:
+            log.append(payload)
+
     tools: list[Tool] = []
 
     def reg(
@@ -189,6 +138,8 @@ def default_registry(
         read_only: bool = True,
     ) -> None:
         tools.append(Tool(name, desc, fn, read_only, schema))
+
+    # --- Read tools: pure, side-effect-free; no log reference (I4) ---
 
     reg("search_corpus", "Ranked candidate spans for a query (with offsets).",
         lambda a: {"hits": [_hit(h) for h in retriever.search(a["query"], a.get("k", 10))]},
@@ -215,20 +166,33 @@ def default_registry(
         lambda a: {"doc_id": a["doc_id"], "text": span_store.get_document(a["doc_id"])},
         _obj({"doc_id": {"type": "string"}}, ["doc_id"]))
 
+    # --- Write tools: append a replayable record to the audit log (I5); read_only=False ---
+
+    def _check_support(a: dict) -> dict:
+        rec = support_record(a["query"], check_support(a["query"], retriever))
+        _append(rec)
+        return rec
+
+    def _check_claim(a: dict) -> dict:
+        rec = support_record(a["claim"], check_support(a["claim"], retriever), kind="check_claim")
+        _append(rec)
+        return rec
+
+    def _verify(a: dict) -> dict:
+        result = verify(answer_from_json(a["answer"]), span_store)
+        _append(verify_record(a["answer"], result))
+        return result_to_json(result)
+
     reg("check_support", "Supporting spans or 'insufficient' — the abstention decision (I2).",
-        lambda a: support_record(a["query"], check_support(a["query"], retriever)),
-        _obj({"query": {"type": "string"}}, ["query"]))
+        _check_support, _obj({"query": {"type": "string"}}, ["query"]), read_only=False)
 
     reg("check_claim", "Resolve a user-supplied claim to supporting spans (or none).",
-        lambda a: support_record(a["claim"], check_support(a["claim"], retriever)),
-        _obj({"claim": {"type": "string"}}, ["claim"]))
+        _check_claim, _obj({"claim": {"type": "string"}}, ["claim"]), read_only=False)
 
     reg("verify", "Resolve every bound atom + recompute derivations; flag unbound figures (I1/D9).",
-        lambda a: _verify_result(verify(_answer_from(a["answer"]), span_store)),
-        _obj({"answer": _ANSWER_SCHEMA}, ["answer"]))
+        _verify, _obj({"answer": _ANSWER_SCHEMA}, ["answer"]), read_only=False)
 
-    if audit_path is not None:
-        log = AuditLog(audit_path)
+    if log is not None:
 
         def _get_audit_log(a: dict) -> dict:
             entries = log.entries()[a.get("offset", 0):]
@@ -237,6 +201,4 @@ def default_registry(
         reg("get_audit_log", "Replay past interactions from the audit log (I5).", _get_audit_log,
             _obj({"offset": {"type": "integer", "minimum": 0, "default": 0}}, []))
 
-    # M4-T3 wires the append-to-log side effects on check_support / check_claim /
-    # verify and enforces read/write asymmetry (I4) at the MCP boundary.
     return {t.name: t for t in tools}

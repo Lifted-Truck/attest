@@ -152,6 +152,65 @@ def _resolve(binding: AtomBinding, store: SpanStore) -> AtomVerdict:
     return AtomVerdict(binding, "ok" if ok else "mismatch", slice_)
 
 
+# --- JSON (the MCP wire form) <-> the structured model -------------------------
+# Shared by the tool registry (tools.py) and the replay layer (session.py) so the
+# answer-with-tags contract is parsed in exactly one place.
+
+def _atom_from_json(d: dict) -> AtomBinding:
+    return AtomBinding(
+        text=d["text"],
+        doc_id=d["doc_id"],
+        char_start=d["char_start"],
+        char_end=d["char_end"],
+        content_hash=d.get("content_hash"),
+    )
+
+
+def answer_from_json(d: dict) -> Answer:
+    """Build an `Answer` from the wire payload (`{"sentences": [...]}`)."""
+    sentences: list[Sentence] = []
+    for s in d["sentences"]:
+        atoms = [_atom_from_json(x) for x in s.get("atoms", [])]
+        derived = [
+            DerivedAtom(
+                text=x["text"],
+                operation=x["operation"],
+                operands=[_atom_from_json(o) for o in x["operands"]],
+            )
+            for x in s.get("derived", [])
+        ]
+        sentences.append(Sentence(text=s["text"], atoms=atoms, derived=derived))
+    return Answer(sentences)
+
+
+def result_to_json(r: VerifyResult) -> dict:
+    """Serialize a `VerifyResult` to a JSON-able dict (the tool's return shape)."""
+    return {
+        "ok": r.ok,
+        "unbound": r.unbound(),
+        "sentences": [
+            {
+                "text": s.text,
+                "ok": s.ok,
+                "unbound_figures": s.unbound_figures,
+                "atoms": [
+                    {
+                        "text": v.binding.text,
+                        "doc_id": v.binding.doc_id,
+                        "char_start": v.binding.char_start,
+                        "char_end": v.binding.char_end,
+                        "status": v.status,
+                        "found": v.found,
+                    }
+                    for v in s.atom_verdicts
+                ],
+                "derived_ok": s.derived_ok,
+            }
+            for s in r.sentences
+        ],
+    }
+
+
 def verify(answer: Answer, store: SpanStore) -> VerifyResult:
     """Resolve every atom + derivation; flag unbound figures. I1/I3 enforced."""
     sentence_verdicts: list[SentenceVerdict] = []
