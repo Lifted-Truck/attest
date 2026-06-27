@@ -62,8 +62,8 @@ def test_question_label_highlighted_near_figure(store):
     # Cross-column association: the same label mark appears in the document AND the
     # response column (question + answer), so "Total assets" reads as one thing.
     doc, _, cards = html.partition('<main class="cards">')
-    assert '<mark class="lbl">Total assets</mark>' in doc      # left (document)
-    assert '<mark class="lbl">Total assets</mark>' in cards    # right (response)
+    assert re.search(r'<mark class="lbl" id="[^"]+">Total assets</mark>', doc)  # left (has id)
+    assert '<mark class="lbl">Total assets</mark>' in cards                     # right (no id)
 
 
 def test_cited_claim_links_to_a_real_mark(store):
