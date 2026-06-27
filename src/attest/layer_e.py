@@ -21,6 +21,7 @@ golden item (the runner snapshots the log length between items).
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 
 
@@ -65,3 +66,79 @@ def aggregate(scores: list[ItemScore]) -> dict:
         "verify_catches": sum(s.verify_failures for s in scores),
         "failures": [s.item_id for s in scores if not s.abstention_correct],
     }
+
+
+# --- entailment judge (the one model-as-judge in the system; isolated here) ---
+#
+# `verify` confirms a citation is *real*; this judge asks whether the cited span
+# actually *supports* the claim (entailment) — the runtime-ungated bit, measured
+# offline (brief §3). The model call is injected (`ask`) so the parsing logic is
+# deterministic and testable; the live default shells to `claude -p`.
+
+
+@dataclass(frozen=True)
+class Verdict:
+    entails: bool
+    raw: str
+
+
+_JUDGE_PROMPT = (
+    "You are a strict entailment judge for a grounded-retrieval system.\n"
+    "Does the SOURCE span, on its own, support the CLAIM? Consider negation, the "
+    "wrong period/entity, and attachment. Answer EXACTLY 'YES' or 'NO' on the first "
+    "line; default to NO if uncertain.\n\nCLAIM: {claim}\nSOURCE: {span}\n"
+)
+
+
+def judge_entailment(claim: str, span: str, ask: Callable[[str], str]) -> Verdict:
+    """Ask the injected model whether `span` supports `claim`. Conservative: only an
+    explicit YES counts as entailment."""
+    raw = ask(_JUDGE_PROMPT.format(claim=claim, span=span))
+    first = raw.strip().splitlines()[0].strip().upper() if raw.strip() else ""
+    return Verdict(entails=first.startswith("YES"), raw=raw)
+
+
+def claude_ask(prompt: str, timeout: int = 120) -> str:  # pragma: no cover - billed model call
+    """Default judge backend: a plain (no-MCP) headless Claude Code call."""
+    import subprocess
+
+    return subprocess.run(  # noqa: S603
+        ["claude", "-p", prompt], capture_output=True, text=True, timeout=timeout  # noqa: S607
+    ).stdout
+
+
+def claims_and_spans(verify_payload: dict, get_span: Callable[[str, int, int], str]) -> Iterator:
+    """From a logged `verify` record, yield (claim_sentence, [cited span texts]) for the judge."""
+    for sent in verify_payload.get("answer", {}).get("sentences", []):
+        spans = [
+            get_span(a["doc_id"], a["char_start"], a["char_end"]) for a in sent.get("atoms", [])
+        ]
+        if spans:
+            yield sent["text"], spans
+
+
+# --- abstention calibration (pure: Brier + reliability over (confidence, correct)) ---
+
+
+def brier_score(pairs: list[tuple[float, bool]]) -> float | None:
+    """Mean squared error of stated confidence vs outcome. 0 = perfect, 1 = worst."""
+    if not pairs:
+        return None
+    return round(sum((c - (1.0 if ok else 0.0)) ** 2 for c, ok in pairs) / len(pairs), 4)
+
+
+def reliability(pairs: list[tuple[float, bool]], bins: int = 5) -> list[dict]:
+    """Per confidence bucket: count, mean stated confidence, observed accuracy."""
+    out = []
+    for b in range(bins):
+        lo, hi = b / bins, (b + 1) / bins
+        bucket = [(c, ok) for c, ok in pairs if (lo <= c < hi or (b == bins - 1 and c == 1.0))]
+        if not bucket:
+            continue
+        out.append({
+            "bucket": f"{lo:.1f}-{hi:.1f}",
+            "n": len(bucket),
+            "mean_confidence": round(sum(c for c, _ in bucket) / len(bucket), 4),
+            "accuracy": round(sum(1 for _, ok in bucket if ok) / len(bucket), 4),
+        })
+    return out

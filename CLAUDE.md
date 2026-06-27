@@ -106,6 +106,7 @@ product.
 4. **Plural & ranked.** When multiple defensible answers exist, return them all, ranked, each with its own evidence — never collapse to one (brief §4).
 5. **`verify(answer)` before presenting.** It confirms every atom resolves at its offset + hash-matches (I1/I3), flags unbound figures, and recomputes derived values. If `not ok` → fix the binding or abstain. (`verify` confirms a citation is *real*, not that it *entails* — entailment is Layer-E.)
 6. The verify/support result is appended to the audit log (I5, from M3). Present, or abstain.
+7. **(Layer-E convention)** When run under the Layer-E harness (`scripts/run_layer_e.py`), end the answer with a line `Confidence: 0.NN` — your calibrated confidence that the answer is correct and grounded. The harness parses it for the calibration curve; it has no effect on the runtime guarantee.
 
 ## Stack (start boring on purpose)
 

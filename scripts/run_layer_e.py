@@ -13,22 +13,42 @@ Layer-E is **periodic, not a blocking gate** (brief §3), and the live run is
     python scripts/run_layer_e.py --live          # BILLED: actually run the agent + score
     python scripts/run_layer_e.py --live --limit 1   # smoke one item
 
-The entailment judge (LLM-as-judge over the cited spans) and abstention
-calibration (Brier) are the remaining Layer-E pieces; they are also model steps
-and slot in beside the deterministic scoring here.
+In `--live` it also runs the **entailment judge** (LLM-as-judge over each cited
+span, billed) and **calibration** (Brier + reliability over the agent's stated
+`Confidence: 0.NN` vs whether the answer entailed). So one live pass yields the
+full metric set: abstention accuracy, entailment rate, and calibration.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
 from attest.audit import AuditLog
-from attest.layer_e import aggregate, score_item
+from attest.ingest import DocumentStore
+from attest.layer_e import (
+    aggregate,
+    brier_score,
+    claims_and_spans,
+    claude_ask,
+    judge_entailment,
+    reliability,
+    score_item,
+)
+from attest.spans import SpanStore
+
+_CONF = re.compile(r"confidence[:\s]+(0?\.\d+|1(?:\.0+)?|0)", re.IGNORECASE)
+
+
+def parse_confidence(text: str) -> float | None:
+    """The agent ends its answer with 'Confidence: 0.NN' (documented convention)."""
+    m = _CONF.search(text or "")
+    return float(m.group(1)) if m else None
 
 ROOT = Path(__file__).resolve().parent.parent
 GOLDEN = ROOT / "golden_seed.json"
@@ -76,18 +96,43 @@ def main() -> int:
     AUDIT.parent.mkdir(parents=True, exist_ok=True)
     AUDIT.write_text("", encoding="utf-8")  # fresh log for this run
     log = AuditLog(AUDIT)
+    store = SpanStore.from_store(DocumentStore(ROOT / "corpus" / "store"))
 
-    scores = []
+    scores, entailed_items, calib = [], [], []
     for item in items:
         before = len(log.entries())
-        run_agent(item["question"])
+        stdout = run_agent(item["question"])
         segment = [e.payload for e in log.entries()[before:]]
         s = score_item(item, segment)
         scores.append(s)
         mark = "✓" if s.abstention_correct else "✗"
         print(f"  {mark} {item['id']:<5} presented={s.presented}  (answerable={s.answerable})")
 
-    summary = {"timestamp": ns.timestamp, **aggregate(scores)}
+        if s.presented:
+            # entailment: LLM-judge each cited span against its claim (billed)
+            payload = next(
+                e for e in reversed(segment) if e.get("kind") == "verify" and e.get("ok")
+            )
+            verdicts = [
+                judge_entailment(claim, "\n".join(spans), claude_ask).entails
+                for claim, spans in claims_and_spans(payload, store.get_span)
+            ]
+            item_ok = bool(verdicts) and all(verdicts)
+            entailed_items.append(item_ok)
+            # calibration: the agent's stated confidence vs whether it was right
+            conf = parse_confidence(stdout)
+            if conf is not None:
+                calib.append((conf, item_ok))
+
+    summary = {
+        "timestamp": ns.timestamp,
+        **aggregate(scores),
+        "entailment_rate": round(sum(entailed_items) / len(entailed_items), 4)
+        if entailed_items else None,
+        "brier": brier_score(calib),
+        "reliability": reliability(calib),
+        "n_calibrated": len(calib),
+    }
     TREND.parent.mkdir(parents=True, exist_ok=True)
     with TREND.open("a", encoding="utf-8") as f:
         f.write(json.dumps(summary) + "\n")
