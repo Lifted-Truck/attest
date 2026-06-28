@@ -9,8 +9,9 @@ deterministic output of the M1/M2 tools.
 
 Usage:
   python scripts/build_evidence_view.py                 # curated demos → ./evidence_view.html
-  python scripts/build_evidence_view.py --from-audit     # a REAL session → ./evidence_view.html
-  python scripts/build_evidence_view.py --from-audit audit_log/agent.jsonl --out review.html
+  python scripts/build_evidence_view.py --from-audit            # whole session → evidence_view.html
+  python scripts/build_evidence_view.py --from-audit --latest   # just the most recent answer
+  python scripts/build_evidence_view.py --from-audit --last 3 --out review.html
 
 `--from-audit` rebuilds the view from a live Claude Code / Desktop session's audit
 log (every presented `verify` becomes a card) — the bridge from working in Desktop
@@ -39,7 +40,7 @@ OUT = ROOT / "evidence_view.html"
 AUDIT = ROOT / "audit_log" / "agent.jsonl"
 
 
-def build_from_audit(audit_path: Path, out: Path) -> int:
+def build_from_audit(audit_path: Path, out: Path, last: int = 0) -> int:
     store = SpanStore.from_store(DocumentStore(ROOT / "corpus" / "store"))
     if not audit_path.exists():
         print(f"No audit log at {audit_path} — run a live session first "
@@ -50,8 +51,12 @@ def build_from_audit(audit_path: Path, out: Path) -> int:
     if not interactions:
         print(f"No presented (verify-ok) interactions in {audit_path} — nothing to render.")
         return 1
+    total = len(interactions)
+    if last > 0:                       # most recent N (the audit log is cumulative)
+        interactions = interactions[-last:]
     out.write_text(render_evidence_view(interactions, store), encoding="utf-8")
-    print(f"OK — wrote {out} ({len(interactions)} interaction(s) from {audit_path})")
+    scope = f" (latest {len(interactions)} of {total})" if len(interactions) != total else ""
+    print(f"OK — wrote {out} ({len(interactions)} interaction(s){scope} from {audit_path})")
     return 0
 
 TOTAL_ASSETS = "Total assets $ 364,980 $ 352,583"
@@ -64,10 +69,14 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Build the ATTEST evidence-view GUI")
     ap.add_argument("--from-audit", nargs="?", const=str(AUDIT), default=None,
                     metavar="PATH", help="rebuild from a live session's audit log")
+    ap.add_argument("--last", type=int, default=0, metavar="N",
+                    help="with --from-audit, render only the last N interactions (0 = all)")
+    ap.add_argument("--latest", action="store_true",
+                    help="with --from-audit, render only the most recent interaction")
     ap.add_argument("--out", default=str(OUT), help="output HTML path")
     ns = ap.parse_args()
     if ns.from_audit is not None:
-        return build_from_audit(Path(ns.from_audit), Path(ns.out))
+        return build_from_audit(Path(ns.from_audit), Path(ns.out), 1 if ns.latest else ns.last)
 
     store = SpanStore.from_store(DocumentStore(ROOT / "corpus" / "store"))
     retriever = Retriever(store)

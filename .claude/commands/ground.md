@@ -22,11 +22,12 @@ Follow the loop in `CLAUDE.md` ("Runtime agent loop"):
 5. **Present** the grounded answer (or the structured refusal / correction). End with
    a line `Confidence: 0.NN`.
 
-Then **rebuild the evidence view** from this session's audit log so I can review the
-citations beside the document:
+Then **rebuild the evidence view** for *this* answer so I can review the citations
+beside the document (`--latest` keeps it to the most recent interaction; drop it for
+the whole session):
 
 ```
-python scripts/build_evidence_view.py --from-audit
+python scripts/build_evidence_view.py --from-audit --latest
 ```
 
 …and tell me to open `evidence_view.html`.
