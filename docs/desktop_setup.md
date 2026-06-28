@@ -7,8 +7,16 @@ own** (the agent is the only model). This is the day-to-day workflow.
 ## 1. Connect the ATTEST tools
 
 The repo ships a project-scoped [`.mcp.json`](../.mcp.json) that registers the
-ATTEST server (`python -m attest.mcp_server`). Open this project in Claude Code
-Desktop and **approve the `attest` MCP server** when prompted.
+ATTEST server (`python -m attest.mcp_server`). "Open the project" just means
+**Claude Code Desktop's working folder is this repo** — there's no separate action.
+Desktop reads `.mcp.json` **when a session starts** and **approve the `attest`
+server** if prompted; so if you ever edit `.mcp.json` (or the tools don't appear),
+**start a fresh session in the repo** to re-read it. A different engagement is its
+own folder with its own `.mcp.json` + corpus — that's when "open the project"
+(point Desktop at that folder) is a real step.
+
+Quick check that it's live: ask *"use check_support to find Apple's total assets"* —
+a `supported` result with a span id means the tools are connected.
 
 Prerequisites (one time):
 
