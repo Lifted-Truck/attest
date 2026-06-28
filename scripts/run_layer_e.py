@@ -55,12 +55,23 @@ GOLDEN = ROOT / "golden_seed.json"
 AUDIT = ROOT / "audit_log" / "agent.jsonl"
 TREND = ROOT / "audit_log" / "layer_e_results.jsonl"
 
-# Headless agent invocation. The agent reads the project CLAUDE.md (the runtime
-# loop) and reaches ATTEST via .mcp.json; tools are auto-approved for the run.
-# The prompt is the value of -p; flags follow.
+# Headless agent invocation. `--bare` forces ANTHROPIC_API_KEY auth (never the
+# keychain/OAuth) so a CI/eval env authenticates by key; it also skips CLAUDE.md
+# auto-discovery, so we re-add the repo (--add-dir, loads the loop) and a compact
+# system prompt. The agent reaches ATTEST via .mcp.json; tools auto-approved.
+AGENT_SYSTEM = (
+    "Answer the question ONLY using the attest MCP tools. Loop: search_corpus / "
+    "check_support to locate; get_span / get_document to read; draft, binding every "
+    "load-bearing figure to its exact span; call verify(answer) before presenting; "
+    "abstain (structured refusal) if unsupported or if the text doesn't answer THIS "
+    "question. End your reply with a line: Confidence: 0.NN"
+)
 CLAUDE_FLAGS = [
+    "--bare",
+    "--add-dir", str(ROOT),
     "--mcp-config", str(ROOT / ".mcp.json"),
     "--permission-mode", "bypassPermissions",
+    "--append-system-prompt", AGENT_SYSTEM,
     "--allowedTools", "mcp__attest__search_corpus,mcp__attest__get_span,"
     "mcp__attest__get_document,mcp__attest__check_support,mcp__attest__verify,"
     "mcp__attest__check_claim",
