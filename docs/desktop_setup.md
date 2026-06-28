@@ -50,6 +50,19 @@ parent's server connection (same old code) and can't invoke slash commands.
 Only the live MCP tool surface caches. (Dev tip: run `python -m attest.mcp_server`
 in a terminal to watch its logs while iterating.)
 
+**Smoke-test a tool change *without* restarting.** The MCP server is just one
+surface over the same `attest.tools` registry, so you can confirm a change works on
+the **CLI** (or in Python) before bothering with any Desktop refresh — same code,
+no stale process:
+
+```
+attest call verify '{"answer": {...}, "outcome": "correction"}'   # exercises the new path
+attest list                                                        # current tool set
+```
+
+If the CLI shows the new behaviour, the code is correct; the Desktop refresh is then
+only about making it usable interactively in chat — not a correctness gate.
+
 ## 2. Auth — no API key needed here
 
 In Desktop you're already signed in, and the ATTEST tools are deterministic, so the
