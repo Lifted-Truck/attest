@@ -45,23 +45,31 @@ def replay_support(payload: dict, retriever: Retriever) -> dict:
     return support_record(payload["query"], check_support(payload["query"], retriever), kind)
 
 
-def verify_record(answer_json: dict, result: VerifyResult) -> dict:
+def verify_record(answer_json: dict, result: VerifyResult, outcome: str | None = None) -> dict:
     """Loggable record of a verify interaction — self-contained and replayable.
 
     Stores the answer-with-tags input (so verify can be re-run from the log alone,
-    I5/I6) alongside the derived verdict.
+    I5/I6) alongside the derived verdict. `outcome` (D16: answer/correction/partial)
+    is the agent's self-declared outcome class — metadata for review / the evidence
+    view; included only when provided, so existing records are byte-unchanged (I6).
     """
-    return {
+    rec = {
         "kind": "verify",
         "answer": answer_json,
         "ok": result.ok,
         "unbound": result.unbound(),
     }
+    if outcome is not None:
+        rec["outcome"] = outcome
+    return rec
 
 
 def replay_verify(payload: dict, store: SpanStore) -> dict:
     """Re-run verify from the logged answer alone and re-derive the record (I6)."""
-    return verify_record(payload["answer"], verify(answer_from_json(payload["answer"]), store))
+    return verify_record(
+        payload["answer"], verify(answer_from_json(payload["answer"]), store),
+        payload.get("outcome"),
+    )
 
 
 def replays_identically(payload: dict, engine) -> bool:

@@ -61,9 +61,9 @@ def test_document_is_clean_by_default(store):
 
 def test_interaction_wiring_is_present(store):
     html = render_evidence_view([_clean(store)], store)
-    assert "const CLUSTERS = " in html               # cluster data for the box JS
-    assert '<section class="card" id="i0">' in html    # card carries the interaction id
-    assert 'data-int="i0"' in html                     # marks own their interaction
+    assert "const CLUSTERS = " in html                          # cluster data for the box JS
+    assert re.search(r'<section class="card answer" id="i0">', html)  # card carries kind + id
+    assert 'data-int="i0"' in html                              # marks own their interaction
 
 
 def test_cited_claim_links_to_a_real_mark(store):
@@ -142,3 +142,37 @@ def test_interactions_from_audit_rebuilds_presented(store):
     assert len(inters) == 1                                   # only the presented one
     assert inters[0].question == "What were Apple's total assets?"  # paired from check_support
     assert inters[0].verify is not None and inters[0].verify.ok    # verify re-run, resolves
+
+
+def test_correction_renders_distinctly(store):
+    """A grounded correction (D16) presents: its own badge/colour + highlighted spans."""
+    ans = Answer([Sentence(
+        "Total assets did not decline — they rose from $352,583M to $364,980M.",
+        atoms=[_bind(store, "352,583", TOTAL_ASSETS), _bind(store, "364,980", TOTAL_ASSETS)],
+    )])
+    inter = Interaction("Why did total assets decline?", "correction",
+                        answer=ans, verify=verify(ans, store))
+    html = render_evidence_view([inter], store)
+    assert '<section class="card correction" id="i0">' in html   # distinct card class
+    assert '<span class="badge correction">' in html             # distinct badge
+    assert "--corr:" in html and ".card.correction.active" in html  # its own colour
+    assert re.search(r'<mark class="m k-fig"[^>]*>364,980</mark>', html)  # spans highlight
+
+
+def test_from_audit_tags_outcome(store):
+    """interactions_from_audit reads the logged D16 outcome → the card's kind."""
+    from attest.evidence_view import interactions_from_audit
+
+    atom = _bind(store, "352,583", TOTAL_ASSETS)
+    answer_json = {"sentences": [{
+        "text": "Total assets rose to $364,980M (from $352,583M).",
+        "atoms": [{"text": atom.text, "doc_id": atom.doc_id,
+                   "char_start": atom.char_start, "char_end": atom.char_end}],
+    }]}
+    entries = [
+        {"kind": "check_support", "query": "Why did total assets decline?",
+         "status": "supported"},
+        {"kind": "verify", "ok": True, "answer": answer_json, "outcome": "correction"},
+    ]
+    inters = interactions_from_audit(entries, store)
+    assert len(inters) == 1 and inters[0].kind == "correction"

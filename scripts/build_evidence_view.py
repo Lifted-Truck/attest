@@ -193,15 +193,19 @@ def main() -> int:
               f"BUT the agent abstains on the period mismatch (semantic trap, D12 → Layer-E)",
     ))
 
-    # 6. Reject the false premise — cite the figures that disprove it.
+    # 6. Grounded correction (D16) — the premise is false, so present a refutation that
+    #    CITES the contradicting figures (not a silent abstention).
     q6 = "Why did Apple's total assets decline in fiscal 2024?"
+    a6 = Answer([Sentence(
+        "Apple's total assets did not decline in fiscal 2024 — they rose from $352,583 "
+        "million (FY2023) to $364,980 million (FY2024).",
+        atoms=[bind("352,583", TOTAL_ASSETS), bind("364,980", TOTAL_ASSETS)],
+    )])
     interactions.append(Interaction(
-        q6, "reject",
-        reason="The premise is false: total assets rose, they did not decline.",
-        note="Total assets increased from $352,583M (FY2023) to $364,980M (FY2024).",
-        closest=retriever.search("total assets", 1),
-        trace="agent rejects the false premise; the cited figures show the value rose "
-              "(semantic, D12 → Layer-E). Note the $-figures here are illustrative, not bound.",
+        q6, "correction", answer=a6, verify=verify(a6, store),
+        note="False premise → grounded correction: the cited figures show the value rose.",
+        trace="agent rejects the false premise and cites the contradicting figures "
+              "(grounded correction, D16); both atoms verify against the balance sheet.",
     ))
 
     out = Path(ns.out)

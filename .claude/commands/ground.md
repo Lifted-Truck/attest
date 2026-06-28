@@ -19,6 +19,8 @@ Follow the loop in `CLAUDE.md` ("Runtime agent loop"):
 3. **Ground the output** — bind every load-bearing figure/date/entity to its exact
    span; derived values declare their operands, never a cited result (D9).
 4. **`verify(answer)` before presenting** — if `not ok`, fix the binding or abstain.
+   Pass `outcome` (`answer` / `correction` / `partial`) so the review view tags it
+   correctly (a grounded correction shows in its own color).
 5. **Present** the grounded answer (or the structured refusal / correction). End with
    a line `Confidence: 0.NN`.
 

@@ -42,6 +42,11 @@ class Interaction:
     frame: QuestionFrame | None = None
 
 
+# Outcome classes that PRESENT something (D16) — they get cited-span highlights and
+# the answer-style card; only `abstain` stays silent.
+_PRESENTS = {"answer", "correction", "partial"}
+
+
 def interactions_from_audit(entries: list[dict], store: SpanStore) -> list[Interaction]:
     """Reconstruct presented interactions from audit-log payloads (I5) → evidence view.
 
@@ -58,9 +63,10 @@ def interactions_from_audit(entries: list[dict], store: SpanStore) -> list[Inter
             question = e.get("query") or e.get("claim") or question
         elif kind == "verify" and e.get("ok") and e.get("answer"):
             answer = answer_from_json(e["answer"])
+            outcome = e.get("outcome") if e.get("outcome") in _PRESENTS else "answer"
             out.append(Interaction(
                 question=question or "(question not in log)",
-                kind="answer", answer=answer, verify=run_verify(answer, store),
+                kind=outcome, answer=answer, verify=run_verify(answer, store),
                 note="Reconstructed from the audit log (I5) — a real logged session.",
             ))
     return out
@@ -69,7 +75,7 @@ def interactions_from_audit(entries: list[dict], store: SpanStore) -> list[Inter
 _CSS = """
 :root { --bg:#0f1115; --panel:#171a21; --ink:#e6e9ef; --muted:#8b93a3;
   --line:#262b36; --markb:#e0a32e; --ok:#3fb950; --bad:#f85149;
-  --chip:#1f6feb22; --chipb:#388bfd; --teal:#5fe0c4; }
+  --chip:#1f6feb22; --chipb:#388bfd; --teal:#5fe0c4; --corr:#a371f7; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--ink); height:100vh; overflow:hidden;
   display:flex; flex-direction:column;
@@ -118,12 +124,16 @@ mark.flash { outline:2px solid var(--chipb); }
 .card { border-bottom:1px solid var(--line); padding:18px 24px; cursor:pointer;
   border-left:3px solid transparent; }
 .card.active { border-left-color:var(--chipb); background:#10131a; }
+.card.correction.active { border-left-color:var(--corr); }
+.card.partial.active { border-left-color:var(--markb); }
 .card .hint { color:var(--muted); font-size:11px; } .card.active .hint { color:var(--chipb); }
 .q { font-weight:600; margin:0 0 2px; }
 .badge { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.04em;
   padding:2px 8px; border-radius:999px; text-transform:uppercase; margin-bottom:10px; }
 .badge.answer { background:#11331c; color:var(--ok); }
-.badge.abstain, .badge.reject, .badge.partial { background:#3a1d1d; color:var(--bad); }
+.badge.abstain, .badge.reject { background:#3a1d1d; color:var(--bad); }
+.badge.correction { background:#241a3a; color:var(--corr); }
+.badge.partial { background:#3a2f12; color:var(--markb); }
 .answer-text { background:var(--panel); border:1px solid var(--line); border-radius:8px;
   padding:12px 14px; }
 .reason { color:var(--muted); margin:0 0 8px; }
@@ -255,7 +265,7 @@ def _gather(interactions, store) -> dict[str, list[tuple[int, int, str, str]]]:
 
     for idx, inter in enumerate(interactions):
         iid = f"i{idx}"
-        if inter.kind == "answer" and inter.answer is not None:
+        if inter.kind in _PRESENTS and inter.answer is not None:
             cons = inter.frame.constraints if inter.frame else []
             for sent in inter.answer.sentences:
                 atoms = list(sent.atoms) + [o for d in sent.derived for o in d.operands]
@@ -452,13 +462,13 @@ def render_evidence_view(
     cards = []
     for idx, inter in enumerate(interactions):
         body = _answer_card(inter, store, seg_id) if (
-            inter.kind == "answer" and inter.answer is not None
+            inter.kind in _PRESENTS and inter.answer is not None
         ) else _abstain_card(inter, seg_id)
         trace = f'<p class="trace"><b>decision</b> · {_esc(inter.trace)}</p>' if inter.trace else ""
         terms = tuple(c.text for c in inter.frame.constraints) if inter.frame else ()
         q_html = _render_text(inter.question, label_terms=terms)
         cards.append(
-            f'<section class="card" id="i{idx}"><p class="q">{q_html}</p>'
+            f'<section class="card {inter.kind}" id="i{idx}"><p class="q">{q_html}</p>'
             f'<span class="badge {inter.kind}">{inter.kind}</span> '
             f'<span class="hint">click to show evidence</span>{body}{trace}</section>'
         )

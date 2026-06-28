@@ -180,7 +180,7 @@ def default_registry(
 
     def _verify(a: dict) -> dict:
         result = verify(answer_from_json(a["answer"]), span_store)
-        _append(verify_record(a["answer"], result))
+        _append(verify_record(a["answer"], result, a.get("outcome")))
         return result_to_json(result)
 
     reg("check_support", "Supporting spans or 'insufficient' — the abstention decision (I2).",
@@ -190,7 +190,12 @@ def default_registry(
         _check_claim, _obj({"claim": {"type": "string"}}, ["claim"]), read_only=False)
 
     reg("verify", "Resolve every bound atom + recompute derivations; flag unbound figures (I1/D9).",
-        _verify, _obj({"answer": _ANSWER_SCHEMA}, ["answer"]), read_only=False)
+        _verify, _obj({
+            "answer": _ANSWER_SCHEMA,
+            "outcome": {"type": "string", "enum": ["answer", "correction", "partial"],
+                        "description": "Outcome class (D16) — for review; correction = "
+                                       "grounded refutation of a false premise."},
+        }, ["answer"]), read_only=False)
 
     if log is not None:
 
