@@ -32,11 +32,13 @@ import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 from attest.audit import AuditLog
 from attest.ingest import DocumentStore
 from attest.layer_e import (
+    CORRECTION,
     aggregate,
     brier_score,
     claims_and_spans,
     claude_ask,
     judge_entailment,
+    judge_refutes_premise,
     reliability,
     score_item,
 )
@@ -110,7 +112,7 @@ def main() -> int:
     log = AuditLog(AUDIT)
     store = SpanStore.from_store(DocumentStore(ROOT / "corpus" / "store"))
 
-    scores, entailed_items, calib, errored = [], [], [], []
+    scores, entailed_items, calib, errored, refutations = [], [], [], [], []
     for item in items:
         before = len(log.entries())
         proc = run_agent(item["question"])
@@ -129,17 +131,18 @@ def main() -> int:
 
         s = score_item(item, segment)
         scores.append(s)
-        mark = "✓" if s.abstention_correct else "✗"
-        print(f"  {mark} {item['id']:<5} presented={s.presented}  (answerable={s.answerable})")
+        mark = "✓" if s.decision_correct else "✗"
+        print(f"  {mark} {item['id']:<5} {s.expected:<10} presented={s.presented}")
 
         if s.presented:
             # entailment: LLM-judge each cited span against its claim (billed)
             payload = next(
                 e for e in reversed(segment) if e.get("kind") == "verify" and e.get("ok")
             )
+            pairs = list(claims_and_spans(payload, store.get_span))
             verdicts = [
-                judge_entailment(claim, "\n".join(spans), claude_ask).entails
-                for claim, spans in claims_and_spans(payload, store.get_span)
+                judge_entailment(claim, "\n".join(spans), claude_ask).yes
+                for claim, spans in pairs
             ]
             item_ok = bool(verdicts) and all(verdicts)
             entailed_items.append(item_ok)
@@ -147,6 +150,10 @@ def main() -> int:
             conf = parse_confidence(stdout)
             if conf is not None:
                 calib.append((conf, item_ok))
+            # grounded correction (D16): did it actually refute the false premise?
+            if s.expected == CORRECTION:
+                answer = " ".join(c for c, _ in pairs) or stdout
+                refutations.append(judge_refutes_premise(item["question"], answer, claude_ask).yes)
 
     if not scores:
         print("\nNo items scored — the agent produced no tool calls on any item.")
@@ -163,6 +170,8 @@ def main() -> int:
         "brier": brier_score(calib),
         "reliability": reliability(calib),
         "n_calibrated": len(calib),
+        "correction_refute_rate": round(sum(refutations) / len(refutations), 4)
+        if refutations else None,
         "n_errored": len(errored),
         "errored": errored,
     }

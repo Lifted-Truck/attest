@@ -6,14 +6,15 @@ non-deterministic and **periodic, not a blocking gate** (brief §3). But the
 agent's tool calls are logged immutably (I5), so a large part of the scoring is
 *deterministic and replayable from the audit log* — that's what lives here:
 
-  - **abstention correctness** — did the agent abstain on unanswerable items and
-    present on answerable ones? Inferred from the log: a passing `verify` record
-    means it presented a grounded answer; its absence means it abstained.
+  - **decision correctness** — did the present/abstain decision match the item's
+    expected outcome class (D16: answer | abstain | correction | partial)? A
+    passing `verify` record means it presented; its absence means it abstained.
   - **verify-catch count** — how often `verify` flagged an ungrounded draft.
 
 The remaining Layer-E metrics are model/extra and live in the runner: entailment
-(LLM-as-judge over the cited spans) and abstention calibration (Brier). This
-module stays pure so its scoring is itself testable in the Layer-0 gate.
+(LLM-as-judge over the cited spans), false-premise refutation (did a *correction*
+actually refute?), and calibration (Brier). This module stays pure so its scoring
+is itself testable in the Layer-0 gate.
 
 A log *segment* is the slice of audit entries produced while the agent worked one
 golden item (the runner snapshots the log length between items).
@@ -24,47 +25,67 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 
+# Four first-class outcomes (D16). "Ground or abstain" is not binary: rejecting a
+# false premise WITH the contradicting evidence is a grounded *correction*, not an
+# abstention, and answering an in-corpus part while flagging the rest is *partial*.
+# Both should present something; only `abstain` should stay silent.
+ANSWER, ABSTAIN, CORRECTION, PARTIAL = "answer", "abstain", "correction", "partial"
+PRESENTS = {ANSWER, CORRECTION, PARTIAL}  # classes where the agent SHOULD present
+
+
+def expected_outcome(item: dict) -> str:
+    """Derive the expected outcome class from the golden item (no seed edits)."""
+    if item.get("answerable"):
+        return ANSWER
+    beh = item.get("expected_behavior")
+    if beh == "reject-false-premise":
+        return CORRECTION
+    if beh == "partial-abstain":
+        return PARTIAL
+    return ABSTAIN
+
 
 @dataclass(frozen=True)
 class ItemScore:
     item_id: str
-    answerable: bool
+    expected: str              # answer | abstain | correction | partial
     presented: bool            # a passing verify record exists → the agent presented
-    abstention_correct: bool   # presented iff answerable
+    decision_correct: bool     # present/abstain decision matches the expected class
     verify_failures: int       # verify records the agent ran that did NOT pass
 
 
 def score_item(item: dict, log_segment: list[dict]) -> ItemScore:
     verifies = [e for e in log_segment if e.get("kind") == "verify"]
     presented = any(e.get("ok") for e in verifies)
-    answerable = bool(item["answerable"])
+    expected = expected_outcome(item)
     return ItemScore(
         item_id=item["id"],
-        answerable=answerable,
+        expected=expected,
         presented=presented,
-        abstention_correct=(presented == answerable),
+        decision_correct=(presented == (expected in PRESENTS)),
         verify_failures=sum(1 for e in verifies if not e.get("ok")),
     )
 
 
 def aggregate(scores: list[ItemScore]) -> dict:
-    answerable = [s for s in scores if s.answerable]
-    unanswerable = [s for s in scores if not s.answerable]
-
     def rate(xs: list[bool]) -> float | None:
         return round(sum(xs) / len(xs), 4) if xs else None
 
+    def of(cls: str) -> list[ItemScore]:
+        return [s for s in scores if s.expected == cls]
+
     return {
         "n": len(scores),
-        "n_answerable": len(answerable),
-        "n_unanswerable": len(unanswerable),
-        # the headline: did it abstain on every unanswerable item?
-        "abstention_accuracy": rate([s.presented is False for s in unanswerable]),
-        # did it present a grounded answer on answerable items?
-        "answer_rate": rate([s.presented for s in answerable]),
-        "abstention_correct_overall": rate([s.abstention_correct for s in scores]),
+        "by_class": {c: len(of(c)) for c in (ANSWER, ABSTAIN, CORRECTION, PARTIAL)},
+        # the present/abstain decision matched the expected class, overall
+        "decision_accuracy": rate([s.decision_correct for s in scores]),
+        # per class: did it do the right kind of thing?
+        "answer_rate": rate([s.presented for s in of(ANSWER)]),
+        "abstention_accuracy": rate([not s.presented for s in of(ABSTAIN)]),
+        "correction_rate": rate([s.presented for s in of(CORRECTION)]),
+        "partial_rate": rate([s.presented for s in of(PARTIAL)]),
         "verify_catches": sum(s.verify_failures for s in scores),
-        "failures": [s.item_id for s in scores if not s.abstention_correct],
+        "failures": [s.item_id for s in scores if not s.decision_correct],
     }
 
 
@@ -78,8 +99,14 @@ def aggregate(scores: list[ItemScore]) -> dict:
 
 @dataclass(frozen=True)
 class Verdict:
-    entails: bool
+    yes: bool   # the asked YES/NO condition holds
     raw: str
+
+
+def _verdict(raw: str) -> Verdict:
+    """Parse a model reply whose first line is YES/NO. Conservative: only explicit YES."""
+    first = raw.strip().splitlines()[0].strip().upper() if raw.strip() else ""
+    return Verdict(yes=first.startswith("YES"), raw=raw)
 
 
 _JUDGE_PROMPT = (
@@ -89,13 +116,22 @@ _JUDGE_PROMPT = (
     "line; default to NO if uncertain.\n\nCLAIM: {claim}\nSOURCE: {span}\n"
 )
 
+_REFUTE_PROMPT = (
+    "A user's QUESTION contains a FALSE PREMISE. Did the ANSWER reject/correct that "
+    "premise (rather than accept it and confabulate)? Answer EXACTLY 'YES' or 'NO' on "
+    "the first line; YES only if it clearly refutes the premise.\n\n"
+    "QUESTION: {question}\nANSWER: {answer}\n"
+)
+
 
 def judge_entailment(claim: str, span: str, ask: Callable[[str], str]) -> Verdict:
-    """Ask the injected model whether `span` supports `claim`. Conservative: only an
-    explicit YES counts as entailment."""
-    raw = ask(_JUDGE_PROMPT.format(claim=claim, span=span))
-    first = raw.strip().splitlines()[0].strip().upper() if raw.strip() else ""
-    return Verdict(entails=first.startswith("YES"), raw=raw)
+    """Ask the injected model whether `span` supports `claim` (only explicit YES counts)."""
+    return _verdict(ask(_JUDGE_PROMPT.format(claim=claim, span=span)))
+
+
+def judge_refutes_premise(question: str, answer: str, ask: Callable[[str], str]) -> Verdict:
+    """For a false-premise item: did the answer refute the premise (a grounded correction)?"""
+    return _verdict(ask(_REFUTE_PROMPT.format(question=question, answer=answer)))
 
 
 def claude_ask(prompt: str, timeout: int = 120) -> str:  # pragma: no cover - billed model call

@@ -8,7 +8,9 @@ from attest.layer_e import (
     aggregate,
     brier_score,
     claims_and_spans,
+    expected_outcome,
     judge_entailment,
+    judge_refutes_premise,
     reliability,
     score_item,
 )
@@ -24,66 +26,93 @@ CAUGHT = [  # the agent drafted something ungrounded; verify flagged it, then it
     {"kind": "verify", "ok": False, "unbound": ["999,999"]},
 ]
 
-
-def test_answerable_presented_is_correct():
-    s = score_item({"id": "G001", "answerable": True}, ANSWERED)
-    assert s.presented and s.abstention_correct
-
-
-def test_unanswerable_abstained_is_correct():
-    s = score_item({"id": "G011", "answerable": False}, ABSTAINED)
-    assert not s.presented and s.abstention_correct
+# golden-item shapes (subset of fields the scorer reads)
+I_ANSWER = {"id": "G001", "answerable": True}
+I_ABSTAIN = {"id": "G011", "answerable": False, "expected_behavior": "abstain"}
+I_CORRECTION = {"id": "G020", "answerable": False, "expected_behavior": "reject-false-premise"}
+I_PARTIAL = {"id": "G016", "answerable": False, "expected_behavior": "partial-abstain"}
 
 
-def test_unanswerable_but_presented_is_a_failure():
-    """A semantic-trap miss: it presented on an unanswerable item."""
-    s = score_item({"id": "G014", "answerable": False}, ANSWERED)
-    assert s.presented and not s.abstention_correct
+def test_expected_outcome_taxonomy():
+    assert expected_outcome(I_ANSWER) == "answer"
+    assert expected_outcome(I_ABSTAIN) == "abstain"
+    assert expected_outcome(I_CORRECTION) == "correction"
+    assert expected_outcome(I_PARTIAL) == "partial"
 
 
-def test_answerable_but_abstained_is_a_failure():
-    s = score_item({"id": "G002", "answerable": True}, ABSTAINED)
-    assert not s.presented and not s.abstention_correct
+def test_answer_presented_is_correct():
+    s = score_item(I_ANSWER, ANSWERED)
+    assert s.presented and s.decision_correct and s.expected == "answer"
+
+
+def test_abstain_silent_is_correct():
+    s = score_item(I_ABSTAIN, ABSTAINED)
+    assert not s.presented and s.decision_correct
+
+
+def test_grounded_correction_must_present():
+    """A false-premise item is RIGHT to present (a grounded refutation), not abstain."""
+    presented = score_item(I_CORRECTION, ANSWERED)
+    assert presented.presented and presented.decision_correct      # presented → correct
+    silent = score_item(I_CORRECTION, ABSTAINED)
+    assert not silent.presented and not silent.decision_correct    # silent → wrong
+
+
+def test_partial_must_present():
+    assert score_item(I_PARTIAL, ANSWERED).decision_correct
+    assert not score_item(I_PARTIAL, ABSTAINED).decision_correct
+
+
+def test_answer_but_abstained_is_a_failure():
+    s = score_item(I_ANSWER, ABSTAINED)
+    assert not s.presented and not s.decision_correct
 
 
 def test_verify_failures_counted():
-    s = score_item({"id": "G011", "answerable": False}, CAUGHT)
+    s = score_item(I_ABSTAIN, CAUGHT)
     assert s.verify_failures == 1 and not s.presented
 
 
-def test_aggregate_summarizes_a_session():
+def test_aggregate_summarizes_by_class():
     scores = [
-        score_item({"id": "G001", "answerable": True}, ANSWERED),
+        score_item(I_ANSWER, ANSWERED),
         score_item({"id": "G002", "answerable": True}, ANSWERED),
-        score_item({"id": "G011", "answerable": False}, ABSTAINED),
-        score_item({"id": "G014", "answerable": False}, ANSWERED),  # trap miss
+        score_item(I_ABSTAIN, ABSTAINED),
+        score_item(I_CORRECTION, ANSWERED),    # correctly presents a correction
+        score_item(I_PARTIAL, ABSTAINED),      # wrongly stayed silent
     ]
     agg = aggregate(scores)
-    assert agg["n"] == 4 and agg["n_unanswerable"] == 2
-    assert agg["answer_rate"] == 1.0          # both answerable presented
-    assert agg["abstention_accuracy"] == 0.5  # abstained on 1 of 2 unanswerable
-    assert agg["failures"] == ["G014"]
+    assert agg["n"] == 5
+    assert agg["by_class"] == {"answer": 2, "abstain": 1, "correction": 1, "partial": 1}
+    assert agg["answer_rate"] == 1.0
+    assert agg["abstention_accuracy"] == 1.0
+    assert agg["correction_rate"] == 1.0       # G020 presented its correction
+    assert agg["partial_rate"] == 0.0          # G016 wrongly abstained
+    assert agg["failures"] == ["G016"]
 
 
 # --- entailment judge (model call injected as a fake) ---
 
 
-def test_judge_yes_means_entails():
+def test_judge_yes_means_supported():
     v = judge_entailment("Total assets were $364,980M", "Total assets $ 364,980 $ 352,583",
                          ask=lambda _p: "YES — the line states it.")
-    assert v.entails
+    assert v.yes
 
 
-def test_judge_no_or_ambiguous_defaults_to_not_entailed():
-    assert not judge_entailment("x", "y", ask=lambda _p: "NO").entails
-    assert not judge_entailment("x", "y", ask=lambda _p: "").entails          # empty → NO
-    assert not judge_entailment("x", "y", ask=lambda _p: "maybe?").entails     # unclear → NO
+def test_judge_no_or_ambiguous_defaults_to_no():
+    assert not judge_entailment("x", "y", ask=lambda _p: "NO").yes
+    assert not judge_entailment("x", "y", ask=lambda _p: "").yes          # empty → NO
+    assert not judge_entailment("x", "y", ask=lambda _p: "maybe?").yes     # unclear → NO
 
 
-def test_judge_prompt_carries_claim_and_span():
-    seen = {}
-    judge_entailment("CLAIM-A", "SPAN-B", ask=lambda p: seen.setdefault("p", p) and "" or "YES")
-    assert "CLAIM-A" in seen["p"] and "SPAN-B" in seen["p"]
+def test_refutes_premise_judge():
+    yes = judge_refutes_premise("Why did assets decline?", "They did not decline; they rose.",
+                                ask=lambda p: "YES" if "decline" in p else "NO")
+    assert yes.yes
+    no = judge_refutes_premise("Why did assets decline?", "Assets fell by $X.",
+                               ask=lambda _p: "NO, it accepts the premise")
+    assert not no.yes
 
 
 def test_claims_and_spans_extracts_from_verify_record():

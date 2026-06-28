@@ -38,11 +38,16 @@ numbers are a snapshot, not an oracle.
 
 ## Follow-ups this surfaced
 
-1. **Scorer refinement (reject-false-premise).** Credit a grounded rejection of a
-   false premise as correct — likely judge-assisted ("does the presented answer
-   affirm or reject the premise?"). Needs a Decisions-log `D#`.
+1. **Scorer refinement (grounded correction) — DONE (D16).** Layer-E now scores
+   four outcome classes (answer / abstain / **correction** / **partial**); a false
+   premise is *expected to present* a grounded refutation, and a model judge
+   (`judge_refutes_premise`) confirms it actually refuted. The numbers above were
+   produced by the **old** binary scorer — on a re-run, G020 scores as a correct
+   `correction`, and G016 is re-classed `partial` (so its full abstention becomes a
+   *partial*-miss). Re-run `--live` to refresh the trend under the new taxonomy.
 2. **G008 / plural answers.** The agent abstains when it should surface multiple
    ranked values; tighten the loop guidance toward plural-and-ranked (brief §4).
 3. **Calibration / judge.** Agent is overconfident (0.98 → 0.69); and some
-   `entailment=NO` verdicts are the agent over-claiming beyond its cited spans.
-   Worth separating "agent over-claim" from "judge too strict" on the 4 misses.
+   `entailment=NO` verdicts were the **judge 401ing** (since fixed with `--bare`),
+   the rest the agent over-claiming. Re-run to get clean entailment numbers, then
+   separate "agent over-claim" from "judge too strict" on any remaining misses.
