@@ -7,16 +7,25 @@ curated (from the golden answers) — the *live* agent composes it at M4 — but
 citations, highlights, verify status, and abstention spans are all real
 deterministic output of the M1/M2 tools.
 
-Usage:  python scripts/build_evidence_view.py   # writes ./evidence_view.html
+Usage:
+  python scripts/build_evidence_view.py                 # curated demos → ./evidence_view.html
+  python scripts/build_evidence_view.py --from-audit     # a REAL session → ./evidence_view.html
+  python scripts/build_evidence_view.py --from-audit audit_log/agent.jsonl --out review.html
+
+`--from-audit` rebuilds the view from a live Claude Code / Desktop session's audit
+log (every presented `verify` becomes a card) — the bridge from working in Desktop
+to reviewing the citations.
 """
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
-from attest.evidence_view import Interaction, render_evidence_view
+from attest.audit import AuditLog
+from attest.evidence_view import Interaction, interactions_from_audit, render_evidence_view
 from attest.frame import Constraint, QuestionFrame
 from attest.ingest import DocumentStore
 from attest.retrieval import Retriever
@@ -27,6 +36,23 @@ from attest.verify import Answer, AtomBinding, DerivedAtom, Sentence, verify
 ROOT = Path(__file__).resolve().parent.parent
 DOC = "AAPL-10K-FY2024"
 OUT = ROOT / "evidence_view.html"
+AUDIT = ROOT / "audit_log" / "agent.jsonl"
+
+
+def build_from_audit(audit_path: Path, out: Path) -> int:
+    store = SpanStore.from_store(DocumentStore(ROOT / "corpus" / "store"))
+    if not audit_path.exists():
+        print(f"No audit log at {audit_path} — run a live session first "
+              "(or scripts/run_layer_e.py).")
+        return 1
+    entries = [e.payload for e in AuditLog(audit_path).entries()]
+    interactions = interactions_from_audit(entries, store)
+    if not interactions:
+        print(f"No presented (verify-ok) interactions in {audit_path} — nothing to render.")
+        return 1
+    out.write_text(render_evidence_view(interactions, store), encoding="utf-8")
+    print(f"OK — wrote {out} ({len(interactions)} interaction(s) from {audit_path})")
+    return 0
 
 TOTAL_ASSETS = "Total assets $ 364,980 $ 352,583"
 LIAB_EQUITY = "Total liabilities and shareholders’ equity $ 364,980 $ 352,583"
@@ -35,6 +61,14 @@ TERM_NON = "Term debt 85,750 95,281"
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser(description="Build the ATTEST evidence-view GUI")
+    ap.add_argument("--from-audit", nargs="?", const=str(AUDIT), default=None,
+                    metavar="PATH", help="rebuild from a live session's audit log")
+    ap.add_argument("--out", default=str(OUT), help="output HTML path")
+    ns = ap.parse_args()
+    if ns.from_audit is not None:
+        return build_from_audit(Path(ns.from_audit), Path(ns.out))
+
     store = SpanStore.from_store(DocumentStore(ROOT / "corpus" / "store"))
     retriever = Retriever(store)
     canonical = store.get_document(DOC)
@@ -161,8 +195,9 @@ def main() -> int:
               "(semantic, D12 → Layer-E). Note the $-figures here are illustrative, not bound.",
     ))
 
-    OUT.write_text(render_evidence_view(interactions, store), encoding="utf-8")
-    print(f"OK — wrote {OUT.relative_to(ROOT)} ({len(interactions)} interactions)")
+    out = Path(ns.out)
+    out.write_text(render_evidence_view(interactions, store), encoding="utf-8")
+    print(f"OK — wrote {out} ({len(interactions)} interactions)")
     return 0
 
 

@@ -25,7 +25,8 @@ from dataclasses import dataclass, field
 from .frame import QuestionFrame, check_coverage
 from .retrieval import Hit
 from .spans import SpanStore
-from .verify import Answer, VerifyResult, equation
+from .verify import Answer, VerifyResult, answer_from_json, equation
+from .verify import verify as run_verify
 
 
 @dataclass
@@ -39,6 +40,30 @@ class Interaction:
     note: str = ""
     trace: str = ""
     frame: QuestionFrame | None = None
+
+
+def interactions_from_audit(entries: list[dict], store: SpanStore) -> list[Interaction]:
+    """Reconstruct presented interactions from audit-log payloads (I5) → evidence view.
+
+    The bridge from a live Claude Code / Desktop session to the review GUI: each
+    `verify(ok)` record becomes a card, its question taken from the preceding
+    `check_support` / `check_claim`. `verify` is re-run (deterministic) so the view
+    reflects the current corpus. Abstentions (no `verify ok`) are not rendered.
+    """
+    out: list[Interaction] = []
+    question = None
+    for e in entries:
+        kind = e.get("kind")
+        if kind in ("check_support", "check_claim"):
+            question = e.get("query") or e.get("claim") or question
+        elif kind == "verify" and e.get("ok") and e.get("answer"):
+            answer = answer_from_json(e["answer"])
+            out.append(Interaction(
+                question=question or "(question not in log)",
+                kind="answer", answer=answer, verify=run_verify(answer, store),
+                note="Reconstructed from the audit log (I5) — a real logged session.",
+            ))
+    return out
 
 
 _CSS = """

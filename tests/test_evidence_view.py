@@ -119,3 +119,26 @@ def test_render_is_deterministic(store):
     a = render_evidence_view([_clean(store)], store)
     b = render_evidence_view([_clean(store)], store)
     assert a == b
+
+
+def test_interactions_from_audit_rebuilds_presented(store):
+    """The Desktop bridge: a real session's audit log → evidence-view interactions."""
+    from attest.evidence_view import interactions_from_audit
+
+    atom = _bind(store, "364,980", TOTAL_ASSETS)
+    answer_json = {"sentences": [{
+        "text": "Apple's total assets were $364,980 million.",
+        "atoms": [{"text": atom.text, "doc_id": atom.doc_id,
+                   "char_start": atom.char_start, "char_end": atom.char_end}],
+    }]}
+    entries = [
+        {"kind": "check_support", "query": "What were Apple's total assets?",
+         "status": "supported"},
+        {"kind": "verify", "ok": True, "answer": answer_json},
+        {"kind": "check_support", "query": "CEO pay?",
+         "status": "insufficient"},  # abstain → dropped from the view
+    ]
+    inters = interactions_from_audit(entries, store)
+    assert len(inters) == 1                                   # only the presented one
+    assert inters[0].question == "What were Apple's total assets?"  # paired from check_support
+    assert inters[0].verify is not None and inters[0].verify.ok    # verify re-run, resolves
