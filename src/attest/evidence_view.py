@@ -201,6 +201,34 @@ _CELLPAT = r"\$?\s?\(?\d{1,3}(?:,\d{3})+\)?"
 _CELL = re.compile(_CELLPAT)
 # A financial row: a label followed by a trailing run of numeric cells to end-of-line.
 _ROW = re.compile(rf"((?:\s*{_CELLPAT})+)\s*$")
+# A period-header cell, e.g. "September 28, 2024" (years are bare, not comma-grouped).
+_DATE_CELL = re.compile(r"[A-Z][a-z]+ \d{1,2},? \d{4}")
+
+
+def _column_header(store: SpanStore, doc_id: str, fig_start: int) -> tuple[int, int] | None:
+    """For a figure in a financial row, the matching period-header cell's (start, end).
+
+    Maps the figure's numeric-column index to the same-index date cell on the nearest
+    period-header line above it — so an answer can highlight the *column* its figure
+    sits under (the period qualifier, D13). Returns None when the figure isn't in a
+    date-keyed table or the columns don't line up (graceful: just no header mark).
+    """
+    text = store.get_document(doc_id)
+    starts = _line_starts(text)
+    li = bisect_right(starts, fig_start) - 1
+    if li < 0:
+        return None
+    lend = starts[li + 1] - 1 if li + 1 < len(starts) else len(text)
+    cells = list(_CELL.finditer(text, starts[li], lend))
+    col = next((i for i, m in enumerate(cells) if m.start() <= fig_start < m.end()), None)
+    if col is None:
+        return None
+    for hj in range(li - 1, max(-1, li - 80), -1):              # nearest period header above
+        hend = starts[hj + 1] - 1
+        dates = list(_DATE_CELL.finditer(text, starts[hj], hend))
+        if dates:
+            return (dates[col].start(), dates[col].end()) if col < len(dates) else None
+    return None
 
 
 def _esc(s: str) -> str:
@@ -271,6 +299,9 @@ def _gather(interactions, store) -> dict[str, list[tuple[int, int, str, str]]]:
                 atoms = list(sent.atoms) + [o for d in sent.derived for o in d.operands]
                 for a in atoms:
                     add(a.doc_id, a.char_start, a.char_end, "figure", iid)
+                    hdr = _column_header(store, a.doc_id, a.char_start)
+                    if hdr:                      # light the column header (the period qualifier)
+                        add(a.doc_id, hdr[0], hdr[1], "label", iid)
                     sp = store.span_containing(a.doc_id, a.char_start)
                     if sp is None:
                         continue

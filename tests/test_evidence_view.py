@@ -176,3 +176,13 @@ def test_from_audit_tags_outcome(store):
     ]
     inters = interactions_from_audit(entries, store)
     assert len(inters) == 1 and inters[0].kind == "correction"
+
+
+def test_table_figure_lights_its_column_header(store):
+    """A cited table figure also highlights its column's period header (D13)."""
+    ans = Answer([Sentence("Total assets were $364,980 million.",
+                           atoms=[_bind(store, "364,980", TOTAL_ASSETS)])])
+    inter = Interaction("total assets?", "answer", answer=ans, verify=verify(ans, store))
+    html = render_evidence_view([inter], store)
+    # 364,980 is the FY2024 (first) column → its header is September 28, 2024
+    assert re.search(r'<mark class="m k-lbl"[^>]*>September 28, 2024</mark>', html)
