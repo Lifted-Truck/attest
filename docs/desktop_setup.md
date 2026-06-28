@@ -30,6 +30,26 @@ Verify the tools are live — ask Desktop *"list your attest tools"*; you should
 `verify`, `get_audit_log`. The server logs every interaction to
 `audit_log/agent.jsonl` (I5) — that log is the bridge to the review GUI below.
 
+### Iterating on the tools — when a refresh is needed (and when it isn't)
+
+The MCP server is a **long-lived subprocess** that loads the tool code once at
+startup, so changes to the **tool code or schema** (`src/attest/tools.py`,
+`mcp_server.py`, `session.py`, `verify.py`, etc.) **don't take effect until the
+server is refreshed**. To refresh, cheapest first:
+
+1. **`/mcp` panel → reconnect the `attest` server** — no app restart, no new thread.
+2. **Quit and reopen Desktop** — the guaranteed reset (also required after editing
+   `.mcp.json` itself, which is read only at session startup).
+
+A **new conversation/thread alone is NOT reliable** — stdio servers persist across
+conversations in one app instance. **Sub-agents don't help either**: they share the
+parent's server connection (same old code) and can't invoke slash commands.
+
+**Most edits need no refresh at all** — `CLAUDE.md`, the `/ground` command, the
+`evidence_view` renderer, and anything under `scripts/` are read fresh every time.
+Only the live MCP tool surface caches. (Dev tip: run `python -m attest.mcp_server`
+in a terminal to watch its logs while iterating.)
+
 ## 2. Auth — no API key needed here
 
 In Desktop you're already signed in, and the ATTEST tools are deterministic, so the
