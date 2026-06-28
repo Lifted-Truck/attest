@@ -99,11 +99,13 @@ def judge_entailment(claim: str, span: str, ask: Callable[[str], str]) -> Verdic
 
 
 def claude_ask(prompt: str, timeout: int = 120) -> str:  # pragma: no cover - billed model call
-    """Default judge backend: a plain (no-MCP) headless Claude Code call."""
+    """Default judge backend: a plain (no-MCP) headless Claude Code call. `--bare`
+    forces ANTHROPIC_API_KEY auth (never keychain/OAuth), matching the eval env."""
     import subprocess
 
     return subprocess.run(  # noqa: S603
-        ["claude", "-p", prompt], capture_output=True, text=True, timeout=timeout  # noqa: S607
+        ["claude", "-p", prompt, "--bare"], capture_output=True, text=True,  # noqa: S607
+        stdin=subprocess.DEVNULL, timeout=timeout
     ).stdout
 
 
