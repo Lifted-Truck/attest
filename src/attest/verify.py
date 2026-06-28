@@ -21,6 +21,7 @@ to the audit log at M3.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 
@@ -62,6 +63,12 @@ def to_number(text: str) -> float:
     return -abs(val) if neg else val
 
 
+def _decimals(text: str) -> int:
+    """Decimal places written in the asserted result — sets the recompute tolerance."""
+    m = re.search(r"\.(\d+)", text.replace(",", ""))
+    return len(m.group(1)) if m else 0
+
+
 @dataclass(frozen=True)
 class AtomBinding:
     """A load-bearing atom bound to an exact source location."""
@@ -82,11 +89,16 @@ class DerivedAtom:
     operands: list[AtomBinding]
 
 
-_OP_SYMBOL = {"subtract": " − ", "sum": " + "}
+_OP_SYMBOL = {
+    "subtract": " − ", "sum": " + ", "multiply": " × ", "divide": " ÷ ", "ratio": " ÷ ",
+}
 
 
 def equation(d: DerivedAtom) -> str:
     """Human-readable derivation, e.g. '364,980 − 352,583 = 12,397'."""
+    if d.operation == "percent_change" and len(d.operands) == 2:
+        new, old = d.operands[0].text, d.operands[1].text
+        return f"({new} − {old}) / {old} × 100 = {d.text}"
     sym = _OP_SYMBOL.get(d.operation, f" {d.operation} ")
     lhs = sym.join(o.text for o in d.operands)
     return f"{lhs} = {d.text}"
@@ -132,6 +144,10 @@ class VerifyResult:
 _OPS = {
     "subtract": lambda xs: xs[0] - sum(xs[1:]),
     "sum": sum,
+    "multiply": math.prod,
+    "divide": lambda xs: xs[0] / xs[1],
+    "ratio": lambda xs: xs[0] / xs[1],
+    "percent_change": lambda xs: (xs[0] - xs[1]) / xs[1] * 100,
 }
 
 
@@ -225,8 +241,11 @@ def verify(answer: Answer, store: SpanStore) -> VerifyResult:
                 continue
             try:
                 expected = _OPS[d.operation]([to_number(o.text) for o in d.operands])
-                derived_ok.append(to_number(d.text) == expected)
-            except ValueError:
+                # Match the recompute to the asserted result at the precision the
+                # agent wrote it (D18) — exact for integers, rounded for ratios/%.
+                asserted = to_number(d.text)
+                derived_ok.append(abs(round(expected, _decimals(d.text)) - asserted) < 1e-9)
+            except (ValueError, ZeroDivisionError, IndexError):
                 derived_ok.append(False)
 
         # Independent extraction: every load-bearing atom (figure or date) in the

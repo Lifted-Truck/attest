@@ -145,3 +145,32 @@ def test_bound_date_passes(store):
     result = verify(Answer([sent]), store)
     assert result.ok
     assert not result.unbound()
+
+
+def test_percent_change_recomputes(store):
+    """VER-1: percent change recomputed from operands, matched at the written precision."""
+    sent = Sentence(
+        "Total assets grew 3.5% from fiscal 2023 to 2024.",
+        derived=[DerivedAtom(
+            "3.5%", "percent_change",
+            [bind(store, "364,980", TOTAL_ASSETS), bind(store, "352,583", TOTAL_ASSETS)],
+        )],
+    )
+    assert verify(Answer([sent]), store).ok
+
+
+def test_ratio_recompute_respects_written_precision(store):
+    """1.035161… rounds to the asserted precision: 1.035 passes, 1.03 does not."""
+    ops = [bind(store, "364,980", TOTAL_ASSETS), bind(store, "352,583", TOTAL_ASSETS)]
+    good = Sentence("The ratio is 1.035.", derived=[DerivedAtom("1.035", "ratio", ops)])
+    bad = Sentence("The ratio is 1.03.", derived=[DerivedAtom("1.03", "ratio", ops)])
+    assert verify(Answer([good]), store).ok
+    assert not verify(Answer([bad]), store).ok
+
+
+def test_new_op_equations(store):
+    from attest.verify import equation
+    ops = [bind(store, "364,980", TOTAL_ASSETS), bind(store, "352,583", TOTAL_ASSETS)]
+    assert equation(DerivedAtom("Z", "multiply", ops)) == "364,980 × 352,583 = Z"
+    assert (equation(DerivedAtom("3.5%", "percent_change", ops))
+            == "(364,980 − 352,583) / 352,583 × 100 = 3.5%")

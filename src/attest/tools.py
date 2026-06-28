@@ -74,7 +74,9 @@ _ANSWER_SCHEMA: dict = {
                             "type": "object",
                             "properties": {
                                 "text": {"type": "string"},
-                                "operation": {"type": "string", "enum": ["subtract", "sum"]},
+                                "operation": {"type": "string", "enum": [
+                                    "subtract", "sum", "multiply", "divide", "ratio",
+                                    "percent_change"]},
                                 "operands": {"type": "array", "items": _ATOM_SCHEMA},
                             },
                             "required": ["text", "operation", "operands"],
