@@ -49,3 +49,36 @@ def test_claim_spans_resolve_through_the_span_store(tmp_path):
 
 def test_no_claims_section_returns_empty():
     assert parse_claims("A document with no claims section at all.") == []
+
+
+def test_decompose_independent_claim_into_limitations():
+    from attest.patents import decompose_claim
+    claims = parse_claims(_text())
+    lims = decompose_claim(claims[0])               # claim 1: comprising + 2 semicolons
+    assert [lim.text for lim in lims] == [
+        "a housing",
+        "a sprocket coupled to the housing",
+        "a controller configured to rotate the sprocket based on a measured temperature",
+    ]
+    text = _text()
+    for lim in lims:                                # each limitation is self-addressable
+        assert text[lim.char_start:lim.char_end] == lim.text
+
+
+def test_dependent_wherein_is_one_limitation():
+    from attest.patents import decompose_claim
+    claims = parse_claims(_text())
+    lims = decompose_claim(claims[1])               # "...wherein the sprocket comprises titanium"
+    assert len(lims) == 1
+    assert lims[0].text == "the sprocket comprises titanium"
+
+
+def test_limitations_resolve_through_the_span_store(tmp_path):
+    from attest.patents import decompose_claim
+    store_dir = tmp_path / "store"
+    ingest_paths([str(SAMPLE)], store_dir, kind="patent")
+    store = SpanStore.from_store(DocumentStore(store_dir))
+    doc = SAMPLE.stem
+    c1 = parse_claims(store.get_document(doc))[0]
+    for lim in decompose_claim(c1):
+        assert store.get_span(doc, lim.char_start, lim.char_end) == lim.text

@@ -31,6 +31,14 @@ _DEP_REF = re.compile(r"\bclaims?\s+(\d+)", re.IGNORECASE)
 INDEPENDENT = "independent"
 DEPENDENT = "dependent"
 
+# Claim transition: the body (the limitations) begins after it.
+_TRANSITION = re.compile(
+    r"\b(comprising|comprises|consisting essentially of|consisting of|including|"
+    r"wherein|characterized in that|having|the steps of)\b",
+    re.IGNORECASE,
+)
+_LEAD_CONJ = re.compile(r"^(and|or)\b\s*", re.IGNORECASE)
+
 
 @dataclass(frozen=True)
 class Claim:
@@ -40,6 +48,51 @@ class Claim:
     char_end: int
     kind: str                 # INDEPENDENT | DEPENDENT
     depends_on: int | None    # the claim this one references, or None
+
+
+@dataclass(frozen=True)
+class Limitation:
+    claim_number: int
+    index: int                # 0-based position within the claim
+    text: str
+    char_start: int
+    char_end: int
+
+
+def decompose_claim(claim: Claim) -> list[Limitation]:
+    """Split a claim into its limitation clauses, each an addressable span.
+
+    First cut: the body after the transition word (`comprising`/`wherein`/…) split
+    on semicolons — the canonical claim-element delimiter. Each limitation's offsets
+    are absolute, so `text[c.char_start:c.char_end] == c.text` and `SpanStore`
+    resolves it (I3). Nested sub-elements ("…including: a; b; c") come out flat, and
+    a `wherein` dependent with no semicolons yields one limitation — both refinable
+    later. Locate-only (D10): structure, never a scope/validity opinion.
+    """
+    text, base = claim.text, claim.char_start
+    m = _TRANSITION.search(text)
+    if m:
+        i = m.end()
+        while i < len(text) and text[i] in " :\n\t":   # skip the transition's colon
+            i += 1
+        body_start = i
+    else:                                              # no transition → skip "N." only
+        nm = re.match(r"\s*\d+\.\s*", text)
+        body_start = nm.end() if nm else 0
+
+    out: list[Limitation] = []
+    for seg in re.finditer(r"[^;]+", text[body_start:]):
+        s, e = body_start + seg.start(), body_start + seg.end()
+        while s < e and text[s] in " \n\t":            # trim leading whitespace
+            s += 1
+        lead = _LEAD_CONJ.match(text[s:e])             # drop a leading "and"/"or"
+        if lead:
+            s += lead.end()
+        while e > s and text[e - 1] in " \n\t.,;":      # trim trailing ws/punctuation
+            e -= 1
+        if e > s:
+            out.append(Limitation(claim.number, len(out), text[s:e], base + s, base + e))
+    return out
 
 
 def parse_claims(text: str) -> list[Claim]:
