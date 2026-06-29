@@ -101,3 +101,29 @@ def test_plural_items_surface_all_gold_spans_ranked(store, retriever, golden):
         assert gold <= set(returned), f"{gid}: not all gold spans surfaced (collapsed?)"
         scores = [h.score for h in result.supporting]
         assert scores == sorted(scores, reverse=True), f"{gid}: supporting not ranked"
+
+
+# D20: the support floor is FITTED from the golden set's score separation, not
+# hand-tuned. fit_floor is pure (testable without retrieval); calibrate_threshold
+# runs it over the real golden + retriever.
+
+
+def test_fit_floor_lands_in_the_clean_gap():
+    from attest.support import fit_floor
+    assert fit_floor([19, 20, 33], [6, 10, 11]) == 15.0   # midpoint of the 11→19 gap
+
+
+def test_fit_floor_handles_overlap_by_best_accuracy():
+    from attest.support import fit_floor
+    # 3/4 separable; the floor takes the max-margin cutoff among the best splits
+    assert fit_floor([10, 12], [8, 11]) == 9.0
+
+
+def test_calibrate_rediscovers_the_edgar_floor(golden, retriever):
+    """On EDGAR the fitted floor reproduces the hand-set ~15 — from labels, audibly."""
+    from attest.support import calibrate_threshold
+    c = calibrate_threshold(golden, retriever)
+    assert c.clean and c.gap > 0
+    assert c.absent_max < c.threshold <= c.present_min   # floor sits in the separation
+    assert 13.0 <= c.threshold <= 17.0                   # ≈ the EDGAR 15.0
+    assert c.n_absent == 3 and c.excluded >= 3           # traps excluded, not used
