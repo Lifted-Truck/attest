@@ -104,3 +104,30 @@ def test_paragraphs_resolve_through_the_span_store(tmp_path):
     doc = SAMPLE.stem
     for p in parse_paragraphs(store.get_document(doc)):
         assert store.get_span(doc, p.char_start, p.char_end) == p.text
+
+
+def test_support_mapping_links_limitation_to_spec_paragraph():
+    """PE-3: claim 2's titanium limitation maps to the spec paragraph that describes it."""
+    from attest.patents import map_claim_support, parse_paragraphs
+    text = _text()
+    claims = parse_claims(text)
+    paras = parse_paragraphs(text)
+    mapping = dict((lim.text, edges)
+                   for lim, edges in map_claim_support(claims[1], paras, SAMPLE.stem))
+    edges = mapping["the sprocket comprises titanium"]
+    assert edges, "expected support to be located"
+    assert edges[0].paragraph_label == "[0005]"          # the titanium/aluminum paragraph
+    assert edges[0].edge_type == "CLAIM_LIMITATION→SPEC_SUPPORT"
+
+
+def test_support_edges_are_addressable(tmp_path):
+    from attest.patents import map_claim_support, parse_paragraphs
+    store_dir = tmp_path / "store"
+    ingest_paths([str(SAMPLE)], store_dir, kind="patent")
+    store = SpanStore.from_store(DocumentStore(store_dir))
+    doc = SAMPLE.stem
+    text = store.get_document(doc)
+    c1 = parse_claims(text)[0]
+    for _lim, edges in map_claim_support(c1, parse_paragraphs(text), doc):
+        for e in edges:                                  # each edge points at a real span
+            assert store.get_span(doc, e.char_start, e.char_end)

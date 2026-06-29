@@ -19,6 +19,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from .retrieval import BM25Backend
+from .spans import Span
+
 # Section marker preceding the claims, e.g. "What is claimed is:" / "We claim:".
 _CLAIMS_MARKER = re.compile(
     r"(?im)^\s*(?:what is claimed is|we claim|i claim|the invention claimed is|claims)\s*:?\s*$"
@@ -103,6 +106,62 @@ def parse_paragraphs(text: str) -> list[Paragraph]:
     for m in re.finditer(r".+", text[region_start:end]):       # each non-empty line
         s, e = region_start + m.start(), region_start + m.end()
         out.append(Paragraph(f"¶{len(out) + 1}", len(out), text[s:e], s, e))
+    return out
+
+
+# --- claim-limitation → specification support mapping (PE-3) ----------------------
+# For each claim limitation, surface the spec paragraphs whose text most supports it
+# (ranked, plural, each an addressable span). Deterministic — BM25 over the paragraph
+# set (reuses the engine; I6). **Locate & evidence, never adjudicate (D10/§2):** an
+# empty list is "no clear textual support *located*", NOT "support is legally
+# insufficient / the claim lacks written description" — that is a professional's call.
+
+SUPPORT_EDGE = "CLAIM_LIMITATION→SPEC_SUPPORT"
+
+
+@dataclass(frozen=True)
+class SupportEdge:
+    edge_type: str            # SUPPORT_EDGE (typed provenance, §4)
+    claim_number: int
+    limitation_index: int
+    limitation_text: str
+    paragraph_label: str      # the supporting spec paragraph
+    score: float
+    doc_id: str
+    char_start: int           # the paragraph span (resolvable via SpanStore)
+    char_end: int
+
+
+def _spec_index(paragraphs: list[Paragraph], doc_id: str) -> BM25Backend:
+    return BM25Backend([
+        Span(f"{doc_id}@{p.char_start}-{p.char_end}", doc_id, p.char_start, p.char_end, p.text)
+        for p in paragraphs
+    ])
+
+
+def map_claim_support(
+    claim: Claim, paragraphs: list[Paragraph], doc_id: str, *, k: int = 5, floor: float = 0.0,
+) -> list[tuple[Limitation, list[SupportEdge]]]:
+    """Map each of a claim's limitations to its supporting spec paragraphs (ranked).
+
+    Returns one `(limitation, edges)` pair per limitation; an **empty** `edges` list
+    is a *surfaced gap* (no clear textual support located) — never a legal conclusion
+    (D10). `floor` filters weak matches; it is a per-corpus knob (calibratable like
+    the support threshold, D20), not a sufficiency judgment.
+    """
+    index = _spec_index(paragraphs, doc_id)
+    by_start = {p.char_start: p for p in paragraphs}
+    out: list[tuple[Limitation, list[SupportEdge]]] = []
+    for lim in decompose_claim(claim):
+        edges = []
+        for h in index.search(lim.text, k):
+            if h.score <= floor:
+                continue
+            p = by_start[h.span.char_start]
+            edges.append(SupportEdge(
+                SUPPORT_EDGE, claim.number, lim.index, lim.text, p.label,
+                round(h.score, 2), doc_id, p.char_start, p.char_end))
+        out.append((lim, edges))
     return out
 
 
