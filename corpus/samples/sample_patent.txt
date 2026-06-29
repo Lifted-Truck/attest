@@ -1,0 +1,55 @@
+United States Patent                                      US 9,999,999 B2
+Smith et al.                                       Date of Patent: Jan. 2, 2024
+
+(54) THERMAL REGULATION WIDGET WITH ADAPTIVE SPROCKET
+(71) Applicant: Acme Thermal Systems, Inc., Springfield, IL (US)
+(72) Inventors: Jane Smith, Springfield, IL (US); John Doe, Springfield, IL (US)
+(21) Appl. No.: 17/000,000
+(22) Filed: Mar. 15, 2021
+(60) Provisional application No. 62/900,000, filed on Mar. 20, 2020.
+
+(57) ABSTRACT
+
+A thermal regulation device includes a housing, a sprocket adaptively coupled to
+the housing, and a controller that adjusts the sprocket based on a measured
+temperature, maintaining an internal temperature within a target range.
+
+BACKGROUND
+
+[0001] Conventional thermal devices fail to adjust quickly to changing loads.
+
+SUMMARY
+
+[0002] In one aspect, a thermal device comprises a housing and an adaptive sprocket.
+
+BRIEF DESCRIPTION OF THE DRAWINGS
+
+[0003] FIG. 1 is a perspective view of the device.
+
+DETAILED DESCRIPTION
+
+[0004] Referring to FIG. 1, the device 100 includes a housing 10 and a sprocket 12
+coupled to the housing 10. A controller 14 is configured to rotate the sprocket 12.
+
+[0005] In some embodiments, the sprocket 12 comprises titanium and the housing 10
+comprises aluminum.
+
+[0006] The controller 14 maintains a temperature between 60 and 80 degrees Celsius.
+
+What is claimed is:
+
+1. A thermal regulation device comprising:
+a housing;
+a sprocket coupled to the housing; and
+a controller configured to rotate the sprocket based on a measured temperature.
+
+2. The thermal regulation device of claim 1, wherein the sprocket comprises titanium.
+
+3. The thermal regulation device of claim 2, wherein the housing comprises aluminum.
+
+4. A method of regulating temperature, the method comprising:
+measuring a temperature; and
+rotating a sprocket based on the measured temperature.
+
+5. The method of claim 4, further comprising maintaining the temperature within a
+target range of between 60 and 80 degrees Celsius.
