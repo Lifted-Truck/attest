@@ -131,3 +131,22 @@ def test_support_edges_are_addressable(tmp_path):
     for _lim, edges in map_claim_support(c1, parse_paragraphs(text), doc):
         for e in edges:                                  # each edge points at a real span
             assert store.get_span(doc, e.char_start, e.char_end)
+
+
+def test_dependency_integrity_clean_patent_has_no_issues():
+    from attest.patents import check_dependencies
+    assert check_dependencies(parse_claims(_text())) == []   # synthetic is well-formed
+
+
+def test_dependency_integrity_flags_missing_and_forward_refs():
+    from attest.patents import Claim, check_dependencies
+    claims = [
+        Claim(1, "1. A device.", 0, 12, "independent", None),
+        Claim(2, "2. The device of claim 9, …", 13, 40, "dependent", 9),    # missing
+        Claim(3, "3. The device of claim 5, …", 41, 68, "dependent", 5),    # forward (5 exists)
+        Claim(5, "5. The device of claim 1, …", 69, 96, "dependent", 1),    # ok
+    ]
+    issues = check_dependencies(claims)
+    assert {i.claim_number for i in issues} == {2, 3}
+    assert "does not exist" in next(i.message for i in issues if i.claim_number == 2)
+    assert "not an earlier claim" in next(i.message for i in issues if i.claim_number == 3)

@@ -116,6 +116,46 @@ def parse_paragraphs(text: str) -> list[Paragraph]:
 # empty list is "no clear textual support *located*", NOT "support is legally
 # insufficient / the claim lacks written description" — that is a professional's call.
 
+# --- structural checks (PE-2) ----------------------------------------------------
+# Deterministic, no-model checks that *surface* structural facts for review. Only
+# the high-precision ones ship: claim-dependency integrity is objective (a missing
+# or forward reference is a fact). The §112 heuristics (antecedent basis,
+# element-numeral, term consistency) need precise NLP — a naive numeral check flags
+# 34/67 numerals on US5447630A (mostly false positives: "at 92", "of 18", plurals),
+# which would bury real issues; deferred until they can be done at high precision.
+# Even here: state the structural fact, never conclude invalidity (D10).
+
+
+@dataclass(frozen=True)
+class StructuralIssue:
+    kind: str                 # "dependency"
+    claim_number: int
+    message: str
+    char_start: int
+    char_end: int
+
+
+def check_dependencies(claims: list[Claim]) -> list[StructuralIssue]:
+    """Claim-dependency integrity: every dependent claim must reference an existing,
+    earlier claim (no missing, self-, or forward references). Objective — surfaces
+    the fact, not a validity conclusion."""
+    numbers = {c.number for c in claims}
+    issues: list[StructuralIssue] = []
+    for c in claims:
+        d = c.depends_on
+        if d is None:
+            continue
+        if d not in numbers:
+            msg = f"claim {c.number} depends on claim {d}, which does not exist"
+        elif d >= c.number:
+            rel = "itself" if d == c.number else f"a later claim ({d})"
+            msg = f"claim {c.number} references {rel}, not an earlier claim"
+        else:
+            continue
+        issues.append(StructuralIssue("dependency", c.number, msg, c.char_start, c.char_end))
+    return issues
+
+
 SUPPORT_EDGE = "CLAIM_LIMITATION→SPEC_SUPPORT"
 
 
