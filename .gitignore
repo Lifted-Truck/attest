@@ -45,3 +45,6 @@ audit_log/
 # Local secrets (never commit) — e.g. ANTHROPIC_API_KEY for Layer-E live runs
 .env
 .env.local
+
+# Per-engagement corpora — kept local, never committed
+corpus/engagements/

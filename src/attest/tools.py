@@ -25,6 +25,7 @@ from .ingest import DocumentStore
 from .retrieval import Hit, Retriever
 from .session import support_record, verify_record
 from .spans import SpanStore
+from .support import THRESHOLD as SUPPORT_THRESHOLD
 from .support import check_support
 from .verify import answer_from_json, result_to_json, verify
 
@@ -117,7 +118,8 @@ def _hit(h: Hit) -> dict:
 
 
 def default_registry(
-    store_dir: Path | str, audit_path: Path | str | None = None
+    store_dir: Path | str, audit_path: Path | str | None = None,
+    *, support_threshold: float = SUPPORT_THRESHOLD,
 ) -> dict[str, Tool]:
     span_store = SpanStore.from_store(DocumentStore(store_dir))
     retriever = Retriever(span_store)
@@ -172,12 +174,15 @@ def default_registry(
     # --- Write tools: append a replayable record to the audit log (I5); read_only=False ---
 
     def _check_support(a: dict) -> dict:
-        rec = support_record(a["query"], check_support(a["query"], retriever))
+        rec = support_record(
+            a["query"], check_support(a["query"], retriever, threshold=support_threshold))
         _append(rec)
         return rec
 
     def _check_claim(a: dict) -> dict:
-        rec = support_record(a["claim"], check_support(a["claim"], retriever), kind="check_claim")
+        rec = support_record(
+            a["claim"], check_support(a["claim"], retriever, threshold=support_threshold),
+            kind="check_claim")
         _append(rec)
         return rec
 

@@ -169,3 +169,14 @@ def test_mcp_adapter_builds_when_sdk_present():
     from attest.mcp_server import build_server
     server = build_server(STORE)
     assert server is not None
+
+
+def test_support_threshold_is_configurable(registry):
+    """A lower per-engagement floor flips a borderline query from insufficient → supported.
+
+    The EDGAR floor (15.0) is calibrated for EDGAR; a different corpus (e.g. patents,
+    whose BM25 scores run lower) sets its own via ATTEST_SUPPORT_THRESHOLD (D12)."""
+    q = "What is Apple's customer churn rate?"
+    assert registry["check_support"].handler({"query": q})["status"] == "insufficient"
+    loose = default_registry(STORE, None, support_threshold=5.0)
+    assert loose["check_support"].handler({"query": q})["status"] == "supported"

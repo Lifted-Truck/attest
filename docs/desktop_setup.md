@@ -97,8 +97,17 @@ claim? — is the un-gated, human step (entailment).
 
 ## 5. Per engagement
 
-Each corpus (e.g. a patent matter) gets its **own** ingested store and a `.mcp.json`
-whose `ATTEST_STORE` / `ATTEST_AUDIT` point at it. The engine, tools, loop, and
-this workflow are identical — only the corpus changes (D10). For patents, the
-cardinal rule tightens: **locate & evidence, never adjudicate** (no conclusions on
-novelty / validity / infringement / claim construction).
+Each corpus (e.g. a patent matter) gets its **own** ingested store, and the MCP
+server is pointed at it via three env vars (in `.mcp.json` or the shell):
+
+- `ATTEST_STORE` — the store dir (`python scripts/ingest_files.py … --store <dir>`)
+- `ATTEST_AUDIT` — that engagement's audit log
+- `ATTEST_SUPPORT_THRESHOLD` — the `check_support` floor. **Per-corpus calibration
+  (D12):** the default `15.0` is tuned for EDGAR; other corpora score differently
+  (a patent's relevant spans run ~5–14), so set a lower floor or `check_support`
+  over-abstains. Calibrate from the engagement's golden items (PE-5).
+
+The engine, tools, loop, and this workflow are identical — only the corpus changes
+(D10). For patents, the cardinal rule tightens: **locate & evidence, never
+adjudicate** (no conclusions on novelty / validity / infringement / claim
+construction).

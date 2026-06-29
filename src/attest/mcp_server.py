@@ -14,15 +14,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .tools import default_registry
+from .tools import SUPPORT_THRESHOLD, default_registry
 
 
-def build_server(store_dir: Path | str = "corpus/store", audit_path: Path | str | None = None):
+def build_server(store_dir: Path | str = "corpus/store", audit_path: Path | str | None = None,
+                 *, support_threshold: float = SUPPORT_THRESHOLD):
     """Build an MCP Server exposing the ATTEST tools. Requires the `mcp` SDK."""
     import mcp.types as types
     from mcp.server import Server
 
-    registry = default_registry(store_dir, audit_path)
+    registry = default_registry(store_dir, audit_path, support_threshold=support_threshold)
     server = Server("attest")
 
     @server.list_tools()
@@ -54,7 +55,11 @@ def main() -> int:  # pragma: no cover - requires the mcp SDK + a stdio client
     # score from the audit log. Configurable for tests/CI.
     store_dir = os.environ.get("ATTEST_STORE", "corpus/store")
     audit_path = os.environ.get("ATTEST_AUDIT", "audit_log/agent.jsonl")
-    server = build_server(store_dir, audit_path)
+    threshold = os.environ.get("ATTEST_SUPPORT_THRESHOLD")
+    server = build_server(
+        store_dir, audit_path,
+        support_threshold=float(threshold) if threshold else SUPPORT_THRESHOLD,
+    )
 
     async def _run() -> None:
         async with stdio_server() as (read, write):
