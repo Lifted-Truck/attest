@@ -174,3 +174,33 @@ def test_new_op_equations(store):
     assert equation(DerivedAtom("Z", "multiply", ops)) == "364,980 × 352,583 = Z"
     assert (equation(DerivedAtom("3.5%", "percent_change", ops))
             == "(364,980 − 352,583) / 352,583 × 100 = 3.5%")
+
+
+def test_comparison_gt_verifies(store):
+    """VER-1 slice 2 (D19): a numeric relation between cited operands is confirmed."""
+    ops = [bind(store, "364,980", TOTAL_ASSETS), bind(store, "352,583", TOTAL_ASSETS)]
+    sent = Sentence("FY2024 total assets 364,980 exceed FY2023 352,583.",
+                    derived=[DerivedAtom("true", "gt", ops)])
+    assert verify(Answer([sent]), store).ok
+
+
+def test_within_range_verifies_and_flags_wrong_boolean(store):
+    val = bind(store, "364,980", TOTAL_ASSETS)
+    lo = bind(store, "352,583", TOTAL_ASSETS)
+    hi = bind(store, "364,980", TOTAL_ASSETS)            # inclusive upper bound
+    text = "364,980 sits within [352,583, 364,980]."
+    assert verify(Answer([Sentence(text, derived=[
+        DerivedAtom("true", "within_range", [val, lo, hi])])]), store).ok
+    # asserting the opposite of the recomputed relation is flagged
+    assert not verify(Answer([Sentence(text, derived=[
+        DerivedAtom("false", "within_range", [val, lo, hi])])]), store).ok
+
+
+def test_comparison_equations(store):
+    from attest.verify import equation
+    ab = [bind(store, "364,980", TOTAL_ASSETS), bind(store, "352,583", TOTAL_ASSETS)]
+    assert equation(DerivedAtom("true", "gt", ab)) == "364,980 > 352,583 → true"
+    vlh = [bind(store, "364,980", TOTAL_ASSETS), bind(store, "352,583", TOTAL_ASSETS),
+           bind(store, "364,980", TOTAL_ASSETS)]
+    assert equation(DerivedAtom("true", "within_range", vlh)) == \
+        "352,583 ≤ 364,980 ≤ 364,980 → true"

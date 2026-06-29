@@ -99,6 +99,11 @@ def equation(d: DerivedAtom) -> str:
     if d.operation == "percent_change" and len(d.operands) == 2:
         new, old = d.operands[0].text, d.operands[1].text
         return f"({new} − {old}) / {old} × 100 = {d.text}"
+    if d.operation == "within_range" and len(d.operands) == 3:
+        v, lo, hi = (o.text for o in d.operands)
+        return f"{lo} ≤ {v} ≤ {hi} → {d.text}"
+    if d.operation in _REL_SYMBOL:
+        return _REL_SYMBOL[d.operation].join(o.text for o in d.operands) + f" → {d.text}"
     sym = _OP_SYMBOL.get(d.operation, f" {d.operation} ")
     lhs = sym.join(o.text for o in d.operands)
     return f"{lhs} = {d.text}"
@@ -149,6 +154,30 @@ _OPS = {
     "ratio": lambda xs: xs[0] / xs[1],
     "percent_change": lambda xs: (xs[0] - xs[1]) / xs[1] * 100,
 }
+
+# Relational checks (D19): each recomputes a NUMERIC relation between cited operands
+# and confirms the agent's asserted true/false. `within_range` is value-low-high.
+# **Boundary (D10): these verify arithmetic, not legal status** — a value being
+# "within range" is a numeric fact, NOT an infringement/novelty/validity conclusion;
+# the agent must not phrase the boolean as adjudication (refusal class, Layer-E).
+_BOOL_OPS = {
+    "gt": lambda xs: xs[0] > xs[1],
+    "ge": lambda xs: xs[0] >= xs[1],
+    "lt": lambda xs: xs[0] < xs[1],
+    "le": lambda xs: xs[0] <= xs[1],
+    "eq": lambda xs: xs[0] == xs[1],
+    "within_range": lambda xs: xs[1] <= xs[0] <= xs[2],   # value, low, high (inclusive)
+}
+_REL_SYMBOL = {"gt": " > ", "ge": " ≥ ", "lt": " < ", "le": " ≤ ", "eq": " = "}
+
+
+def _parse_bool(text: str) -> bool:
+    t = text.strip().lower()
+    if t in ("true", "yes"):
+        return True
+    if t in ("false", "no"):
+        return False
+    raise ValueError(f"not a boolean result: {text!r}")
 
 
 def _normalize(s: str) -> str:
@@ -236,15 +265,23 @@ def verify(answer: Answer, store: SpanStore) -> VerifyResult:
         derived_ok: list[bool] = []
         for d in sent.derived:
             ops = [_resolve(o, store) for o in d.operands]
-            if not all(v.status == "ok" for v in ops) or d.operation not in _OPS:
+            if not all(v.status == "ok" for v in ops):
                 derived_ok.append(False)
                 continue
             try:
-                expected = _OPS[d.operation]([to_number(o.text) for o in d.operands])
-                # Match the recompute to the asserted result at the precision the
-                # agent wrote it (D18) — exact for integers, rounded for ratios/%.
-                asserted = to_number(d.text)
-                derived_ok.append(abs(round(expected, _decimals(d.text)) - asserted) < 1e-9)
+                nums = [to_number(o.text) for o in d.operands]
+                if d.operation in _OPS:
+                    # Numeric (D18): match the recompute to the asserted result at the
+                    # precision the agent wrote — exact for integers, rounded for %/ratio.
+                    expected = _OPS[d.operation](nums)
+                    derived_ok.append(
+                        abs(round(expected, _decimals(d.text)) - to_number(d.text)) < 1e-9
+                    )
+                elif d.operation in _BOOL_OPS:
+                    # Relational (D19): confirm the asserted true/false (a numeric fact).
+                    derived_ok.append(_BOOL_OPS[d.operation](nums) == _parse_bool(d.text))
+                else:
+                    derived_ok.append(False)
             except (ValueError, ZeroDivisionError, IndexError):
                 derived_ok.append(False)
 

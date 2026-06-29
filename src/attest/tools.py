@@ -76,7 +76,8 @@ _ANSWER_SCHEMA: dict = {
                                 "text": {"type": "string"},
                                 "operation": {"type": "string", "enum": [
                                     "subtract", "sum", "multiply", "divide", "ratio",
-                                    "percent_change"]},
+                                    "percent_change", "gt", "ge", "lt", "le", "eq",
+                                    "within_range"]},
                                 "operands": {"type": "array", "items": _ATOM_SCHEMA},
                             },
                             "required": ["text", "operation", "operands"],
