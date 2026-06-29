@@ -56,6 +56,8 @@ or definitive claim construction (a patent professional is in the loop; UPL boun
 
 ## Invariants — non-negotiable
 
+These guarantees are declared in one place — [`docs/truth_contract.md`](docs/truth_contract.md) (**truth-contract v1**, D21) — each mapped to its enforcing mechanism, layer, and current strength, alongside the **monotonic rule** (rigor strengthens freely; weakening needs a new major contract version + rationale + the oracle) and the **upgrade ratchet** (new methods plug in behind a seam and ship only if Layer-0 holds + Layer-E improves-or-holds). Read it before changing anything on the evidence path.
+
 Each maps to a standing test. A change that violates one does not merge.
 
 - **I1** Span-level provenance — every claim points to a real span (`doc_id`, `char_start`, `char_end`).
