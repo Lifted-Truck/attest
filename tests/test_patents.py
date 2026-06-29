@@ -82,3 +82,25 @@ def test_limitations_resolve_through_the_span_store(tmp_path):
     c1 = parse_claims(store.get_document(doc))[0]
     for lim in decompose_claim(c1):
         assert store.get_span(doc, lim.char_start, lim.char_end) == lim.text
+
+
+def test_parse_paragraphs_uses_native_numbering():
+    from attest.patents import parse_paragraphs
+    paras = parse_paragraphs(_text())                       # synthetic has [0001]–[0006]
+    assert [p.label for p in paras] == ["[0001]", "[0002]", "[0003]",
+                                        "[0004]", "[0005]", "[0006]"]
+    text = _text()
+    for p in paras:                                         # each is self-addressable
+        assert text[p.char_start:p.char_end] == p.text
+    assert paras[0].text.startswith("[0001]")
+    assert "claimed" not in " ".join(p.text for p in paras)  # claims excluded
+
+
+def test_paragraphs_resolve_through_the_span_store(tmp_path):
+    from attest.patents import parse_paragraphs
+    store_dir = tmp_path / "store"
+    ingest_paths([str(SAMPLE)], store_dir, kind="patent")
+    store = SpanStore.from_store(DocumentStore(store_dir))
+    doc = SAMPLE.stem
+    for p in parse_paragraphs(store.get_document(doc)):
+        assert store.get_span(doc, p.char_start, p.char_end) == p.text

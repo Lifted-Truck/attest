@@ -59,6 +59,53 @@ class Limitation:
     char_end: int
 
 
+# Native paragraph numbering (post-~2001 patents): [0001], [0042].
+_PARA_NUM = re.compile(r"\[(\d{3,4})\]")
+# Where the specification body starts (older patents lack [NNNN]).
+_SPEC_START = re.compile(
+    r"(?im)^\s*(detailed description|description|field of the invention|background)\b.*$"
+)
+
+
+@dataclass(frozen=True)
+class Paragraph:
+    label: str                # "[0042]" (native) or "¶N" (sequential)
+    index: int
+    text: str
+    char_start: int
+    char_end: int
+
+
+def parse_paragraphs(text: str) -> list[Paragraph]:
+    """Address the specification as paragraph spans (PE-1).
+
+    Native `[NNNN]` numbering when present (modern patents); otherwise each
+    description line is a paragraph (older patents — the spec is one paragraph per
+    line). Offsets are absolute (`text[p.char_start:p.char_end] == p.text`), so each
+    paragraph resolves through `SpanStore` — the spec side of PE-3's claim→spec
+    support mapping. Excludes the claims section.
+    """
+    cm = _CLAIMS_MARKER.search(text)
+    end = cm.start() if cm else len(text)
+
+    marks = list(_PARA_NUM.finditer(text[:end]))
+    out: list[Paragraph] = []
+    if marks:
+        for i, m in enumerate(marks):
+            s = m.start()
+            e = marks[i + 1].start() if i + 1 < len(marks) else end
+            body = text[s:e].rstrip()
+            out.append(Paragraph(f"[{m.group(1)}]", len(out), body, s, s + len(body)))
+        return out
+
+    hm = _SPEC_START.search(text[:end])
+    region_start = hm.end() if hm else 0
+    for m in re.finditer(r".+", text[region_start:end]):       # each non-empty line
+        s, e = region_start + m.start(), region_start + m.end()
+        out.append(Paragraph(f"¶{len(out) + 1}", len(out), text[s:e], s, e))
+    return out
+
+
 def decompose_claim(claim: Claim) -> list[Limitation]:
     """Split a claim into its limitation clauses, each an addressable span.
 
