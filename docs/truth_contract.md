@@ -81,14 +81,24 @@ harness; the harness decides what is real.
 | entailment | the injected judge (`ask`) | better judges; later, a formal entailment provider |
 | corpus | the ingestion adapter (`edgar.py`, `patents.py`) | new corpora / domain packs |
 
-## Provenance (TC-2 — planned)
+## Provenance (TC-2 — implemented)
 
-For the contract to be forward-compatible, every output and audit record will carry
-the **rigor it was produced under**: `contract_version` plus the methods that
-produced/checked it (retrieval backend + params, support threshold / calibration id,
-verify-op-set version, entailment method + version when applied). This keeps old
-records interpretable after an upgrade and makes rigor **comparable across versions**.
-Additive and backward-compatible — records without a stamp read as pre-provenance.
+Every audit record carries a `provenance` block stamping the **rigor it was produced
+under**, so it stays interpretable after an upgrade and rigor is **comparable across
+versions**:
+
+- `check_support` / `check_claim` → `{contract, retrieval, threshold}`
+- `verify` → `{contract, verify_ops}`
+
+`contract` is the version of *this* document ([`attest.contract.CONTRACT_VERSION`](../src/attest/contract.py)).
+Replay reads the recorded floor (not the default), so a record made under a
+per-engagement threshold reproduces byte-identically (I6). The evidence view renders
+the line — e.g. *"truth-contract v1.0 · retrieval bm25 · floor 15 · verify-ops 1"*.
+Additive and backward-compatible: records without a stamp read as pre-provenance.
+
+The remaining seam is **entailment provenance** — stamped when a runtime entailment
+method exists (today entailment is Layer-E only, recorded in the eval trend, not the
+runtime record).
 
 ## The anti-trap
 

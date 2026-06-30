@@ -175,14 +175,15 @@ def default_registry(
 
     def _check_support(a: dict) -> dict:
         rec = support_record(
-            a["query"], check_support(a["query"], retriever, threshold=support_threshold))
+            a["query"], check_support(a["query"], retriever, threshold=support_threshold),
+            threshold=support_threshold, retrieval=retriever.method)
         _append(rec)
         return rec
 
     def _check_claim(a: dict) -> dict:
         rec = support_record(
             a["claim"], check_support(a["claim"], retriever, threshold=support_threshold),
-            kind="check_claim")
+            kind="check_claim", threshold=support_threshold, retrieval=retriever.method)
         _append(rec)
         return rec
 

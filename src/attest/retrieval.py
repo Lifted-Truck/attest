@@ -66,6 +66,8 @@ class RetrievalBackend(Protocol):
 class BM25Backend:
     """Okapi BM25 over featurized spans. Deterministic; tie-break by span_id."""
 
+    name = "bm25"   # method tag for provenance (TC-2)
+
     def __init__(self, spans: list[Span], k1: float = BM25_K1, b: float = BM25_B):
         self.spans = spans
         self.k1 = k1
@@ -109,6 +111,11 @@ class Retriever:
         for doc_id in ids:
             spans.extend(span_store.spans(doc_id))
         self.backend: RetrievalBackend = BM25Backend(spans)
+
+    @property
+    def method(self) -> str:
+        """Backend tag for provenance (TC-2) — becomes e.g. 'bm25+embed' under fusion."""
+        return getattr(self.backend, "name", "unknown")
 
     def search(self, query: str, k: int = 10) -> list[Hit]:
         return self.backend.search(query, k)

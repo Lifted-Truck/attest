@@ -51,3 +51,34 @@ def test_replay_detects_a_changed_query(retriever):
     record = support_record(q, check_support(q, retriever))
     tampered = {**record, "query": "What were Apple's total assets?"}
     assert not replays_identically(tampered, retriever)
+
+
+class _OkResult:
+    """Minimal VerifyResult stand-in: verify_record reads only .ok and .unbound()."""
+    ok = True
+
+    def unbound(self):
+        return []
+
+
+def test_records_carry_contract_provenance_and_replay(retriever):
+    """TC-2/D21: records stamp contract_version + methods, and still replay (I6)."""
+    from attest.contract import CONTRACT_VERSION
+    from attest.session import verify_record
+
+    q = "How much term debt does Apple carry?"
+    rec = support_record(q, check_support(q, retriever), threshold=15.0,
+                         retrieval=retriever.method)
+    assert rec["provenance"] == {"contract": CONTRACT_VERSION, "retrieval": "bm25",
+                                 "threshold": 15.0}
+    assert replays_identically(rec, retriever)            # stamp round-trips byte-identical
+
+    # a non-default floor is recorded and replays under that floor, not the default
+    loose = support_record(q, check_support(q, retriever, threshold=1.0), threshold=1.0,
+                           retrieval=retriever.method)
+    assert loose["provenance"]["threshold"] == 1.0
+    assert replays_identically(loose, retriever)
+
+    vr = verify_record({"sentences": [{"text": "x", "atoms": []}]}, _OkResult())
+    assert vr["provenance"]["contract"] == CONTRACT_VERSION
+    assert "verify_ops" in vr["provenance"]

@@ -57,10 +57,12 @@ def interactions_from_audit(entries: list[dict], store: SpanStore) -> list[Inter
     """
     out: list[Interaction] = []
     question = None
+    sup_prov: dict = {}
     for e in entries:
         kind = e.get("kind")
         if kind in ("check_support", "check_claim"):
             question = e.get("query") or e.get("claim") or question
+            sup_prov = e.get("provenance", {}) or sup_prov
         elif kind == "verify" and e.get("ok") and e.get("answer"):
             answer = answer_from_json(e["answer"])
             outcome = e.get("outcome") if e.get("outcome") in _PRESENTS else "answer"
@@ -68,8 +70,23 @@ def interactions_from_audit(entries: list[dict], store: SpanStore) -> list[Inter
                 question=question or "(question not in log)",
                 kind=outcome, answer=answer, verify=run_verify(answer, store),
                 note="Reconstructed from the audit log (I5) — a real logged session.",
+                trace=_provenance_line(e.get("provenance", {}), sup_prov),
             ))
     return out
+
+
+def _provenance_line(verify_prov: dict, support_prov: dict) -> str:
+    """The rigor a logged answer was produced under (TC-2/D21), for the trace."""
+    bits = []
+    if verify_prov.get("contract"):
+        bits.append(f"truth-contract v{verify_prov['contract']}")
+    if support_prov.get("retrieval"):
+        bits.append(f"retrieval {support_prov['retrieval']}")
+    if support_prov.get("threshold") is not None:
+        bits.append(f"floor {support_prov['threshold']:g}")
+    if verify_prov.get("verify_ops"):
+        bits.append(f"verify-ops {verify_prov['verify_ops']}")
+    return " · ".join(bits)
 
 
 _CSS = """

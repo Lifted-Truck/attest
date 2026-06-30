@@ -12,10 +12,11 @@ environments; the underlying retrieval is already deterministic.
 
 from __future__ import annotations
 
+from .contract import CONTRACT_VERSION
 from .retrieval import Retriever
 from .spans import SpanStore
-from .support import SupportResult, check_support
-from .verify import VerifyResult, answer_from_json, verify
+from .support import THRESHOLD, SupportResult, check_support
+from .verify import OPS_VERSION, VerifyResult, answer_from_json, verify
 
 _PRECISION = 6
 
@@ -24,11 +25,17 @@ def _hits(hits) -> list[dict]:
     return [{"span_id": h.span.span_id, "score": round(h.score, _PRECISION)} for h in hits]
 
 
-def support_record(query: str, result: SupportResult, kind: str = "check_support") -> dict:
+def support_record(
+    query: str, result: SupportResult, kind: str = "check_support", *,
+    threshold: float = THRESHOLD, retrieval: str = "bm25",
+) -> dict:
     """Canonical, loggable record of a check_support / check_claim interaction.
 
     `kind` distinguishes the two (both re-derive from the query the same way), so
     a check_claim entry stays replayable and is not mislabelled as check_support.
+    The `provenance` block (TC-2) stamps the rigor this record was produced under —
+    the contract version, the retrieval method, and the support floor used — so it
+    stays interpretable after an upgrade and replays deterministically (I6).
     """
     return {
         "kind": kind,
@@ -36,13 +43,23 @@ def support_record(query: str, result: SupportResult, kind: str = "check_support
         "status": result.status,
         "supporting": _hits(result.supporting),
         "closest": _hits(result.closest),
+        "provenance": {
+            "contract": CONTRACT_VERSION, "retrieval": retrieval, "threshold": threshold,
+        },
     }
 
 
 def replay_support(payload: dict, retriever: Retriever) -> dict:
-    """Re-derive a check_support / check_claim interaction from the logged query alone."""
+    """Re-derive a check_support / check_claim interaction from the logged query alone.
+
+    Uses the floor recorded in `provenance` (not the default), so a record made under
+    a per-engagement threshold reproduces byte-identically (I6)."""
     kind = payload.get("kind", "check_support")
-    return support_record(payload["query"], check_support(payload["query"], retriever), kind)
+    prov = payload.get("provenance", {})
+    threshold = prov.get("threshold", THRESHOLD)
+    result = check_support(payload["query"], retriever, threshold=threshold)
+    return support_record(payload["query"], result, kind,
+                          threshold=threshold, retrieval=retriever.method)
 
 
 def verify_record(answer_json: dict, result: VerifyResult, outcome: str | None = None) -> dict:
@@ -58,6 +75,7 @@ def verify_record(answer_json: dict, result: VerifyResult, outcome: str | None =
         "answer": answer_json,
         "ok": result.ok,
         "unbound": result.unbound(),
+        "provenance": {"contract": CONTRACT_VERSION, "verify_ops": OPS_VERSION},
     }
     if outcome is not None:
         rec["outcome"] = outcome

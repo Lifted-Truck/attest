@@ -170,6 +170,10 @@ _BOOL_OPS = {
 }
 _REL_SYMBOL = {"gt": " > ", "ge": " ≥ ", "lt": " < ", "le": " ≤ ", "eq": " = "}
 
+# Version of the derived-operation set (D18/D19); stamped into records (TC-2) and
+# bumped when the set changes, so a derivation's record says which ops verified it.
+OPS_VERSION = "1"
+
 
 def _parse_bool(text: str) -> bool:
     t = text.strip().lower()
