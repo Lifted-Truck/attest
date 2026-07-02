@@ -82,3 +82,17 @@ def test_records_carry_contract_provenance_and_replay(retriever):
     vr = verify_record({"sentences": [{"text": "x", "atoms": []}]}, _OkResult())
     assert vr["provenance"]["contract"] == CONTRACT_VERSION
     assert "verify_ops" in vr["provenance"]
+
+
+def test_replay_preserves_recorded_provenance_across_versions(retriever):
+    """D21/TC-2: a record stamped under an EARLIER contract still replays byte-
+    identically after a version bump — the stamp describes original production."""
+    q = "How much term debt does Apple carry?"
+    rec = support_record(q, check_support(q, retriever), threshold=15.0,
+                         retrieval=retriever.method)
+    aged = {**rec, "provenance": {**rec["provenance"], "contract": "1.0"}}
+    assert replays_identically(aged, retriever)
+
+    # pre-provenance records (before TC-2) replay as pre-provenance
+    old = {k: v for k, v in rec.items() if k != "provenance"}
+    assert replays_identically(old, retriever)

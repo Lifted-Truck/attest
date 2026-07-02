@@ -1,6 +1,11 @@
 # ATTEST — the truth contract
 
-**Version: 1.0** · governed by [`ROADMAP.md`](../ROADMAP.md) decision **D21**.
+**Version: 1.1** · governed by [`ROADMAP.md`](../ROADMAP.md) decision **D21**.
+
+| Version | Date | Change | Kind |
+|---|---|---|---|
+| **1.1** | 2026-06-30 | Outcome honesty refined (D22): **refuse-to-adjudicate** becomes a first-class fifth outcome, distinct from `abstain` — the evidence may be *present*; the legal conclusion is declined (UPL boundary). Scored separately at Layer-E (`refusal_accuracy`); rendered distinctly. | strengthening → minor |
+| 1.0 | 2026-06-29 | Initial declaration (D21). | — |
 
 This is the single, declared statement of what ATTEST guarantees about anything it
 asserts — and how each guarantee is enforced or measured. It exists so that
@@ -28,8 +33,8 @@ Everything below is the machinery that makes that guarantee real and checkable.
 | **I4 — read/write asymmetry** | the corpus is read-only; the only writable surface is the audit log | structural (only write tools hold the log) | runtime + Layer-0 | **hard** |
 | **I5 — append-only audit** | every interaction logged immutably and replayably | `AuditLog` (hash-chained) | runtime + Layer-0 | **hard** |
 | **I6 — deterministic evidence** | same corpus + query → reproducible results; no runtime model calls | seeded/temperature-0 evidence path | runtime + Layer-0 | **hard** |
-| **Outcome honesty (D16)** | answer / abstain / **correction** / **partial** — a false premise is refuted with evidence, not silently dropped | agent + `verify(outcome=…)` | runtime; Layer-E | **hard** (present/abstain decision); **measured** (correctness) |
-| **Locate-never-adjudicate (D10)** | patent domain: surface & evidence; never conclude novelty/validity/infringement/claim-construction | agent refusal class + design | runtime; Layer-E negative test | **hard** (boundary); **measured** (adherence) |
+| **Outcome honesty (D16, D22)** | answer / abstain / **correction** / **partial** / **refuse** — a false premise is refuted with evidence; a legal conclusion is declined *as its own outcome*, never blurred into abstention | agent + `verify(outcome=…)`; `refuse` rendered + scored first-class | runtime; Layer-E | **hard** (present/abstain decision); **measured** (correctness, `refusal_accuracy`) |
+| **Locate-never-adjudicate (D10)** | patent domain: surface & evidence; never conclude novelty/validity/infringement/claim-construction — expressed as the first-class **refuse** outcome (D22) | agent refusal class + design | runtime; Layer-E negative test | **hard** (boundary); **measured** (adherence) |
 
 ### The one deliberate non-guarantee — `verified ≠ entailed`
 

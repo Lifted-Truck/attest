@@ -32,7 +32,7 @@ from .verify import verify as run_verify
 @dataclass
 class Interaction:
     question: str
-    kind: str  # "answer" | "abstain" | "reject" | "partial"
+    kind: str  # "answer" | "abstain" | "correction" | "partial" | "refuse" (D16/D22)
     answer: Answer | None = None
     verify: VerifyResult | None = None
     reason: str = ""
@@ -92,7 +92,7 @@ def _provenance_line(verify_prov: dict, support_prov: dict) -> str:
 _CSS = """
 :root { --bg:#0f1115; --panel:#171a21; --ink:#e6e9ef; --muted:#8b93a3;
   --line:#262b36; --markb:#e0a32e; --ok:#3fb950; --bad:#f85149;
-  --chip:#1f6feb22; --chipb:#388bfd; --teal:#5fe0c4; --corr:#a371f7; }
+  --chip:#1f6feb22; --chipb:#388bfd; --teal:#5fe0c4; --corr:#a371f7; --refuse:#f0883e; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--ink); height:100vh; overflow:hidden;
   display:flex; flex-direction:column;
@@ -143,6 +143,7 @@ mark.flash { outline:2px solid var(--chipb); }
 .card.active { border-left-color:var(--chipb); background:#10131a; }
 .card.correction.active { border-left-color:var(--corr); }
 .card.partial.active { border-left-color:var(--markb); }
+.card.refuse.active { border-left-color:var(--refuse); }
 .card .hint { color:var(--muted); font-size:11px; } .card.active .hint { color:var(--chipb); }
 .q { font-weight:600; margin:0 0 2px; }
 .badge { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.04em;
@@ -151,6 +152,7 @@ mark.flash { outline:2px solid var(--chipb); }
 .badge.abstain, .badge.reject { background:#3a1d1d; color:var(--bad); }
 .badge.correction { background:#241a3a; color:var(--corr); }
 .badge.partial { background:#3a2f12; color:var(--markb); }
+.badge.refuse { background:#3a2413; color:var(--refuse); }
 .answer-text { background:var(--panel); border:1px solid var(--line); border-radius:8px;
   padding:12px 14px; }
 .reason { color:var(--muted); margin:0 0 8px; }

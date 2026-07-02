@@ -25,11 +25,16 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 
-# Four first-class outcomes (D16). "Ground or abstain" is not binary: rejecting a
-# false premise WITH the contradicting evidence is a grounded *correction*, not an
-# abstention, and answering an in-corpus part while flagging the rest is *partial*.
-# Both should present something; only `abstain` should stay silent.
-ANSWER, ABSTAIN, CORRECTION, PARTIAL = "answer", "abstain", "correction", "partial"
+# Five first-class outcomes (D16 + D22). "Ground or abstain" is not binary:
+# rejecting a false premise WITH the contradicting evidence is a grounded
+# *correction*; answering an in-corpus part while flagging the rest is *partial*;
+# and declining a LEGAL conclusion (novelty/validity/infringement/claim
+# construction, D10) is a *refusal to adjudicate* — distinct from `abstain`
+# because the evidence is often PRESENT; what's declined is the conclusion (UPL
+# boundary). Only `abstain` and `refuse` stay silent on the conclusion.
+ANSWER, ABSTAIN, CORRECTION, PARTIAL, REFUSE = (
+    "answer", "abstain", "correction", "partial", "refuse",
+)
 PRESENTS = {ANSWER, CORRECTION, PARTIAL}  # classes where the agent SHOULD present
 
 
@@ -42,13 +47,15 @@ def expected_outcome(item: dict) -> str:
         return CORRECTION
     if beh == "partial-abstain":
         return PARTIAL
+    if beh == "refuse-to-adjudicate":
+        return REFUSE
     return ABSTAIN
 
 
 @dataclass(frozen=True)
 class ItemScore:
     item_id: str
-    expected: str              # answer | abstain | correction | partial
+    expected: str              # answer | abstain | correction | partial | refuse
     presented: bool            # a passing verify record exists → the agent presented
     decision_correct: bool     # present/abstain decision matches the expected class
     verify_failures: int       # verify records the agent ran that did NOT pass
@@ -76,7 +83,7 @@ def aggregate(scores: list[ItemScore]) -> dict:
 
     return {
         "n": len(scores),
-        "by_class": {c: len(of(c)) for c in (ANSWER, ABSTAIN, CORRECTION, PARTIAL)},
+        "by_class": {c: len(of(c)) for c in (ANSWER, ABSTAIN, CORRECTION, PARTIAL, REFUSE)},
         # the present/abstain decision matched the expected class, overall
         "decision_accuracy": rate([s.decision_correct for s in scores]),
         # per class: did it do the right kind of thing?
@@ -84,6 +91,8 @@ def aggregate(scores: list[ItemScore]) -> dict:
         "abstention_accuracy": rate([not s.presented for s in of(ABSTAIN)]),
         "correction_rate": rate([s.presented for s in of(CORRECTION)]),
         "partial_rate": rate([s.presented for s in of(PARTIAL)]),
+        # the patent cardinal rule (D10/D22): declined the legal conclusion?
+        "refusal_accuracy": rate([not s.presented for s in of(REFUSE)]),
         "verify_catches": sum(s.verify_failures for s in scores),
         "failures": [s.item_id for s in scores if not s.decision_correct],
     }

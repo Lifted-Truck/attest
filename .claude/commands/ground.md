@@ -12,10 +12,12 @@ Follow the loop in `CLAUDE.md` ("Runtime agent loop"):
 
 1. **Locate** — `check_support` / `search_corpus`; read freely with `get_span` /
    `get_document` for the context a citation needs (D11).
-2. **Pick the outcome (D16)** — *answer* · *abstain* (content absent / wrong
+2. **Pick the outcome (D16, D22)** — *answer* · *abstain* (content absent / wrong
    period/entity) · **grounded correction** (the question rests on a false premise →
    present a refutation citing the contradicting span) · **partial** (answer the
-   in-corpus part, explicitly flag what's out of corpus).
+   in-corpus part, explicitly flag what's out of corpus) · **refuse-to-adjudicate**
+   (the question asks for a legal conclusion — novelty/validity/infringement/claim
+   construction: decline it and offer the located evidence; distinct from abstain).
 3. **Ground the output** — bind every load-bearing figure/date/entity to its exact
    span; derived values declare their operands, never a cited result (D9).
 4. **`verify(answer)` before presenting** — if `not ok`, fix the binding or abstain.

@@ -6,4 +6,7 @@ comparable across versions. Bump per the monotonic rule: minor for a strengtheni
 major for a structural change to what is guaranteed.
 """
 
-CONTRACT_VERSION = "1.0"
+# 1.1 (2026-06-30, D22): outcome honesty refined — refuse-to-adjudicate becomes a
+#     first-class fifth outcome, distinct from abstain. Strengthening → minor bump.
+# 1.0 (2026-06-29, D21): initial declaration.
+CONTRACT_VERSION = "1.1"

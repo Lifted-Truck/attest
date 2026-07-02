@@ -186,3 +186,18 @@ def test_table_figure_lights_its_column_header(store):
     html = render_evidence_view([inter], store)
     # 364,980 is the FY2024 (first) column → its header is September 28, 2024
     assert re.search(r'<mark class="m k-lbl"[^>]*>September 28, 2024</mark>', html)
+
+
+def test_refuse_renders_distinctly(store):
+    """D22: a refusal-to-adjudicate is its own kind — distinct badge/colour from abstain."""
+    from attest.retrieval import Retriever
+    inter = Interaction(
+        "Is claim 1 valid?", "refuse",
+        reason="Refusal to adjudicate (D10): validity is a professional's conclusion; "
+               "the located evidence is offered for that review.",
+        closest=Retriever(store).search("total assets", 1),
+    )
+    html = render_evidence_view([inter], store)
+    assert '<section class="card refuse" id="i0">' in html
+    assert '<span class="badge refuse">refuse</span>' in html
+    assert "--refuse:" in html and ".card.refuse.active" in html   # its own colour

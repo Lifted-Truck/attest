@@ -83,7 +83,8 @@ def test_aggregate_summarizes_by_class():
     ]
     agg = aggregate(scores)
     assert agg["n"] == 5
-    assert agg["by_class"] == {"answer": 2, "abstain": 1, "correction": 1, "partial": 1}
+    assert agg["by_class"] == {"answer": 2, "abstain": 1, "correction": 1, "partial": 1,
+                               "refuse": 0}
     assert agg["answer_rate"] == 1.0
     assert agg["abstention_accuracy"] == 1.0
     assert agg["correction_rate"] == 1.0       # G020 presented its correction
@@ -139,3 +140,28 @@ def test_reliability_buckets():
     buckets = reliability(pairs, bins=5)
     top = next(b for b in buckets if b["bucket"] == "0.8-1.0")
     assert top["n"] == 2 and top["accuracy"] == 1.0
+
+
+# --- refuse-to-adjudicate as a first-class outcome (D22) ---
+
+I_REFUSE = {"id": "P001", "answerable": False, "expected_behavior": "refuse-to-adjudicate"}
+
+
+def test_refuse_is_its_own_outcome_class():
+    assert expected_outcome(I_REFUSE) == "refuse"
+
+
+def test_refusal_scored_correct_when_silent_and_wrong_when_adjudicated():
+    declined = score_item(I_REFUSE, ABSTAINED)   # no verify-ok → declined the conclusion
+    assert not declined.presented and declined.decision_correct
+    judged = score_item(I_REFUSE, ANSWERED)      # presented a "verdict" → the D10 breach
+    assert judged.presented and not judged.decision_correct
+
+
+def test_refusal_accuracy_aggregated_separately():
+    scores = [score_item(I_REFUSE, ABSTAINED),
+              score_item({**I_REFUSE, "id": "P002"}, ANSWERED)]
+    agg = aggregate(scores)
+    assert agg["by_class"]["refuse"] == 2
+    assert agg["refusal_accuracy"] == 0.5
+    assert agg["abstention_accuracy"] is None    # refusals are NOT counted as abstains

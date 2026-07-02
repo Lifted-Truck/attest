@@ -53,13 +53,21 @@ def replay_support(payload: dict, retriever: Retriever) -> dict:
     """Re-derive a check_support / check_claim interaction from the logged query alone.
 
     Uses the floor recorded in `provenance` (not the default), so a record made under
-    a per-engagement threshold reproduces byte-identically (I6)."""
+    a per-engagement threshold reproduces byte-identically (I6). The provenance stamp
+    describes the *original* production context, so replay preserves it verbatim
+    (D21/TC-2): a record made under an earlier contract version — or before stamping
+    existed — still replays byte-identically after an upgrade."""
     kind = payload.get("kind", "check_support")
     prov = payload.get("provenance", {})
     threshold = prov.get("threshold", THRESHOLD)
     result = check_support(payload["query"], retriever, threshold=threshold)
-    return support_record(payload["query"], result, kind,
-                          threshold=threshold, retrieval=retriever.method)
+    rec = support_record(payload["query"], result, kind,
+                         threshold=threshold, retrieval=retriever.method)
+    if "provenance" in payload:
+        rec["provenance"] = payload["provenance"]
+    else:                                   # pre-provenance record stays pre-provenance
+        rec.pop("provenance")
+    return rec
 
 
 def verify_record(answer_json: dict, result: VerifyResult, outcome: str | None = None) -> dict:
@@ -83,11 +91,21 @@ def verify_record(answer_json: dict, result: VerifyResult, outcome: str | None =
 
 
 def replay_verify(payload: dict, store: SpanStore) -> dict:
-    """Re-run verify from the logged answer alone and re-derive the record (I6)."""
-    return verify_record(
+    """Re-run verify from the logged answer alone and re-derive the record (I6).
+
+    The verdict (`ok`/`unbound`) is re-derived by the *current* engine; the
+    provenance stamp describes the original production context and is preserved
+    verbatim, so older-contract and pre-provenance records replay byte-identically
+    (D21/TC-2) — while any real behavioral drift still fails on the verdict."""
+    rec = verify_record(
         payload["answer"], verify(answer_from_json(payload["answer"]), store),
         payload.get("outcome"),
     )
+    if "provenance" in payload:
+        rec["provenance"] = payload["provenance"]
+    else:
+        rec.pop("provenance")
+    return rec
 
 
 def replays_identically(payload: dict, engine) -> bool:
