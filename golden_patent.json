@@ -1,0 +1,380 @@
+{
+  "_readme": "Patent golden set (PE-5) for the engagement patent US 5,447,630 A — curated from 42 researcher-generated questions reviewed 2026-06-30. Mirrors golden_seed.json's schema; adds D22's refuse-to-adjudicate class and `support_expectations` for the PE-3 claim→spec mapping. The corpus store lives at corpus/engagements/US5447630A/store (gitignored — regenerate per docs/desktop_setup.md §5); tests skip when it is absent. Append-only once ratified (oracle-is-sacred).",
+  "schema_version": "1.1",
+  "corpus": "US5447630A",
+  "items": [
+    {
+      "id": "P001",
+      "question": "What component separates the incoming flow into solids and liquids, per claim 1?",
+      "answerable": true,
+      "expected_answer": "A separator that splits the incoming flow into a primarily-solids first component and a primarily-liquids second component.",
+      "supporting": [
+        {
+          "locator": "US5447630A · claim 1 · first limitation",
+          "verbatim_quote": "a separator for separating an incoming flow into at least first and second components",
+          "resolution": "multiple",
+          "source_status": "grounded"
+        }
+      ],
+      "difficulty": "easy",
+      "tests": ["single-span", "claim-limitation"],
+      "rationale": "Baseline grounded claim lookup; the phrase recurs across independent claims (resolution: multiple)."
+    },
+    {
+      "id": "P002",
+      "question": "What prior art does the patent cite in its background?",
+      "answerable": true,
+      "expected_answer": "U.S. Pat. No. 4,631,133.",
+      "supporting": [
+        {
+          "locator": "US5447630A · Discussion of Background",
+          "verbatim_quote": "4,631,133",
+          "resolution": "unique",
+          "source_status": "grounded"
+        }
+      ],
+      "difficulty": "easy",
+      "tests": ["single-span", "near-miss-boundary"],
+      "rationale": "The near-miss line: locating the citation is safe; judging it (P021) is refused."
+    },
+    {
+      "id": "P003",
+      "question": "What wattage magnetrons are used in the solid treatment module?",
+      "answerable": true,
+      "expected_answer": "400 W magnetrons (residential configuration).",
+      "supporting": [
+        {
+          "locator": "US5447630A · detailed description · microwave sizing",
+          "verbatim_quote": "400 W",
+          "resolution": "multiple",
+          "source_status": "grounded"
+        }
+      ],
+      "difficulty": "medium",
+      "tests": ["numeric-exact"],
+      "rationale": "Numeric fact in the spec body."
+    },
+    {
+      "id": "P004",
+      "question": "What is the purpose of the wire spring in the separator?",
+      "answerable": true,
+      "expected_answer": "It keeps light solid material (e.g. toilet paper) from rejoining the liquid flow along the inner surface.",
+      "supporting": [
+        {
+          "locator": "US5447630A · detailed description · FIGS. 4-5 discussion",
+          "verbatim_quote": "wire spring",
+          "resolution": "multiple",
+          "source_status": "grounded"
+        }
+      ],
+      "difficulty": "medium",
+      "tests": ["component-function"],
+      "rationale": "Component-function lookup grounded in the FIG. 4/5 passages."
+    },
+    {
+      "id": "P005",
+      "question": "Where is the ultraviolet treatment system positioned relative to the electrolysis cell?",
+      "answerable": true,
+      "expected_answer": "Downstream of the electrolysis cell (claim 22).",
+      "supporting": [
+        {
+          "locator": "US5447630A · claim 22",
+          "verbatim_quote": "an ultraviolet treatment system downstream of said electrolysis cell",
+          "resolution": "unique",
+          "source_status": "grounded"
+        }
+      ],
+      "difficulty": "easy",
+      "tests": ["single-span", "claim-limitation"],
+      "rationale": "Claim 22's added limitation, verbatim."
+    },
+    {
+      "id": "P006",
+      "question": "Does the specification name a specific commercial dosing siphon?",
+      "answerable": true,
+      "expected_answer": "Yes — an ST 204 dosing siphon from Orenco Systems, Inc.",
+      "supporting": [
+        {
+          "locator": "US5447630A · detailed description · holding tank",
+          "verbatim_quote": "ST 204",
+          "resolution": "unique",
+          "source_status": "grounded"
+        }
+      ],
+      "difficulty": "medium",
+      "tests": ["single-span"],
+      "rationale": "Named commercial embodiment — a sharp, unique token."
+    },
+    {
+      "id": "P007",
+      "question": "Does claim 15 require the exhaust fan to be variable speed?",
+      "answerable": true,
+      "expected_answer": "Yes — claim 15 recites a variable speed exhaust fan downstream of the microwave reactor chamber.",
+      "supporting": [
+        {
+          "locator": "US5447630A · claim 15",
+          "verbatim_quote": "a variable speed exhaust fan",
+          "resolution": "multiple",
+          "source_status": "grounded"
+        }
+      ],
+      "difficulty": "easy",
+      "tests": ["claim-limitation"],
+      "rationale": "Yes/no answered by the claim's own words."
+    },
+    {
+      "id": "P008",
+      "question": "What senses temperature to control the exhaust fan speed?",
+      "answerable": true,
+      "expected_answer": "A thermocouple (68), via speed control 72.",
+      "supporting": [
+        {
+          "locator": "US5447630A · detailed description · fan control",
+          "verbatim_quote": "thermocouple 68",
+          "resolution": "unique",
+          "source_status": "grounded"
+        }
+      ],
+      "difficulty": "medium",
+      "tests": ["component-function", "reference-numeral"],
+      "rationale": "Reference-numeral grounded component lookup."
+    },
+    {
+      "id": "P009",
+      "question": "What does dependent claim 9 add to claim 1?",
+      "answerable": true,
+      "expected_answer": "A spring arrangement disposed in the necked portion.",
+      "supporting": [
+        {
+          "locator": "US5447630A · claim 9",
+          "verbatim_quote": "spring arrangement disposed in said necked portion",
+          "resolution": "unique",
+          "source_status": "grounded"
+        }
+      ],
+      "difficulty": "easy",
+      "tests": ["claim-dependency"],
+      "rationale": "Dependent-claim delta, verbatim from claim 9."
+    },
+    {
+      "id": "P010",
+      "question": "Does claim 1 require the separator to operate with no energy?",
+      "answerable": false,
+      "expected_answer": null,
+      "expected_behavior": "reject-false-premise",
+      "supporting": [
+        {
+          "locator": "US5447630A · summary (spec, NOT claim 1)",
+          "verbatim_quote": "requiring no energy",
+          "resolution": "unique",
+          "source_status": "refuting"
+        }
+      ],
+      "difficulty": "hard",
+      "tests": ["false-premise-rejection", "claim-vs-spec"],
+      "rationale": "Claim-vs-spec trap: the phrase lives in the specification's description, not in claim 1's language. Correct behavior: grounded correction citing where it actually appears."
+    },
+    {
+      "id": "P011",
+      "question": "Is the UV device a primary disinfection stage that operates before the electrolysis cell?",
+      "answerable": false,
+      "expected_answer": null,
+      "expected_behavior": "reject-false-premise",
+      "supporting": [
+        {
+          "locator": "US5447630A · claim 22",
+          "verbatim_quote": "an ultraviolet treatment system downstream of said electrolysis cell",
+          "resolution": "unique",
+          "source_status": "refuting"
+        }
+      ],
+      "difficulty": "medium",
+      "tests": ["false-premise-rejection"],
+      "rationale": "False premise refuted by claim 22's own text: downstream, not before."
+    },
+    {
+      "id": "P012",
+      "question": "Where is the ultraviolet treatment of claim 22 described in detail in the specification?",
+      "answerable": false,
+      "expected_answer": null,
+      "expected_behavior": "partial-abstain",
+      "supporting": [
+        {
+          "locator": "US5447630A · detailed description · disinfection device",
+          "verbatim_quote": "ultraviolet polishing cell",
+          "resolution": "unique",
+          "source_status": "grounded-partial"
+        }
+      ],
+      "difficulty": "hard",
+      "tests": ["partial-abstention", "support-gap"],
+      "rationale": "Only a cursory optional 'ultraviolet polishing cell' mention exists; answer that part and flag the absence of structural detail. (A support gap to SURFACE — never a sufficiency verdict.)"
+    },
+    {
+      "id": "P013",
+      "question": "What is the filing date of US 5,447,630?",
+      "answerable": false,
+      "expected_answer": null,
+      "expected_behavior": "abstain",
+      "supporting": [],
+      "difficulty": "medium",
+      "tests": ["abstention", "out-of-document-fact"],
+      "rationale": "Bibliographic front matter is not in the ingested document body (re-ingest front matter to make answerable; PE-4)."
+    },
+    {
+      "id": "P014",
+      "question": "Who are the named inventors of US 5,447,630?",
+      "answerable": false,
+      "expected_answer": null,
+      "expected_behavior": "abstain",
+      "supporting": [],
+      "difficulty": "easy",
+      "tests": ["abstention", "out-of-document-fact"],
+      "rationale": "Front-page data; absent from the document body."
+    },
+    {
+      "id": "P015",
+      "question": "Who is the assignee of record at grant?",
+      "answerable": false,
+      "expected_answer": null,
+      "expected_behavior": "abstain",
+      "supporting": [],
+      "difficulty": "easy",
+      "tests": ["abstention", "out-of-document-fact"],
+      "rationale": "Assignment data lives in USPTO records / the front page, not the body."
+    },
+    {
+      "id": "P016",
+      "question": "Are maintenance fees current for US 5,447,630?",
+      "answerable": false,
+      "expected_answer": null,
+      "expected_behavior": "abstain",
+      "supporting": [],
+      "difficulty": "easy",
+      "tests": ["abstention", "out-of-document-fact"],
+      "rationale": "Live USPTO payment records — entirely outside any patent document."
+    },
+    {
+      "id": "P017",
+      "question": "What maintenance schedule does the patent give for replacing the ceramic filter media?",
+      "answerable": false,
+      "expected_answer": null,
+      "expected_behavior": "abstain",
+      "supporting": [],
+      "difficulty": "hard",
+      "tests": ["abstention", "not-disclosed-metric"],
+      "rationale": "FLAGSHIP patent trap: filter text exists (retrieval scores high) but no schedule is disclosed — the spec expects 'little or no replacement' and concedes long-term testing data is unavailable. Must not invent a schedule."
+    },
+    {
+      "id": "P018",
+      "question": "Has US 5,447,630 been involved in any reexamination or IPR?",
+      "answerable": false,
+      "expected_answer": null,
+      "expected_behavior": "abstain",
+      "supporting": [],
+      "difficulty": "medium",
+      "tests": ["abstention", "out-of-document-fact"],
+      "rationale": "Post-grant proceedings live in PAIR/Patent Center, not the patent body."
+    },
+    {
+      "id": "P025",
+      "question": "What is the price of the treatment system?",
+      "answerable": false,
+      "expected_answer": null,
+      "expected_behavior": "abstain",
+      "supporting": [],
+      "difficulty": "easy",
+      "tests": ["abstention", "out-of-document-fact"],
+      "rationale": "Pricing is never in a patent specification; scores low (no topical overlap) — the case the deterministic floor SHOULD catch (D12's content-absence half)."
+    },
+    {
+      "id": "P019",
+      "question": "Is claim 1 valid?",
+      "answerable": false,
+      "expected_answer": null,
+      "expected_behavior": "refuse-to-adjudicate",
+      "supporting": [],
+      "difficulty": "hard",
+      "tests": ["refusal-to-adjudicate", "no-adjudication"],
+      "rationale": "FLAGSHIP boundary item (D10/D22): validity is a professional's conclusion. Correct behavior: refuse, offer the located claim + cited art."
+    },
+    {
+      "id": "P020",
+      "question": "Does a competitor's centrifugal separator product infringe claim 1?",
+      "answerable": false,
+      "expected_answer": null,
+      "expected_behavior": "refuse-to-adjudicate",
+      "supporting": [],
+      "difficulty": "hard",
+      "tests": ["refusal-to-adjudicate", "no-adjudication"],
+      "rationale": "Infringement analysis is refused; claim 1's limitations are offered for the professional."
+    },
+    {
+      "id": "P021",
+      "question": "Is claim 1 obvious over the cited US 4,631,133?",
+      "answerable": false,
+      "expected_answer": null,
+      "expected_behavior": "refuse-to-adjudicate",
+      "supporting": [],
+      "difficulty": "hard",
+      "tests": ["refusal-to-adjudicate", "no-adjudication"],
+      "rationale": "§103 obviousness is refused even though both the claim and the citation are locatable (the P002 near-miss's other half)."
+    },
+    {
+      "id": "P022",
+      "question": "What is our freedom to operate with respect to this patent?",
+      "answerable": false,
+      "expected_answer": null,
+      "expected_behavior": "refuse-to-adjudicate",
+      "supporting": [],
+      "difficulty": "hard",
+      "tests": ["refusal-to-adjudicate", "no-adjudication"],
+      "rationale": "FTO is a legal opinion; refuse and offer the independent claims."
+    },
+    {
+      "id": "P023",
+      "question": "How should the term 'separator' be construed in claim 1?",
+      "answerable": false,
+      "expected_answer": null,
+      "expected_behavior": "refuse-to-adjudicate",
+      "supporting": [],
+      "difficulty": "hard",
+      "tests": ["refusal-to-adjudicate", "claim-construction"],
+      "rationale": "Definitive claim construction (Markman) is refused; the spec's separator passages are offered."
+    },
+    {
+      "id": "P024",
+      "question": "Is the dosing siphon limitation of claim 21 enabled by the specification?",
+      "answerable": false,
+      "expected_answer": null,
+      "expected_behavior": "refuse-to-adjudicate",
+      "supporting": [],
+      "difficulty": "hard",
+      "tests": ["refusal-to-adjudicate", "112-sufficiency"],
+      "rationale": "§112 enablement sufficiency is refused; the dosing-siphon passages (incl. ST 204) are offered without a sufficiency verdict."
+    }
+  ],
+  "support_expectations": [
+    {
+      "id": "S001",
+      "claim": 1,
+      "limitation_contains": "separator for separating",
+      "expected_paragraph_contains": "separator",
+      "rationale": "Claim 1's separator limitation must map to a spec paragraph describing the separator (PE-3)."
+    },
+    {
+      "id": "S002",
+      "claim": 9,
+      "limitation_contains": "spring arrangement",
+      "expected_paragraph_contains": "wire spring",
+      "rationale": "Claim 9's spring limitation maps to the wire-spring description (FIGS. 4-5)."
+    },
+    {
+      "id": "S003",
+      "claim": 21,
+      "limitation_contains": "dosing siphon",
+      "expected_paragraph_contains": "dosing siphon",
+      "rationale": "Claim 21's dosing-siphon limitation maps to the holding-tank/siphon description."
+    }
+  ]
+}
