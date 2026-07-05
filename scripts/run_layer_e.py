@@ -151,14 +151,16 @@ def main() -> int:
         stdout = proc.stdout
         segment = [e.payload for e in log.entries()[before:]]
 
-        # An agent that called NO tools didn't actually run the loop (auth/MCP
-        # failure, refusal to use tools). That is an ERROR, not an abstention —
-        # surface it loudly instead of silently scoring presented=False.
-        if proc.returncode != 0 or not segment:
+        # A process failure (auth/MCP breakage, timeout) is an ERROR, not an
+        # abstention — surface it loudly instead of silently scoring
+        # presented=False. But an agent that exited cleanly WITH prose and no tool
+        # calls did run: e.g. an immediate refuse-to-adjudicate (D22) needs no
+        # tools. That scores normally (no verify-ok → not presented).
+        if proc.returncode != 0 or (not segment and not stdout.strip()):
             errored.append(item["id"])
             why = (stdout or proc.stderr or "(no output)").strip().splitlines()
             snip = (why[0] if why else "")[:80]
-            print(f"  ⚠ {item['id']:<5} agent error / no tool calls — {snip}")
+            print(f"  ⚠ {item['id']:<5} agent error / no output — {snip}")
             continue
 
         s = score_item(item, segment)
