@@ -17,6 +17,7 @@ and [`ATTEST_build_brief.md`](ATTEST_build_brief.md) for full architecture and r
 - [`golden_seed.json`](golden_seed.json) — the ground-truth eval set (20 items, Apple FY2024 10-K).
 - [`ATTEST_Patent_Tailoring_Consideration.md`](ATTEST_Patent_Tailoring_Consideration.md) — patent-domain specialization for the **first client engagement**. Provisional; **subordinate to `ROADMAP.md`**. Wins on patent-domain design where it doesn't conflict.
 - [`ATTEST_Client_Intake_Questions.md`](ATTEST_Client_Intake_Questions.md) — the open client decisions. Treat its unresolved items as **DO NOT INVENT** (see ROADMAP D10/§10).
+- [`docs/landscape_lessons.md`](docs/landscape_lessons.md) — external prior art (legal/finance AI failures + category winners) mapped onto our decisions. **Research input, subordinate to ROADMAP; authorizes no work.** Its **CONFIRMS** entries are guardrails — the market already validated those decisions, so don't "fix" them (especially: never soften `verified ≠ entailed`; never let answer-rates dominate the eval headline). Its **CANDIDATE** items go to human triage only.
 
 ## Two corpora: EDGAR (reference) + patents (client)
 
