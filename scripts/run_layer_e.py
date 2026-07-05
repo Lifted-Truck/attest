@@ -53,69 +53,101 @@ def parse_confidence(text: str) -> float | None:
     return float(m.group(1)) if m else None
 
 ROOT = Path(__file__).resolve().parent.parent
-GOLDEN = ROOT / "golden_seed.json"
-AUDIT = ROOT / "audit_log" / "agent.jsonl"
-TREND = ROOT / "audit_log" / "layer_e_results.jsonl"
-
 # Headless agent invocation. `--bare` forces ANTHROPIC_API_KEY auth (never the
 # keychain/OAuth) so a CI/eval env authenticates by key; it also skips CLAUDE.md
 # auto-discovery, so we re-add the repo (--add-dir, loads the loop) and a compact
-# system prompt. The agent reaches ATTEST via .mcp.json; tools auto-approved.
+# system prompt. The agent reaches ATTEST via a PER-RUN mcp config (written next
+# to the audit log) whose env points at the requested store/threshold, so any
+# engagement corpus can be evaluated — not just the default EDGAR store.
 AGENT_SYSTEM = (
     "Answer the question ONLY using the attest MCP tools. Loop: search_corpus / "
     "check_support to locate; get_span / get_document to read; draft, binding every "
     "load-bearing figure to its exact span; call verify(answer) before presenting; "
     "abstain (structured refusal) if unsupported or if the text doesn't answer THIS "
-    "question. End your reply with a line: Confidence: 0.NN"
+    "question. If the question asks for a LEGAL CONCLUSION (validity, infringement, "
+    "obviousness, claim construction, freedom-to-operate, enablement sufficiency), "
+    "REFUSE TO ADJUDICATE: decline the conclusion, offer the located evidence, and "
+    "do not call verify. End your reply with a line: Confidence: 0.NN"
 )
-CLAUDE_FLAGS = [
-    "--bare",
-    "--add-dir", str(ROOT),
-    "--mcp-config", str(ROOT / ".mcp.json"),
-    "--permission-mode", "bypassPermissions",
-    "--append-system-prompt", AGENT_SYSTEM,
-    "--allowedTools", "mcp__attest__search_corpus,mcp__attest__get_span,"
-    "mcp__attest__get_document,mcp__attest__check_support,mcp__attest__verify,"
-    "mcp__attest__check_claim",
-]
 
 
-def run_agent(question: str, timeout: int = 180) -> subprocess.CompletedProcess:
-    return subprocess.run(  # noqa: S603
-        ["claude", "-p", question, *CLAUDE_FLAGS], cwd=ROOT, capture_output=True,
-        text=True, stdin=subprocess.DEVNULL, timeout=timeout
-    )
+def claude_flags(mcp_config: Path) -> list[str]:
+    return [
+        "--bare",
+        "--add-dir", str(ROOT),
+        "--mcp-config", str(mcp_config),
+        "--permission-mode", "bypassPermissions",
+        "--append-system-prompt", AGENT_SYSTEM,
+        "--allowedTools", "mcp__attest__search_corpus,mcp__attest__get_span,"
+        "mcp__attest__get_document,mcp__attest__check_support,mcp__attest__verify,"
+        "mcp__attest__check_claim",
+    ]
+
+
+def write_mcp_config(path: Path, store: str, audit: Path, threshold: float | None) -> None:
+    env = {"ATTEST_STORE": str(store), "ATTEST_AUDIT": str(audit)}
+    if threshold is not None:
+        env["ATTEST_SUPPORT_THRESHOLD"] = str(threshold)
+    path.write_text(json.dumps({"mcpServers": {"attest": {
+        "command": str(ROOT / ".venv" / "bin" / "python"),
+        "args": ["-m", "attest.mcp_server"], "env": env,
+    }}}, indent=2), encoding="utf-8")
+
+
+def run_agent(question: str, flags: list[str], timeout: int = 360) -> subprocess.CompletedProcess:
+    """One slow/hung item must not kill the run: a timeout comes back as a failed
+    CompletedProcess and is scored as an errored item, not an exception."""
+    try:
+        return subprocess.run(  # noqa: S603
+            ["claude", "-p", question, *flags], cwd=ROOT, capture_output=True,
+            text=True, stdin=subprocess.DEVNULL, timeout=timeout
+        )
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(
+            args=["claude"], returncode=124, stdout="", stderr=f"timeout after {timeout}s"
+        )
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Layer-E: drive + score the agent over the golden set")
+    ap = argparse.ArgumentParser(description="Layer-E: drive + score the agent over a golden set")
     ap.add_argument("--live", action="store_true", help="actually run the agent (BILLED)")
     ap.add_argument("--limit", type=int, default=0, help="only the first N items (0 = all)")
     ap.add_argument("--timestamp", default="", help="stamp for the trend record (caller-supplied)")
+    ap.add_argument("--golden", default=str(ROOT / "golden_seed.json"))
+    ap.add_argument("--store", default=str(ROOT / "corpus" / "store"))
+    ap.add_argument("--threshold", type=float, default=None,
+                    help="ATTEST_SUPPORT_THRESHOLD for the run (per-engagement floor, D20)")
+    ap.add_argument("--audit-dir", default=str(ROOT / "audit_log"),
+                    help="where the run's agent log, mcp config, and trend line go")
     ns = ap.parse_args()
 
-    items = json.loads(GOLDEN.read_text(encoding="utf-8"))["items"]
+    audit_dir = Path(ns.audit_dir)
+    audit = audit_dir / "agent.jsonl"
+    trend = audit_dir / "layer_e_results.jsonl"
+    mcp_config = audit_dir / "run_mcp.json"
+
+    items = json.loads(Path(ns.golden).read_text(encoding="utf-8"))["items"]
     if ns.limit:
         items = items[: ns.limit]
 
     if not ns.live:
-        print("DRY RUN — would drive the agent over", len(items), "golden items.")
-        print("per-item command:")
-        print('  claude -p "<question>" ' + " ".join(CLAUDE_FLAGS))
-        print("\nRe-run with --live to execute (billed, non-deterministic). Scoring reads")
-        print(f"the audit log ({AUDIT.relative_to(ROOT)}) and writes a trend to "
-              f"{TREND.relative_to(ROOT)}.")
+        print("DRY RUN — would drive the agent over", len(items), "golden items")
+        print(f"  golden={ns.golden}\n  store={ns.store}  threshold={ns.threshold}")
+        print(f"  audit/trend under {audit_dir}")
+        print("Re-run with --live to execute (billed, non-deterministic).")
         return 0
 
-    AUDIT.parent.mkdir(parents=True, exist_ok=True)
-    AUDIT.write_text("", encoding="utf-8")  # fresh log for this run
-    log = AuditLog(AUDIT)
-    store = SpanStore.from_store(DocumentStore(ROOT / "corpus" / "store"))
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    audit.write_text("", encoding="utf-8")  # fresh log for this run
+    write_mcp_config(mcp_config, ns.store, audit, ns.threshold)
+    flags = claude_flags(mcp_config)
+    log = AuditLog(audit)
+    store = SpanStore.from_store(DocumentStore(ns.store))
 
     scores, entailed_items, calib, errored, refutations = [], [], [], [], []
     for item in items:
         before = len(log.entries())
-        proc = run_agent(item["question"])
+        proc = run_agent(item["question"], flags)
         stdout = proc.stdout
         segment = [e.payload for e in log.entries()[before:]]
 
@@ -175,8 +207,7 @@ def main() -> int:
         "n_errored": len(errored),
         "errored": errored,
     }
-    TREND.parent.mkdir(parents=True, exist_ok=True)
-    with TREND.open("a", encoding="utf-8") as f:
+    with trend.open("a", encoding="utf-8") as f:
         f.write(json.dumps(summary) + "\n")
     print("\n" + json.dumps(summary, indent=2))
     return 0
