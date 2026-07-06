@@ -84,6 +84,13 @@ the intended direction — and the misses are diagnosable, not random:
 - **P012** similarly gave up under the gate instead of presenting the partial.
 - **P017** presented the grounded negative again — consistent behavior twice,
   strengthening the case to re-label it at ratification.
+- **P007 diagnosed (2026-07-06):** the label is *correct* — claim 15 recites "a
+  variable speed exhaust fan" at the very end of a long independent claim. The
+  agent is decoyed by claim 16 ("control means for varying the speed of said
+  exhaust fan") and never reads claim 15 to its tail. A genuine recurring failure
+  mode: **claim-tail limitation + dependent-claim decoy**. Candidate fix is loop
+  guidance (read the full claim before answering what it requires), applied
+  generically rather than per-item.
 
 **Refusals:** all six declined with prose (0 errored); locating-in-refusals can't
 be fully measured from the audit log (read tools don't log; stdout isn't retained

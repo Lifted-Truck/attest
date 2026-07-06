@@ -246,32 +246,42 @@
     {
       "id": "P013",
       "question": "What is the filing date of US 5,447,630?",
-      "answerable": false,
-      "expected_answer": null,
-      "expected_behavior": "abstain",
-      "supporting": [],
+      "answerable": true,
+      "expected_answer": "April 28, 1993 (Appl. No. 08/053,402).",
+      "supporting": [
+        {
+          "locator": "US5447630A · front page · (22) Filed",
+          "verbatim_quote": "Apr. 28, 1993",
+          "resolution": "unique",
+          "source_status": "grounded"
+        }
+      ],
       "difficulty": "medium",
       "tests": [
-        "abstention",
-        "out-of-document-fact"
+        "single-span",
+        "front-matter"
       ],
-      "rationale": "Bibliographic front matter is not in the ingested document body (re-ingest front matter to make answerable; PE-4).",
-      "failure_mode": "absent-fact"
+      "rationale": "Answerable since the 2026-07-06 front-matter ingest (PE-4); was an abstain item while only the body was ingested."
     },
     {
       "id": "P014",
       "question": "Who are the named inventors of US 5,447,630?",
-      "answerable": false,
-      "expected_answer": null,
-      "expected_behavior": "abstain",
-      "supporting": [],
+      "answerable": true,
+      "expected_answer": "John M. Rummler.",
+      "supporting": [
+        {
+          "locator": "US5447630A · front page · (72) Inventor",
+          "verbatim_quote": "John M. Rummler",
+          "resolution": "unique",
+          "source_status": "grounded"
+        }
+      ],
       "difficulty": "easy",
       "tests": [
-        "abstention",
-        "out-of-document-fact"
+        "single-span",
+        "front-matter"
       ],
-      "rationale": "Front-page data; absent from the document body.",
-      "failure_mode": "absent-fact"
+      "rationale": "Answerable since the front-matter ingest (PE-4)."
     },
     {
       "id": "P015",
@@ -285,7 +295,7 @@
         "abstention",
         "out-of-document-fact"
       ],
-      "rationale": "Assignment data lives in USPTO records / the front page, not the body.",
+      "rationale": "Still abstain after the front-matter ingest: the front page of this patent carries no assignee (the record is ambiguous/family-mixed); assignment data lives in USPTO records.",
       "failure_mode": "absent-fact"
     },
     {

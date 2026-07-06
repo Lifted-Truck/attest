@@ -39,8 +39,8 @@ def test_taxonomy_covers_all_five_outcomes(golden):
     """D16/D22: the set exercises every outcome class, incl. refuse-to-adjudicate."""
     classes = [expected_outcome(it) for it in golden["items"]]
     counts = {c: classes.count(c) for c in set(classes)}
-    assert counts["answer"] >= 8
-    assert counts["abstain"] >= 5
+    assert counts["answer"] >= 10
+    assert counts["abstain"] >= 4
     assert counts["refuse"] >= 5          # the cardinal-rule negatives (D10)
     assert counts["correction"] >= 2
     assert counts["partial"] >= 1

@@ -150,3 +150,37 @@ def test_dependency_integrity_flags_missing_and_forward_refs():
     assert {i.claim_number for i in issues} == {2, 3}
     assert "does not exist" in next(i.message for i in issues if i.claim_number == 2)
     assert "not an earlier claim" in next(i.message for i in issues if i.claim_number == 3)
+
+
+# --- PE-4: front matter + effective filing + regime flag ---
+
+
+def test_front_matter_parses_the_synthetic_fixture():
+    from attest.patents import effective_filing, parse_front_matter, regime_flag
+    fm = parse_front_matter(_text())
+    assert fm.application_number == "17/000,000"
+    assert fm.filed == "Mar. 15, 2021"
+    assert any("Jane Smith" in i for i in fm.inventors)
+    assert fm.priority_claims and "62/900,000" in fm.priority_claims[0]
+    # effective filing = the PROVISIONAL's date (earlier than filing)
+    src, d = effective_filing(fm)
+    assert d == (2020, 3, 20) and "62/900,000" in src
+    rf = regime_flag(fm)
+    assert rf["flag"] == "AIA" and rf["effective_filing_date"] == "2020-03-20"
+    assert "professional determination" in rf["note"]     # the D10 boundary, stated
+
+
+def test_front_matter_parses_the_real_patent(tmp_path):
+    from attest.patents import parse_front_matter, regime_flag
+    import pathlib
+    real = pathlib.Path("corpus/engagements/US5447630A/US5447630A.txt")
+    if not real.exists():
+        import pytest as _pytest
+        _pytest.skip("engagement corpus not present (local-only)")
+    fm = parse_front_matter(real.read_text(encoding="utf-8"))
+    assert fm.filed == "Apr. 28, 1993"
+    assert fm.date_of_patent == "Sep. 5, 1995"
+    assert fm.inventors == ["John M. Rummler"]
+    assert fm.application_number == "08/053,402"
+    rf = regime_flag(fm)
+    assert rf["flag"] == "pre-AIA" and rf["effective_filing_date"] == "1993-04-28"

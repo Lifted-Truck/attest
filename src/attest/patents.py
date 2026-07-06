@@ -265,3 +265,93 @@ def parse_claims(text: str) -> list[Claim]:
         kind = DEPENDENT if depends_on is not None else INDEPENDENT
         claims.append(Claim(number, body, start, start + len(body), kind, depends_on))
     return claims
+
+
+# --- bibliographic front matter + priority/regime (PE-4) --------------------------
+# Parses the INID-coded front page into addressable fields, derives the effective
+# filing date (earliest of filing + claimed priority dates — a DATE fact), and
+# flags the pre-AIA/AIA regime by comparison to 2013-03-16. The comparison is
+# arithmetic over cited dates (D19's spirit); whether the regime *legally applies*
+# to a given claim (e.g. mixed-priority applications) is a professional's call (D10).
+
+_DATE_TXT = re.compile(
+    r"((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.? \d{1,2},? \d{4})"
+)
+_MONTHS = {m: i + 1 for i, m in enumerate(
+    "jan feb mar apr may jun jul aug sep oct nov dec".split())}
+AIA_DATE = (2013, 3, 16)
+
+
+def _parse_date(text: str) -> tuple[int, int, int] | None:
+    m = re.match(r"([A-Za-z]+)\.? (\d{1,2}),? (\d{4})", text.strip())
+    if not m:
+        return None
+    mon = _MONTHS.get(m.group(1).lower()[:3])
+    return (int(m.group(3)), mon, int(m.group(2))) if mon else None
+
+
+@dataclass(frozen=True)
+class FrontMatter:
+    patent_number: str | None
+    date_of_patent: str | None    # verbatim, e.g. "Sep. 5, 1995"
+    inventors: list[str]
+    application_number: str | None
+    filed: str | None             # verbatim, e.g. "Apr. 28, 1993"
+    priority_claims: list[str]    # verbatim (60)/(63)-style lines, if any
+
+
+def parse_front_matter(text: str) -> FrontMatter:
+    """Parse the INID-coded front page (first ~40 lines) into addressable fields.
+    Locate-only: fields are verbatim strings from the document."""
+    head = "\n".join(text.split("\n")[:40])
+
+    def grab(pattern: str) -> str | None:
+        m = re.search(pattern, head)
+        return m.group(1).strip() if m else None
+
+    number = grab(r"United States Patent\s+(US [\d,]+\s?[A-Z]?\d?)")
+    dop = grab(r"Date of Patent:\s*" + _DATE_TXT.pattern)
+    inv = grab(r"\(7[25]\)\s*Inventors?:\s*(.+)")
+    inventors = [i.strip() for i in re.split(r";|(?<!\bInc)\.,", inv)] if inv else []
+    appno = grab(r"\(21\)\s*Appl\.? No\.?:\s*([\w/,]+)")
+    filed = grab(r"\(22\)\s*Filed:\s*" + _DATE_TXT.pattern)
+    priority = [ln.strip() for ln in head.split("\n")
+                if re.match(r"\s*\((?:60|63)\)", ln)]
+    return FrontMatter(number, dop, inventors, appno, filed, priority)
+
+
+def effective_filing(fm: FrontMatter) -> tuple[str, tuple[int, int, int]] | None:
+    """Earliest of the filing date and any claimed-priority dates — returned with the
+    verbatim source text so the derivation cites its evidence."""
+    cands: list[tuple[tuple[int, int, int], str]] = []
+    if fm.filed:
+        d = _parse_date(fm.filed)
+        if d:
+            cands.append((d, f"(22) Filed: {fm.filed}"))
+    for line in fm.priority_claims:
+        m = _DATE_TXT.search(line)
+        d = _parse_date(m.group(1)) if m else None
+        if d:
+            cands.append((d, line))
+    if not cands:
+        return None
+    d, src = min(cands)
+    return src, d
+
+
+def regime_flag(fm: FrontMatter) -> dict | None:
+    """Pre-AIA/AIA flag as date arithmetic over cited front-matter dates (PE-4).
+    Surfaces the comparison + its evidence; never asserts which regime governs a
+    specific claim's examination — that is a professional's determination (D10)."""
+    eff = effective_filing(fm)
+    if eff is None:
+        return None
+    src, d = eff
+    return {
+        "effective_filing_date": f"{d[0]:04d}-{d[1]:02d}-{d[2]:02d}",
+        "basis": src,
+        "comparison": f"filed {'before' if d < AIA_DATE else 'on/after'} 2013-03-16",
+        "flag": "pre-AIA" if d < AIA_DATE else "AIA",
+        "note": "date arithmetic over the cited filing/priority text; regime "
+                "applicability to specific claims is a professional determination (D10)",
+    }
