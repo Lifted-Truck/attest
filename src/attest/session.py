@@ -70,13 +70,16 @@ def replay_support(payload: dict, retriever: Retriever) -> dict:
     return rec
 
 
-def verify_record(answer_json: dict, result: VerifyResult, outcome: str | None = None) -> dict:
+def verify_record(answer_json: dict, result: VerifyResult, outcome: str | None = None,
+                  frame_json: dict | None = None, coverage_json: dict | None = None) -> dict:
     """Loggable record of a verify interaction — self-contained and replayable.
 
     Stores the answer-with-tags input (so verify can be re-run from the log alone,
-    I5/I6) alongside the derived verdict. `outcome` (D16: answer/correction/partial)
-    is the agent's self-declared outcome class — metadata for review / the evidence
-    view; included only when provided, so existing records are byte-unchanged (I6).
+    I5/I6) alongside the derived verdict. `outcome` (D16/D22) is the agent's
+    self-declared outcome class; `frame_json`/`coverage_json` are the agent's
+    question frame and its deterministic coverage verdict (M2-T8/D13) — coverage is
+    re-derivable from frame + answer, so the record stays replayable. All optional
+    fields are included only when provided (existing records byte-unchanged, I6).
     """
     rec = {
         "kind": "verify",
@@ -87,19 +90,31 @@ def verify_record(answer_json: dict, result: VerifyResult, outcome: str | None =
     }
     if outcome is not None:
         rec["outcome"] = outcome
+    if frame_json is not None:
+        rec["frame"] = frame_json
+        rec["coverage"] = coverage_json
     return rec
 
 
 def replay_verify(payload: dict, store: SpanStore) -> dict:
     """Re-run verify from the logged answer alone and re-derive the record (I6).
 
-    The verdict (`ok`/`unbound`) is re-derived by the *current* engine; the
-    provenance stamp describes the original production context and is preserved
-    verbatim, so older-contract and pre-provenance records replay byte-identically
-    (D21/TC-2) — while any real behavioral drift still fails on the verdict."""
+    The verdict (`ok`/`unbound`) — and, when a frame was logged, the coverage
+    verdict — are re-derived by the *current* engine; the provenance stamp
+    describes the original production context and is preserved verbatim, so
+    older-contract and pre-provenance records replay byte-identically (D21/TC-2)
+    — while any real behavioral drift still fails on the re-derived fields."""
+    from .frame import coverage_for_answer, coverage_to_json, frame_from_json
+
+    answer = answer_from_json(payload["answer"])
+    frame_json = payload.get("frame")
+    coverage_json = (
+        coverage_to_json(coverage_for_answer(frame_from_json(frame_json), answer, store))
+        if frame_json is not None else None
+    )
     rec = verify_record(
-        payload["answer"], verify(answer_from_json(payload["answer"]), store),
-        payload.get("outcome"),
+        payload["answer"], verify(answer, store), payload.get("outcome"),
+        frame_json, coverage_json,
     )
     if "provenance" in payload:
         rec["provenance"] = payload["provenance"]

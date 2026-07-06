@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .audit import AuditLog
+from .frame import ROLES, coverage_for_answer, coverage_to_json, frame_from_json
 from .ingest import DocumentStore
 from .retrieval import Hit, Retriever
 from .session import support_record, verify_record
@@ -188,9 +189,20 @@ def default_registry(
         return rec
 
     def _verify(a: dict) -> dict:
-        result = verify(answer_from_json(a["answer"]), span_store)
-        _append(verify_record(a["answer"], result, a.get("outcome")))
-        return result_to_json(result)
+        answer = answer_from_json(a["answer"])
+        result = verify(answer, span_store)
+        frame_json = a.get("frame")
+        coverage_json = None
+        if frame_json is not None:
+            coverage_json = coverage_to_json(
+                coverage_for_answer(frame_from_json(frame_json), answer, span_store))
+        _append(verify_record(a["answer"], result, a.get("outcome"),
+                              frame_json, coverage_json))
+        out = result_to_json(result)
+        if coverage_json is not None:
+            # D13/M2-T8: present ONLY if ok AND coverage.complete — the loop rule.
+            out["coverage"] = coverage_json
+        return out
 
     reg("check_support", "Supporting spans or 'insufficient' — the abstention decision (I2).",
         _check_support, _obj({"query": {"type": "string"}}, ["query"]), read_only=False)
@@ -204,6 +216,27 @@ def default_registry(
             "outcome": {"type": "string", "enum": ["answer", "correction", "partial"],
                         "description": "Outcome class (D16) — for review; correction = "
                                        "grounded refutation of a false premise."},
+            "frame": {
+                "type": "object",
+                "description": "Question frame (D13/M2-T8): the query decomposed into "
+                               "typed constraints the cited evidence must cover. Present "
+                               "only if verify is ok AND coverage.complete.",
+                "properties": {
+                    "question": {"type": "string"},
+                    "constraints": {"type": "array", "items": {
+                        "type": "object",
+                        "properties": {
+                            "role": {"type": "string", "enum": list(ROLES)},
+                            "text": {"type": "string"},
+                            "required": {"type": "boolean", "default": True},
+                        },
+                        "required": ["role", "text"],
+                        "additionalProperties": False,
+                    }},
+                },
+                "required": ["question", "constraints"],
+                "additionalProperties": False,
+            },
         }, ["answer"]), read_only=False)
 
     if log is not None:

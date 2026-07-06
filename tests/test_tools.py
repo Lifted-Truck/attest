@@ -180,3 +180,47 @@ def test_support_threshold_is_configurable(registry):
     assert registry["check_support"].handler({"query": q})["status"] == "insufficient"
     loose = default_registry(STORE, None, support_threshold=5.0)
     assert loose["check_support"].handler({"query": q})["status"] == "supported"
+
+
+# --- M2-T8: live constraint coverage through the verify tool (D13) ---
+
+
+def _frame(*constraints):
+    return {"question": "What were Apple's total assets?",
+            "constraints": [{"role": r, "text": t} for r, t in constraints]}
+
+
+def test_verify_with_frame_reports_complete_coverage(registry):
+    """The Total assets line carries the metric → ok AND coverage.complete."""
+    answer = {"sentences": [{"text": "Apple's total assets were $364,980 million.",
+                             "atoms": [_bind_total_assets(registry)]}]}
+    out = registry["verify"].handler({"answer": answer,
+                                      "frame": _frame(("metric", "Total assets"))})
+    assert out["ok"] is True
+    assert out["coverage"]["complete"] is True
+    assert out["coverage"]["covered"][0]["text"] == "Total assets"
+
+
+def test_verify_flags_naive_citation_as_coverage_incomplete(registry):
+    """THE D13 case: 364,980 really is on the liabilities+equity line, so verify
+    passes — but that span never says 'Total assets', so coverage fails and the
+    loop rule (present only if ok AND complete) blocks the presentation."""
+    hits = registry["search_corpus"].handler(
+        {"query": "total liabilities shareholders equity", "k": 8})["hits"]
+    liab = next(h for h in hits if h["text"].startswith("Total liabilities and shareholders"))
+    off = liab["char_start"] + liab["text"].index("364,980")
+    answer = {"sentences": [{"text": "Apple's total assets were $364,980 million.",
+                             "atoms": [{"text": "364,980", "doc_id": DOC_ID,
+                                        "char_start": off, "char_end": off + 7}]}]}
+    out = registry["verify"].handler({"answer": answer,
+                                      "frame": _frame(("metric", "Total assets"))})
+    assert out["ok"] is True                                # the citation is REAL...
+    assert out["coverage"]["complete"] is False             # ...but doesn't answer THIS question
+    assert out["coverage"]["missing"][0]["text"] == "Total assets"
+
+
+def test_verify_without_frame_is_unchanged(registry):
+    answer = {"sentences": [{"text": "Apple's total assets were $364,980 million.",
+                             "atoms": [_bind_total_assets(registry)]}]}
+    out = registry["verify"].handler({"answer": answer})
+    assert out["ok"] is True and "coverage" not in out

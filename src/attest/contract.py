@@ -6,7 +6,10 @@ comparable across versions. Bump per the monotonic rule: minor for a strengtheni
 major for a structural change to what is guaranteed.
 """
 
+# 1.2 (2026-07-06, D13/M2-T8): live constraint coverage — `verify` checks the cited
+#     evidence covers the question frame's required constraints; presentation
+#     requires ok AND coverage.complete. Strengthening → minor bump.
 # 1.1 (2026-06-30, D22): outcome honesty refined — refuse-to-adjudicate becomes a
 #     first-class fifth outcome, distinct from abstain. Strengthening → minor bump.
 # 1.0 (2026-06-29, D21): initial declaration.
-CONTRACT_VERSION = "1.1"
+CONTRACT_VERSION = "1.2"

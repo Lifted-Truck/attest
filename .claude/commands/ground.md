@@ -20,9 +20,12 @@ Follow the loop in `CLAUDE.md` ("Runtime agent loop"):
    construction: decline it and offer the located evidence; distinct from abstain).
 3. **Ground the output** — bind every load-bearing figure/date/entity to its exact
    span; derived values declare their operands, never a cited result (D9).
-4. **`verify(answer)` before presenting** — if `not ok`, fix the binding or abstain.
-   Pass `outcome` (`answer` / `correction` / `partial`) so the review view tags it
-   correctly (a grounded correction shows in its own color).
+4. **`verify(answer, frame, outcome)` before presenting** — decompose the question
+   into a typed `frame` (entity/metric/period/… constraints; implicit ones
+   `required: false`) and pass it: verify returns `coverage` over the cited spans.
+   **Present only if `ok` AND `coverage.complete`** — otherwise re-bind to a span
+   carrying the missing constraint, or downgrade to partial/abstain. Pass `outcome`
+   (`answer` / `correction` / `partial`) so the review view tags it correctly.
 5. **Present** the grounded answer (or the structured refusal / correction). End with
    a line `Confidence: 0.NN`.
 

@@ -96,3 +96,27 @@ def test_replay_preserves_recorded_provenance_across_versions(retriever):
     # pre-provenance records (before TC-2) replay as pre-provenance
     old = {k: v for k, v in rec.items() if k != "provenance"}
     assert replays_identically(old, retriever)
+
+
+def test_verify_record_with_frame_replays_byte_identically(retriever):
+    """M2-T8: frame + coverage in the record; coverage re-derives on replay (I6)."""
+    from attest.frame import coverage_for_answer, coverage_to_json, frame_from_json
+    from attest.ingest import DocumentStore
+    from attest.session import verify_record
+    from attest.spans import SpanStore
+    from attest.verify import answer_from_json, verify
+
+    store = SpanStore.from_store(DocumentStore(ROOT / "corpus" / "store"))
+    hits = retriever.search("total assets", 5)
+    h = next(x for x in hits if x.span.text.startswith("Total assets $"))
+    off = h.span.char_start + h.span.text.index("364,980")
+    answer_json = {"sentences": [{"text": "Total assets were $364,980 million.",
+                                  "atoms": [{"text": "364,980", "doc_id": DOC_ID,
+                                             "char_start": off, "char_end": off + 7}]}]}
+    frame_json = {"question": "total assets?",
+                  "constraints": [{"role": "metric", "text": "Total assets"}]}
+    answer = answer_from_json(answer_json)
+    cov = coverage_to_json(coverage_for_answer(frame_from_json(frame_json), answer, store))
+    rec = verify_record(answer_json, verify(answer, store), "answer", frame_json, cov)
+    assert rec["coverage"]["complete"] is True
+    assert replays_identically(rec, store)

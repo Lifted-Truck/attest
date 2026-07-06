@@ -22,7 +22,7 @@ import re
 from bisect import bisect_right
 from dataclasses import dataclass, field
 
-from .frame import QuestionFrame, check_coverage
+from .frame import QuestionFrame, check_coverage, frame_from_json
 from .retrieval import Hit
 from .spans import SpanStore
 from .verify import Answer, VerifyResult, answer_from_json, equation
@@ -66,11 +66,13 @@ def interactions_from_audit(entries: list[dict], store: SpanStore) -> list[Inter
         elif kind == "verify" and e.get("ok") and e.get("answer"):
             answer = answer_from_json(e["answer"])
             outcome = e.get("outcome") if e.get("outcome") in _PRESENTS else "answer"
+            frame = frame_from_json(e["frame"]) if e.get("frame") else None
             out.append(Interaction(
                 question=question or "(question not in log)",
                 kind=outcome, answer=answer, verify=run_verify(answer, store),
                 note="Reconstructed from the audit log (I5) — a real logged session.",
                 trace=_provenance_line(e.get("provenance", {}), sup_prov),
+                frame=frame,
             ))
     return out
 

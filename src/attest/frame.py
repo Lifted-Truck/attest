@@ -60,3 +60,41 @@ def check_coverage(frame: QuestionFrame, cited_texts: list[str]) -> CoverageResu
         else:
             covered.append(c)  # optional + absent → treated as satisfied (e.g. implicit entity)
     return CoverageResult(covered, missing)
+
+
+# --- JSON bridge + live coverage (M2-T8: the agent emits the frame at runtime) ----
+
+def frame_from_json(d: dict) -> QuestionFrame:
+    return QuestionFrame(d.get("question", ""), [
+        Constraint(c["role"], c["text"], bool(c.get("required", True)))
+        for c in d.get("constraints", [])
+    ])
+
+
+def frame_to_json(f: QuestionFrame) -> dict:
+    return {"question": f.question, "constraints": [
+        {"role": c.role, "text": c.text, "required": c.required} for c in f.constraints
+    ]}
+
+
+def coverage_to_json(cov: CoverageResult) -> dict:
+    return {
+        "complete": cov.complete,
+        "covered": [{"role": c.role, "text": c.text} for c in cov.covered],
+        "missing": [{"role": c.role, "text": c.text} for c in cov.missing],
+    }
+
+
+def coverage_for_answer(frame: QuestionFrame, answer, store) -> CoverageResult:
+    """Coverage over the answer's cited evidence — the *containing spans* of every
+    bound atom and derived operand (the connecting clause lives in the surrounding
+    line, not the atom literal). Deterministic; same semantics as the evidence view.
+    `answer` is a `verify.Answer`; `store` a `SpanStore`."""
+    cited: list[str] = []
+    for sent in answer.sentences:
+        atoms = list(sent.atoms) + [o for d in sent.derived for o in d.operands]
+        for a in atoms:
+            sp = store.span_containing(a.doc_id, a.char_start)
+            if sp is not None:
+                cited.append(sp.text)
+    return check_coverage(frame, cited)

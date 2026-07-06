@@ -1,10 +1,11 @@
 # ATTEST — the truth contract
 
-**Version: 1.1** · governed by [`ROADMAP.md`](../ROADMAP.md) decision **D21**.
+**Version: 1.2** · governed by [`ROADMAP.md`](../ROADMAP.md) decision **D21**.
 
 | Version | Date | Change | Kind |
 |---|---|---|---|
-| **1.1** | 2026-06-30 | Outcome honesty refined (D22): **refuse-to-adjudicate** becomes a first-class fifth outcome, distinct from `abstain` — the evidence may be *present*; the legal conclusion is declined (UPL boundary). Scored separately at Layer-E (`refusal_accuracy`); rendered distinctly. | strengthening → minor |
+| **1.2** | 2026-07-06 | **Live constraint coverage (D13/M2-T8):** the agent emits a typed question frame; `verify` deterministically checks the cited evidence **covers every required constraint** (the connecting clause), logs frame + coverage (replayable), and the loop presents **only if `ok` AND `coverage.complete`**. Converts a chunk of "does the evidence answer *this* question" from offline-judged into runtime-checkable — the guarantee the incumbents were falsified on ([landscape §1](landscape_lessons.md)). | strengthening → minor |
+| 1.1 | 2026-06-30 | Outcome honesty refined (D22): **refuse-to-adjudicate** becomes a first-class fifth outcome, distinct from `abstain` — the evidence may be *present*; the legal conclusion is declined (UPL boundary). Scored separately at Layer-E (`refusal_accuracy`); rendered distinctly. | strengthening → minor |
 | 1.0 | 2026-06-29 | Initial declaration (D21). | — |
 
 This is the single, declared statement of what ATTEST guarantees about anything it
@@ -34,6 +35,7 @@ Everything below is the machinery that makes that guarantee real and checkable.
 | **I5 — append-only audit** | every interaction logged immutably and replayably | `AuditLog` (hash-chained) | runtime + Layer-0 | **hard** |
 | **I6 — deterministic evidence** | same corpus + query → reproducible results; no runtime model calls | seeded/temperature-0 evidence path | runtime + Layer-0 | **hard** |
 | **Outcome honesty (D16, D22)** | answer / abstain / **correction** / **partial** / **refuse** — a false premise is refuted with evidence; a legal conclusion is declined *as its own outcome*, never blurred into abstention | agent + `verify(outcome=…)`; `refuse` rendered + scored first-class | runtime; Layer-E | **hard** (present/abstain decision); **measured** (correctness, `refusal_accuracy`) |
+| **Constraint coverage (D13, v1.2)** | when a frame is supplied, a presented answer's cited evidence **covers every required question constraint** (subject + attribute + qualifiers — the connecting clause), not merely the answer token | `verify(frame=…)` → deterministic `check_coverage` over the cited spans; loop presents only if `ok AND coverage.complete`; frame + coverage logged (I5, replayable) | runtime (deterministic flag + loop rule); Layer-E (adherence + the residuals) | **hard** (flag); **measured** (adherence; negation/attachment/coreference remain Layer-E) |
 | **Locate-never-adjudicate (D10)** | patent domain: surface & evidence; never conclude novelty/validity/infringement/claim-construction — expressed as the first-class **refuse** outcome (D22) | agent refusal class + design | runtime; Layer-E negative test | **hard** (boundary); **measured** (adherence) |
 
 ### The one deliberate non-guarantee — `verified ≠ entailed`
