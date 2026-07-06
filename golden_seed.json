@@ -17,9 +17,7 @@
     "balance": "20 items | answerable: 12 | unanswerable/abstain-or-reject: 8 | difficulty easy:6 medium:7 hard:7",
     "properties_exercised": "numeric-exact, multi-span/citation-recall, plural-and-ranked, disambiguation-required, temporal-abstention, false-premise-rejection, distractor-resistance, partial-abstention, derived-arithmetic"
   },
-
   "schema_version": "0.1.0",
-
   "corpus": {
     "scope": "v1 reference corpus = a SINGLE filing. Items are unanswerable when their answer lives outside it.",
     "documents": [
@@ -36,7 +34,6 @@
       }
     ]
   },
-
   "items": [
     {
       "id": "G001",
@@ -44,10 +41,18 @@
       "answerable": true,
       "expected_answer": "$364,980 million",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Total assets' line · FY2024 column", "verbatim_quote": "Total assets $ 364,980 $ 352,583", "value_seen": "$364,980 million (as of 2024-09-28)", "source_status": "grounded" }
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Total assets' line · FY2024 column",
+          "verbatim_quote": "Total assets $ 364,980 $ 352,583",
+          "value_seen": "$364,980 million (as of 2024-09-28)",
+          "source_status": "grounded"
+        }
       ],
       "difficulty": "easy",
-      "tests": ["single-span", "numeric-exact"],
+      "tests": [
+        "single-span",
+        "numeric-exact"
+      ],
       "rationale": "Baseline grounded lookup. If this fails, retrieval or binding is broken."
     },
     {
@@ -56,10 +61,18 @@
       "answerable": true,
       "expected_answer": "$9,967 million",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Commercial paper' · FY2024 column", "verbatim_quote": "Commercial paper 9,967 5,985", "value_seen": "$9,967 million (as of 2024-09-28)", "source_status": "grounded" }
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Commercial paper' · FY2024 column",
+          "verbatim_quote": "Commercial paper 9,967 5,985",
+          "value_seen": "$9,967 million (as of 2024-09-28)",
+          "source_status": "grounded"
+        }
       ],
       "difficulty": "easy",
-      "tests": ["single-span", "numeric-exact"],
+      "tests": [
+        "single-span",
+        "numeric-exact"
+      ],
       "rationale": "Specific line item, low ambiguity."
     },
     {
@@ -68,10 +81,18 @@
       "answerable": true,
       "expected_answer": "$45,680 million",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Property, plant and equipment, net' · FY2024 column", "verbatim_quote": "Property, plant and equipment, net 45,680 43,715", "value_seen": "$45,680 million (as of 2024-09-28)", "source_status": "grounded" }
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Property, plant and equipment, net' · FY2024 column",
+          "verbatim_quote": "Property, plant and equipment, net 45,680 43,715",
+          "value_seen": "$45,680 million (as of 2024-09-28)",
+          "source_status": "grounded"
+        }
       ],
       "difficulty": "easy",
-      "tests": ["single-span", "numeric-exact"],
+      "tests": [
+        "single-span",
+        "numeric-exact"
+      ],
       "rationale": "Tests that the 'net' qualifier is respected."
     },
     {
@@ -80,10 +101,18 @@
       "answerable": true,
       "expected_answer": "$176,392 million",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Total current liabilities' · FY2024 column", "verbatim_quote": "Total current liabilities 176,392 145,308", "value_seen": "$176,392 million (as of 2024-09-28)", "source_status": "grounded" }
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Total current liabilities' · FY2024 column",
+          "verbatim_quote": "Total current liabilities 176,392 145,308",
+          "value_seen": "$176,392 million (as of 2024-09-28)",
+          "source_status": "grounded"
+        }
       ],
       "difficulty": "easy",
-      "tests": ["single-span", "numeric-exact"],
+      "tests": [
+        "single-span",
+        "numeric-exact"
+      ],
       "rationale": "Subtotal line; distractor risk with 'total non-current liabilities' and 'total liabilities'."
     },
     {
@@ -92,11 +121,25 @@
       "answerable": true,
       "expected_answer": "Increased by $12,397 million (from $352,583M to $364,980M).",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Total assets' · FY2024 column", "verbatim_quote": "Total assets $ 364,980 $ 352,583", "value_seen": "$364,980 million (2024-09-28)", "source_status": "grounded" },
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Total assets' · FY2023 column", "verbatim_quote": "Total assets $ 364,980 $ 352,583", "value_seen": "$352,583 million (2023-09-30)", "source_status": "grounded" }
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Total assets' · FY2024 column",
+          "verbatim_quote": "Total assets $ 364,980 $ 352,583",
+          "value_seen": "$364,980 million (2024-09-28)",
+          "source_status": "grounded"
+        },
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Total assets' · FY2023 column",
+          "verbatim_quote": "Total assets $ 364,980 $ 352,583",
+          "value_seen": "$352,583 million (2023-09-30)",
+          "source_status": "grounded"
+        }
       ],
       "difficulty": "medium",
-      "tests": ["multi-span", "citation-recall", "derived-arithmetic"],
+      "tests": [
+        "multi-span",
+        "citation-recall",
+        "derived-arithmetic"
+      ],
       "rationale": "Requires citing BOTH year columns; tests citation recall and that derived answers still carry evidence for every operand."
     },
     {
@@ -105,11 +148,24 @@
       "answerable": true,
       "expected_answer": "$78,304 million (FY2024) and $58,829 million (FY2023).",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Other current liabilities' · FY2024 column", "verbatim_quote": "Other current liabilities 78,304 58,829", "value_seen": "$78,304 million", "source_status": "grounded" },
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Other current liabilities' · FY2023 column", "verbatim_quote": "Other current liabilities 78,304 58,829", "value_seen": "$58,829 million", "source_status": "grounded" }
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Other current liabilities' · FY2024 column",
+          "verbatim_quote": "Other current liabilities 78,304 58,829",
+          "value_seen": "$78,304 million",
+          "source_status": "grounded"
+        },
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Other current liabilities' · FY2023 column",
+          "verbatim_quote": "Other current liabilities 78,304 58,829",
+          "value_seen": "$58,829 million",
+          "source_status": "grounded"
+        }
       ],
       "difficulty": "medium",
-      "tests": ["multi-span", "citation-recall"],
+      "tests": [
+        "multi-span",
+        "citation-recall"
+      ],
       "rationale": "Two-value answer; both spans must be cited for full recall."
     },
     {
@@ -118,11 +174,24 @@
       "answerable": true,
       "expected_answer": "Ambiguous as asked — Apple reports BOTH a current portion of term debt ($10,912M) and non-current term debt ($85,750M) as of 2024-09-28. Correct behavior: return both, labeled and distinguished (plural/ranked), not a single number.",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Term debt' (current liabilities section) · FY2024 column", "verbatim_quote": "Term debt 10,912 9,822", "value_seen": "$10,912 million (current)", "source_status": "grounded" },
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Term debt' (non-current liabilities section) · FY2024 column", "verbatim_quote": "Term debt 85,750 95,281", "value_seen": "$85,750 million (non-current)", "source_status": "grounded" }
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Term debt' (current liabilities section) · FY2024 column",
+          "verbatim_quote": "Term debt 10,912 9,822",
+          "value_seen": "$10,912 million (current)",
+          "source_status": "grounded"
+        },
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Term debt' (non-current liabilities section) · FY2024 column",
+          "verbatim_quote": "Term debt 85,750 95,281",
+          "value_seen": "$85,750 million (non-current)",
+          "source_status": "grounded"
+        }
       ],
       "difficulty": "hard",
-      "tests": ["plural-and-ranked", "disambiguation-required"],
+      "tests": [
+        "plural-and-ranked",
+        "disambiguation-required"
+      ],
       "rationale": "FLAGSHIP plural item. 'Term debt' appears twice with different values. A naive system grabs one and looks confident. Correct behavior is to surface both and distinguish them — this is the I2/plural-ranked behavior in brief §4."
     },
     {
@@ -131,11 +200,24 @@
       "answerable": true,
       "expected_answer": "Plural — current marketable securities $35,228M plus non-current marketable securities $91,479M. Correct behavior: surface both line items.",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Marketable securities' (current assets) · FY2024 column", "verbatim_quote": "Marketable securities 35,228 31,590", "value_seen": "$35,228 million (current)", "source_status": "grounded" },
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Marketable securities' (non-current assets) · FY2024 column", "verbatim_quote": "Marketable securities 91,479 100,544", "value_seen": "$91,479 million (non-current)", "source_status": "grounded" }
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Marketable securities' (current assets) · FY2024 column",
+          "verbatim_quote": "Marketable securities 35,228 31,590",
+          "value_seen": "$35,228 million (current)",
+          "source_status": "grounded"
+        },
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Marketable securities' (non-current assets) · FY2024 column",
+          "verbatim_quote": "Marketable securities 91,479 100,544",
+          "value_seen": "$91,479 million (non-current)",
+          "source_status": "grounded"
+        }
       ],
       "difficulty": "hard",
-      "tests": ["plural-and-ranked", "partial-grounding"],
+      "tests": [
+        "plural-and-ranked",
+        "partial-grounding"
+      ],
       "rationale": "Second plural case. Current ($35,228M) and non-current ($91,479M) marketable securities both appear on the balance sheet; correct behavior surfaces both, distinguished.",
       "verification_note": "AGENT-CORRECTED 2026-06-23 (M0-T2) from canonical AAPL FY2024 10-K balance sheet (corpus/toy). Prior labels were inverted ($91,479M mislabeled 'current'; non-current left unfetched). Human re-review still recommended."
     },
@@ -145,10 +227,19 @@
       "answerable": true,
       "expected_answer": "Ernst & Young LLP",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · Report of Independent Registered Public Accounting Firm (signature/firm name)", "verbatim_quote": "/s/ Ernst & Young LLP\n\nWe have served as the Company\u2019s auditor since 2009.", "value_seen": "Ernst & Young LLP", "source_status": "grounded" }
+        {
+          "locator": "AAPL-10K-FY2024 · Report of Independent Registered Public Accounting Firm (signature/firm name)",
+          "verbatim_quote": "/s/ Ernst & Young LLP\n\nWe have served as the Company’s auditor since 2009.",
+          "value_seen": "Ernst & Young LLP",
+          "source_status": "grounded"
+        }
       ],
       "difficulty": "medium",
-      "tests": ["single-span", "non-financial-section", "retrieval-beyond-balance-sheet"],
+      "tests": [
+        "single-span",
+        "non-financial-section",
+        "retrieval-beyond-balance-sheet"
+      ],
       "rationale": "Pulls retrieval away from the balance sheet into a qualitative section. Firm name appears in the auditor's signature ('/s/ Ernst & Young LLP').",
       "verification_note": "AGENT-VERIFIED 2026-06-23 (M0-T2) against canonical AAPL FY2024 10-K auditor report (corpus/toy). Confirmed Ernst & Young LLP; was unverified_from_memory."
     },
@@ -158,10 +249,18 @@
       "answerable": true,
       "expected_answer": "September 28, 2024.",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · cover / period of report ('For the fiscal year ended September 28, 2024')", "verbatim_quote": "For the fiscal year ended September 28, 2024", "value_seen": "period_of_report = 2024-09-28 (filing metadata + balance sheet column header)", "source_status": "grounded" }
+        {
+          "locator": "AAPL-10K-FY2024 · cover / period of report ('For the fiscal year ended September 28, 2024')",
+          "verbatim_quote": "For the fiscal year ended September 28, 2024",
+          "value_seen": "period_of_report = 2024-09-28 (filing metadata + balance sheet column header)",
+          "source_status": "grounded"
+        }
       ],
       "difficulty": "easy",
-      "tests": ["single-span", "date-fact"],
+      "tests": [
+        "single-span",
+        "date-fact"
+      ],
       "rationale": "Well-supported anchor fact; useful as a near-miss reference for the temporal-abstention items (G014)."
     },
     {
@@ -172,8 +271,12 @@
       "expected_behavior": "abstain",
       "supporting": [],
       "difficulty": "hard",
-      "tests": ["abstention", "out-of-document-fact"],
-      "rationale": "FLAGSHIP trap. Executive compensation is disclosed in the DEF 14A proxy, NOT the 10-K. Plausible enough that a RAG system may confabulate. Must abstain."
+      "tests": [
+        "abstention",
+        "out-of-document-fact"
+      ],
+      "rationale": "FLAGSHIP trap. Executive compensation is disclosed in the DEF 14A proxy, NOT the 10-K. Plausible enough that a RAG system may confabulate. Must abstain.",
+      "failure_mode": "absent-fact"
     },
     {
       "id": "G012",
@@ -183,8 +286,12 @@
       "expected_behavior": "abstain",
       "supporting": [],
       "difficulty": "hard",
-      "tests": ["abstention", "not-disclosed-metric"],
-      "rationale": "Trap. Apple stopped disclosing unit sales (since FY2019). Looks like an obvious 10-K fact but isn't reported. Must abstain rather than estimate."
+      "tests": [
+        "abstention",
+        "not-disclosed-metric"
+      ],
+      "rationale": "Trap. Apple stopped disclosing unit sales (since FY2019). Looks like an obvious 10-K fact but isn't reported. Must abstain rather than estimate.",
+      "failure_mode": "absent-fact"
     },
     {
       "id": "G013",
@@ -194,8 +301,12 @@
       "expected_behavior": "abstain",
       "supporting": [],
       "difficulty": "medium",
-      "tests": ["abstention", "not-disclosed-metric"],
-      "rationale": "Not a metric Apple discloses in the 10-K. Must abstain."
+      "tests": [
+        "abstention",
+        "not-disclosed-metric"
+      ],
+      "rationale": "Not a metric Apple discloses in the 10-K. Must abstain.",
+      "failure_mode": "absent-fact"
     },
     {
       "id": "G014",
@@ -205,8 +316,12 @@
       "expected_behavior": "abstain",
       "supporting": [],
       "difficulty": "hard",
-      "tests": ["abstention", "temporal-out-of-period"],
-      "rationale": "FLAGSHIP temporal trap. Same metric as G001 but a post-fiscal-year date (Q1 FY2025) covered only by a later 10-Q NOT in this corpus. A system keying on 'total assets' may wrongly return the September figure. Must abstain on the date mismatch."
+      "tests": [
+        "abstention",
+        "temporal-out-of-period"
+      ],
+      "rationale": "FLAGSHIP temporal trap. Same metric as G001 but a post-fiscal-year date (Q1 FY2025) covered only by a later 10-Q NOT in this corpus. A system keying on 'total assets' may wrongly return the September figure. Must abstain on the date mismatch.",
+      "failure_mode": "misgrounded"
     },
     {
       "id": "G015",
@@ -216,8 +331,12 @@
       "expected_behavior": "abstain",
       "supporting": [],
       "difficulty": "medium",
-      "tests": ["abstention", "temporal-out-of-period"],
-      "rationale": "Post-period event outside the FY2024 10-K. Must abstain."
+      "tests": [
+        "abstention",
+        "temporal-out-of-period"
+      ],
+      "rationale": "Post-period event outside the FY2024 10-K. Must abstain.",
+      "failure_mode": "misgrounded"
     },
     {
       "id": "G016",
@@ -226,12 +345,27 @@
       "expected_answer": null,
       "expected_behavior": "partial-abstain",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Term debt' (current) · FY2024 column", "verbatim_quote": "Term debt 10,912 9,822", "value_seen": "$10,912 million (current)", "source_status": "grounded" },
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Term debt' (non-current) · FY2024 column", "verbatim_quote": "Term debt 85,750 95,281", "value_seen": "$85,750 million (non-current)", "source_status": "grounded" }
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Term debt' (current) · FY2024 column",
+          "verbatim_quote": "Term debt 10,912 9,822",
+          "value_seen": "$10,912 million (current)",
+          "source_status": "grounded"
+        },
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Term debt' (non-current) · FY2024 column",
+          "verbatim_quote": "Term debt 85,750 95,281",
+          "value_seen": "$85,750 million (non-current)",
+          "source_status": "grounded"
+        }
       ],
       "difficulty": "hard",
-      "tests": ["partial-abstention", "scoping", "no-world-knowledge"],
-      "rationale": "Apple's side is in-corpus; Microsoft's is not. Correct behavior: answer the Apple portion with citation and explicitly abstain on the Microsoft comparison rather than importing world knowledge."
+      "tests": [
+        "partial-abstention",
+        "scoping",
+        "no-world-knowledge"
+      ],
+      "rationale": "Apple's side is in-corpus; Microsoft's is not. Correct behavior: answer the Apple portion with citation and explicitly abstain on the Microsoft comparison rather than importing world knowledge.",
+      "failure_mode": "misgrounded"
     },
     {
       "id": "G017",
@@ -239,10 +373,18 @@
       "answerable": true,
       "expected_answer": "$14,287 million",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Other current assets' · FY2024 column", "verbatim_quote": "Other current assets 14,287 14,695", "value_seen": "$14,287 million", "source_status": "grounded" }
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Other current assets' · FY2024 column",
+          "verbatim_quote": "Other current assets 14,287 14,695",
+          "value_seen": "$14,287 million",
+          "source_status": "grounded"
+        }
       ],
       "difficulty": "medium",
-      "tests": ["single-span", "distractor-resistance"],
+      "tests": [
+        "single-span",
+        "distractor-resistance"
+      ],
       "rationale": "Distractor trap: 'Total current assets' ($152,987M) is a tempting near-label. Tests precise line selection."
     },
     {
@@ -251,10 +393,18 @@
       "answerable": true,
       "expected_answer": "$8,249 million",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Deferred revenue' (current liabilities) · FY2024 column", "verbatim_quote": "Deferred revenue 8,249 8,061", "value_seen": "$8,249 million", "source_status": "grounded" }
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Deferred revenue' (current liabilities) · FY2024 column",
+          "verbatim_quote": "Deferred revenue 8,249 8,061",
+          "value_seen": "$8,249 million",
+          "source_status": "grounded"
+        }
       ],
       "difficulty": "medium",
-      "tests": ["single-span", "numeric-exact"],
+      "tests": [
+        "single-span",
+        "numeric-exact"
+      ],
       "rationale": "Clean lookup; guards against pulling deferred-revenue figures discussed elsewhere (e.g. recognition disclosures) instead of the balance."
     },
     {
@@ -263,11 +413,25 @@
       "answerable": true,
       "expected_answer": "Increased by $1,090 million (from $9,822M to $10,912M).",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Term debt' (current) · FY2024 column", "verbatim_quote": "Term debt 10,912 9,822", "value_seen": "$10,912 million", "source_status": "grounded" },
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Term debt' (current) · FY2023 column", "verbatim_quote": "Term debt 10,912 9,822", "value_seen": "$9,822 million", "source_status": "grounded" }
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Term debt' (current) · FY2024 column",
+          "verbatim_quote": "Term debt 10,912 9,822",
+          "value_seen": "$10,912 million",
+          "source_status": "grounded"
+        },
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Term debt' (current) · FY2023 column",
+          "verbatim_quote": "Term debt 10,912 9,822",
+          "value_seen": "$9,822 million",
+          "source_status": "grounded"
+        }
       ],
       "difficulty": "hard",
-      "tests": ["multi-span", "derived-arithmetic", "disambiguation-required"],
+      "tests": [
+        "multi-span",
+        "derived-arithmetic",
+        "disambiguation-required"
+      ],
       "rationale": "Combines traps: must pick the CURRENT term-debt line (not non-current, G007), cite both years, and compute the delta — every operand carrying its own evidence."
     },
     {
@@ -277,11 +441,20 @@
       "expected_answer": null,
       "expected_behavior": "reject-false-premise",
       "supporting": [
-        { "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Total assets' · FY2024 and FY2023 columns", "verbatim_quote": "Total assets $ 364,980 $ 352,583", "value_seen": "$364,980M (2024) vs $352,583M (2023) — assets INCREASED", "source_status": "grounded" }
+        {
+          "locator": "AAPL-10K-FY2024 · Consolidated Balance Sheets · 'Total assets' · FY2024 and FY2023 columns",
+          "verbatim_quote": "Total assets $ 364,980 $ 352,583",
+          "value_seen": "$364,980M (2024) vs $352,583M (2023) — assets INCREASED",
+          "source_status": "grounded"
+        }
       ],
       "difficulty": "hard",
-      "tests": ["false-premise-rejection", "no-confabulation"],
-      "rationale": "FLAGSHIP false-premise trap. Total assets rose, so the premise is false. Correct behavior: reject the premise and cite the figures showing the increase — never confabulate reasons for a non-event. The strongest test of 'ground or abstain — never invent.'"
+      "tests": [
+        "false-premise-rejection",
+        "no-confabulation"
+      ],
+      "rationale": "FLAGSHIP false-premise trap. Total assets rose, so the premise is false. Correct behavior: reject the premise and cite the figures showing the increase — never confabulate reasons for a non-event. The strongest test of 'ground or abstain — never invent.'",
+      "failure_mode": "misgrounded"
     }
   ]
 }

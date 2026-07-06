@@ -26,9 +26,10 @@ dist-ui/
 data/raw/
 data/corpus/
 
-# Eval / audit outputs
+# Eval / audit outputs — `audit_log/*` (not `audit_log/`) so the re-include
+# below can escape it (git cannot re-include from inside an ignored directory)
 eval_results/
-audit_log/
+audit_log/*
 *.log
 
 # Env & secrets
@@ -48,3 +49,6 @@ audit_log/
 
 # Per-engagement corpora — kept local, never committed
 corpus/engagements/
+# EXCEPTION: the EDGAR reference-build Layer-E trend is the public eval record
+# (landscape lessons §4 — published trend files are the credibility posture).
+!audit_log/layer_e_results.jsonl

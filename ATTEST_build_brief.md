@@ -134,6 +134,23 @@ Spans are referenced by **verbatim quote + locator**, not span IDs — span IDs 
 ```
 Seed (`golden_seed.json`) ships 20 items grounded in Apple's FY2024 10-K. Grow toward 40–80, keeping a healthy unanswerable fraction.
 
+### Failure-mode taxonomy (what the oracle must catch)
+
+The outcome classes (D16/D22) classify *expected behavior*; this taxonomy — adapted from the court-documented failure record ([`docs/landscape_lessons.md`](docs/landscape_lessons.md) §2) — classifies the *planted citation failures* the oracle must catch. Every mode has a catching mechanism and a standing test; "our oracle is thorough" is an enumerable claim, and Layer-E can report per-mode catch rates via the `failure_mode` tags on golden negatives.
+
+| Mode | Example | Caught by | Standing coverage |
+|---|---|---|---|
+| **fabricated source** | citation to a nonexistent doc/offset | span resolution (I1) | `test_out_of_range_is_flagged` |
+| **misquoted source** | cited slice ≠ asserted literal | verbatim match (D9) | `test_wrong_offset_is_mismatch` |
+| **fabricated quote in a real span** | invented words at a real location | same verbatim match | same mechanism as misquote |
+| **unbound assertion** | figure/date in prose, no binding | independent extraction (D9) | `test_planted_unbound_claim_is_flagged`, `test_unbound_date_is_flagged` |
+| **misgrounded source** | resolves + hash-matches but wrong metric/period/entity/premise | D13 coverage (deterministic part) + agent reasoning, judged at Layer-E | `test_frame.py` naive-citation; golden `G014/G015/G016/G020`, `P010/P011` (tagged `misgrounded`) |
+| **derived miscomputation** | wrong delta/ratio/relation | recompute from cited operands (D18/D19) | `test_wrong_derived_value_is_flagged`, `test_within_range_…_flags_wrong_boolean` |
+| **stale source** | corpus changed under a binding | content-hash drift (I3) | `test_stale_hash_is_flagged` |
+| *(bait)* **absent fact** | plausible question whose answer exists nowhere in-corpus — fabrication bait | support floor (D12) + agent reasoning | golden `G011–G013`, `P013–P018/P025` (tagged `absent-fact`) |
+
+Per the Stanford record, **misgrounded** is the dangerous residual — real citation, wrong support — which is why its deterministic half (D13 constraint coverage) is the highest-leverage open engine item and its remainder is measured, not assumed, at Layer-E.
+
 ---
 
 ## §4 — Provenance & abstention mechanics

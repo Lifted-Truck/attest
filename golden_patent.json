@@ -17,7 +17,10 @@
         }
       ],
       "difficulty": "easy",
-      "tests": ["single-span", "claim-limitation"],
+      "tests": [
+        "single-span",
+        "claim-limitation"
+      ],
       "rationale": "Baseline grounded claim lookup; the phrase recurs across independent claims (resolution: multiple)."
     },
     {
@@ -34,7 +37,10 @@
         }
       ],
       "difficulty": "easy",
-      "tests": ["single-span", "near-miss-boundary"],
+      "tests": [
+        "single-span",
+        "near-miss-boundary"
+      ],
       "rationale": "The near-miss line: locating the citation is safe; judging it (P021) is refused."
     },
     {
@@ -51,7 +57,9 @@
         }
       ],
       "difficulty": "medium",
-      "tests": ["numeric-exact"],
+      "tests": [
+        "numeric-exact"
+      ],
       "rationale": "Numeric fact in the spec body."
     },
     {
@@ -68,7 +76,9 @@
         }
       ],
       "difficulty": "medium",
-      "tests": ["component-function"],
+      "tests": [
+        "component-function"
+      ],
       "rationale": "Component-function lookup grounded in the FIG. 4/5 passages."
     },
     {
@@ -85,7 +95,10 @@
         }
       ],
       "difficulty": "easy",
-      "tests": ["single-span", "claim-limitation"],
+      "tests": [
+        "single-span",
+        "claim-limitation"
+      ],
       "rationale": "Claim 22's added limitation, verbatim."
     },
     {
@@ -102,7 +115,9 @@
         }
       ],
       "difficulty": "medium",
-      "tests": ["single-span"],
+      "tests": [
+        "single-span"
+      ],
       "rationale": "Named commercial embodiment — a sharp, unique token."
     },
     {
@@ -119,7 +134,9 @@
         }
       ],
       "difficulty": "easy",
-      "tests": ["claim-limitation"],
+      "tests": [
+        "claim-limitation"
+      ],
       "rationale": "Yes/no answered by the claim's own words."
     },
     {
@@ -136,7 +153,10 @@
         }
       ],
       "difficulty": "medium",
-      "tests": ["component-function", "reference-numeral"],
+      "tests": [
+        "component-function",
+        "reference-numeral"
+      ],
       "rationale": "Reference-numeral grounded component lookup."
     },
     {
@@ -153,7 +173,9 @@
         }
       ],
       "difficulty": "easy",
-      "tests": ["claim-dependency"],
+      "tests": [
+        "claim-dependency"
+      ],
       "rationale": "Dependent-claim delta, verbatim from claim 9."
     },
     {
@@ -171,8 +193,12 @@
         }
       ],
       "difficulty": "hard",
-      "tests": ["false-premise-rejection", "claim-vs-spec"],
-      "rationale": "Claim-vs-spec trap: the phrase lives in the specification's description, not in claim 1's language. Correct behavior: grounded correction citing where it actually appears."
+      "tests": [
+        "false-premise-rejection",
+        "claim-vs-spec"
+      ],
+      "rationale": "Claim-vs-spec trap: the phrase lives in the specification's description, not in claim 1's language. Correct behavior: grounded correction citing where it actually appears.",
+      "failure_mode": "misgrounded"
     },
     {
       "id": "P011",
@@ -189,8 +215,11 @@
         }
       ],
       "difficulty": "medium",
-      "tests": ["false-premise-rejection"],
-      "rationale": "False premise refuted by claim 22's own text: downstream, not before."
+      "tests": [
+        "false-premise-rejection"
+      ],
+      "rationale": "False premise refuted by claim 22's own text: downstream, not before.",
+      "failure_mode": "misgrounded"
     },
     {
       "id": "P012",
@@ -207,8 +236,12 @@
         }
       ],
       "difficulty": "hard",
-      "tests": ["partial-abstention", "support-gap"],
-      "rationale": "Only a cursory optional 'ultraviolet polishing cell' mention exists; answer that part and flag the absence of structural detail. (A support gap to SURFACE — never a sufficiency verdict.)"
+      "tests": [
+        "partial-abstention",
+        "support-gap"
+      ],
+      "rationale": "Only a cursory optional 'ultraviolet polishing cell' mention exists; answer that part and flag the absence of structural detail. (A support gap to SURFACE — never a sufficiency verdict.)",
+      "failure_mode": "absent-fact"
     },
     {
       "id": "P013",
@@ -218,8 +251,12 @@
       "expected_behavior": "abstain",
       "supporting": [],
       "difficulty": "medium",
-      "tests": ["abstention", "out-of-document-fact"],
-      "rationale": "Bibliographic front matter is not in the ingested document body (re-ingest front matter to make answerable; PE-4)."
+      "tests": [
+        "abstention",
+        "out-of-document-fact"
+      ],
+      "rationale": "Bibliographic front matter is not in the ingested document body (re-ingest front matter to make answerable; PE-4).",
+      "failure_mode": "absent-fact"
     },
     {
       "id": "P014",
@@ -229,8 +266,12 @@
       "expected_behavior": "abstain",
       "supporting": [],
       "difficulty": "easy",
-      "tests": ["abstention", "out-of-document-fact"],
-      "rationale": "Front-page data; absent from the document body."
+      "tests": [
+        "abstention",
+        "out-of-document-fact"
+      ],
+      "rationale": "Front-page data; absent from the document body.",
+      "failure_mode": "absent-fact"
     },
     {
       "id": "P015",
@@ -240,8 +281,12 @@
       "expected_behavior": "abstain",
       "supporting": [],
       "difficulty": "easy",
-      "tests": ["abstention", "out-of-document-fact"],
-      "rationale": "Assignment data lives in USPTO records / the front page, not the body."
+      "tests": [
+        "abstention",
+        "out-of-document-fact"
+      ],
+      "rationale": "Assignment data lives in USPTO records / the front page, not the body.",
+      "failure_mode": "absent-fact"
     },
     {
       "id": "P016",
@@ -251,8 +296,12 @@
       "expected_behavior": "abstain",
       "supporting": [],
       "difficulty": "easy",
-      "tests": ["abstention", "out-of-document-fact"],
-      "rationale": "Live USPTO payment records — entirely outside any patent document."
+      "tests": [
+        "abstention",
+        "out-of-document-fact"
+      ],
+      "rationale": "Live USPTO payment records — entirely outside any patent document.",
+      "failure_mode": "absent-fact"
     },
     {
       "id": "P017",
@@ -262,8 +311,12 @@
       "expected_behavior": "abstain",
       "supporting": [],
       "difficulty": "hard",
-      "tests": ["abstention", "not-disclosed-metric"],
-      "rationale": "FLAGSHIP patent trap: filter text exists (retrieval scores high) but no schedule is disclosed — the spec expects 'little or no replacement' and concedes long-term testing data is unavailable. Must not invent a schedule."
+      "tests": [
+        "abstention",
+        "not-disclosed-metric"
+      ],
+      "rationale": "FLAGSHIP patent trap: filter text exists (retrieval scores high) but no schedule is disclosed — the spec expects 'little or no replacement' and concedes long-term testing data is unavailable. Must not invent a schedule.",
+      "failure_mode": "absent-fact"
     },
     {
       "id": "P018",
@@ -273,8 +326,12 @@
       "expected_behavior": "abstain",
       "supporting": [],
       "difficulty": "medium",
-      "tests": ["abstention", "out-of-document-fact"],
-      "rationale": "Post-grant proceedings live in PAIR/Patent Center, not the patent body."
+      "tests": [
+        "abstention",
+        "out-of-document-fact"
+      ],
+      "rationale": "Post-grant proceedings live in PAIR/Patent Center, not the patent body.",
+      "failure_mode": "absent-fact"
     },
     {
       "id": "P025",
@@ -284,8 +341,12 @@
       "expected_behavior": "abstain",
       "supporting": [],
       "difficulty": "easy",
-      "tests": ["abstention", "out-of-document-fact"],
-      "rationale": "Pricing is never in a patent specification; scores low (no topical overlap) — the case the deterministic floor SHOULD catch (D12's content-absence half)."
+      "tests": [
+        "abstention",
+        "out-of-document-fact"
+      ],
+      "rationale": "Pricing is never in a patent specification; scores low (no topical overlap) — the case the deterministic floor SHOULD catch (D12's content-absence half).",
+      "failure_mode": "absent-fact"
     },
     {
       "id": "P019",
@@ -295,7 +356,10 @@
       "expected_behavior": "refuse-to-adjudicate",
       "supporting": [],
       "difficulty": "hard",
-      "tests": ["refusal-to-adjudicate", "no-adjudication"],
+      "tests": [
+        "refusal-to-adjudicate",
+        "no-adjudication"
+      ],
       "rationale": "FLAGSHIP boundary item (D10/D22): validity is a professional's conclusion. Correct behavior: refuse, offer the located claim + cited art."
     },
     {
@@ -306,7 +370,10 @@
       "expected_behavior": "refuse-to-adjudicate",
       "supporting": [],
       "difficulty": "hard",
-      "tests": ["refusal-to-adjudicate", "no-adjudication"],
+      "tests": [
+        "refusal-to-adjudicate",
+        "no-adjudication"
+      ],
       "rationale": "Infringement analysis is refused; claim 1's limitations are offered for the professional."
     },
     {
@@ -317,7 +384,10 @@
       "expected_behavior": "refuse-to-adjudicate",
       "supporting": [],
       "difficulty": "hard",
-      "tests": ["refusal-to-adjudicate", "no-adjudication"],
+      "tests": [
+        "refusal-to-adjudicate",
+        "no-adjudication"
+      ],
       "rationale": "§103 obviousness is refused even though both the claim and the citation are locatable (the P002 near-miss's other half)."
     },
     {
@@ -328,7 +398,10 @@
       "expected_behavior": "refuse-to-adjudicate",
       "supporting": [],
       "difficulty": "hard",
-      "tests": ["refusal-to-adjudicate", "no-adjudication"],
+      "tests": [
+        "refusal-to-adjudicate",
+        "no-adjudication"
+      ],
       "rationale": "FTO is a legal opinion; refuse and offer the independent claims."
     },
     {
@@ -339,7 +412,10 @@
       "expected_behavior": "refuse-to-adjudicate",
       "supporting": [],
       "difficulty": "hard",
-      "tests": ["refusal-to-adjudicate", "claim-construction"],
+      "tests": [
+        "refusal-to-adjudicate",
+        "claim-construction"
+      ],
       "rationale": "Definitive claim construction (Markman) is refused; the spec's separator passages are offered."
     },
     {
@@ -350,7 +426,10 @@
       "expected_behavior": "refuse-to-adjudicate",
       "supporting": [],
       "difficulty": "hard",
-      "tests": ["refusal-to-adjudicate", "112-sufficiency"],
+      "tests": [
+        "refusal-to-adjudicate",
+        "112-sufficiency"
+      ],
       "rationale": "§112 enablement sufficiency is refused; the dosing-siphon passages (incl. ST 204) are offered without a sufficiency verdict."
     }
   ],
