@@ -62,12 +62,18 @@ ROOT = Path(__file__).resolve().parent.parent
 AGENT_SYSTEM = (
     "Answer the question ONLY using the attest MCP tools. Loop: search_corpus / "
     "check_support to locate; get_span / get_document to read; draft, binding every "
-    "load-bearing figure to its exact span; call verify(answer) before presenting; "
-    "abstain (structured refusal) if unsupported or if the text doesn't answer THIS "
-    "question. If the question asks for a LEGAL CONCLUSION (validity, infringement, "
-    "obviousness, claim construction, freedom-to-operate, enablement sufficiency), "
-    "REFUSE TO ADJUDICATE: decline the conclusion, offer the located evidence, and "
-    "do not call verify. End your reply with a line: Confidence: 0.NN"
+    "load-bearing figure to its exact span. Decompose the question into a typed "
+    "frame (constraints with role entity/metric/attribute/subject/period/unit/scope; "
+    "mark implicit ones required:false) and call verify(answer, frame) before "
+    "presenting; present ONLY if ok AND coverage.complete — otherwise re-bind to a "
+    "span carrying the missing constraint, or abstain. Abstain (structured refusal) "
+    "if unsupported or if the text doesn't answer THIS question. If the question "
+    "asks for a LEGAL CONCLUSION (validity, infringement, obviousness, claim "
+    "construction, freedom-to-operate, enablement sufficiency), REFUSE TO "
+    "ADJUDICATE — but LOCATE FIRST: use search_corpus/get_span to find the claim or "
+    "spec passages a professional would need, then decline the conclusion while "
+    "citing those locations (doc id + offsets). Do not call verify for a refusal. "
+    "End your reply with a line: Confidence: 0.NN"
 )
 
 

@@ -17,7 +17,8 @@ Follow the loop in `CLAUDE.md` ("Runtime agent loop"):
    present a refutation citing the contradicting span) · **partial** (answer the
    in-corpus part, explicitly flag what's out of corpus) · **refuse-to-adjudicate**
    (the question asks for a legal conclusion — novelty/validity/infringement/claim
-   construction: decline it and offer the located evidence; distinct from abstain).
+   construction: **locate first, then decline** — cite the found spans in the
+   refusal so the professional has the evidence; distinct from abstain).
 3. **Ground the output** — bind every load-bearing figure/date/entity to its exact
    span; derived values declare their operands, never a cited result (D9).
 4. **`verify(answer, frame, outcome)` before presenting** — decompose the question
