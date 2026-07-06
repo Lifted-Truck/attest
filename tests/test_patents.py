@@ -171,8 +171,9 @@ def test_front_matter_parses_the_synthetic_fixture():
 
 
 def test_front_matter_parses_the_real_patent(tmp_path):
-    from attest.patents import parse_front_matter, regime_flag
     import pathlib
+
+    from attest.patents import parse_front_matter, regime_flag
     real = pathlib.Path("corpus/engagements/US5447630A/US5447630A.txt")
     if not real.exists():
         import pytest as _pytest
