@@ -22,8 +22,29 @@ golden item (the runner snapshots the log length between items).
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+
+
+def ratified_manifest_sha256(items: list[dict], item_ids: list[str]) -> str:
+    """Content hash over the *ratified* golden items — the oracle-freeze primitive.
+
+    Canonical JSON of each ratified item (sorted keys, in id order), sha256'd. A
+    ratified golden set records this under `ratified.manifest_sha256`; the standing
+    freeze test recomputes it. Any edit to — or deletion of — a ratified item
+    changes the hash and fails the gate ("the oracle is sacred"). Items whose id is
+    NOT in `item_ids` are ignored, so the set stays **append-only**: new items may
+    be added freely; the frozen ones cannot be quietly changed. Re-ratifying is the
+    only sanctioned path — it needs a new decision + a re-stamped hash.
+    """
+    by_id = {it["id"]: it for it in items}
+    blob = "\n".join(
+        json.dumps(by_id[i], sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        for i in sorted(item_ids) if i in by_id
+    )
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 # Five first-class outcomes (D16 + D22). "Ground or abstain" is not binary:
 # rejecting a false premise WITH the contradicting evidence is a grounded

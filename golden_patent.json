@@ -1,7 +1,48 @@
 {
-  "_readme": "Patent golden set (PE-5) for the engagement patent US 5,447,630 A — curated from 42 researcher-generated questions reviewed 2026-06-30. Mirrors golden_seed.json's schema; adds D22's refuse-to-adjudicate class and `support_expectations` for the PE-3 claim→spec mapping. The corpus store lives at corpus/engagements/US5447630A/store (gitignored — regenerate per docs/desktop_setup.md §5); tests skip when it is absent. Append-only once ratified (oracle-is-sacred).",
+  "_readme": "Patent golden set (PE-5) for the engagement patent US 5,447,630 A — curated from 42 researcher-generated questions reviewed 2026-06-30. Mirrors golden_seed.json's schema; adds D22's refuse-to-adjudicate class and `support_expectations` for the PE-3 claim→spec mapping. The corpus store lives at corpus/engagements/US5447630A/store (gitignored — regenerate per docs/desktop_setup.md §5); tests skip when it is absent. RATIFIED 2026-07-08 (D23) — labels FROZEN and append-only (oracle-is-sacred); see the `ratified` block. Change a frozen item only via a new decision + re-stamped manifest_sha256.",
   "schema_version": "1.1",
   "corpus": "US5447630A",
+  "ratified": {
+    "date": "2026-07-08",
+    "by": "Julian Smith (patent-domain authority)",
+    "decision": "D23",
+    "worksheet": "scratchpad/ratification.html (2026-07-08)",
+    "decisions": {
+      "A_P017": "keep abstain — the coverage gate already enforces it; the grounded-negative behavior is not adopted for v1 (would require loosening coverage for negatives, a truth-contract change).",
+      "B_frontmatter": "P013 (filing date) & P014 (inventors) confirmed as answerable post-PE-4 front-matter ingest; P015 (assignee) stays abstain — no assignee on this front page.",
+      "C_P007": "stays answer — the label is correct (claim 15 recites the variable-speed fan); the agent's repeated miss is a decoy weakness that must keep counting against the agent.",
+      "roster": "the other 22 items confirmed as labeled."
+    },
+    "note": "Labels FROZEN and APPEND-ONLY henceforth (oracle-is-sacred). New items may be added; these ids cannot be changed without a new decision + a re-stamped manifest_sha256. Enforced by tests/test_patent_golden.py::test_ratified_labels_are_frozen (Layer-0, CI).",
+    "item_ids": [
+      "P001",
+      "P002",
+      "P003",
+      "P004",
+      "P005",
+      "P006",
+      "P007",
+      "P008",
+      "P009",
+      "P010",
+      "P011",
+      "P012",
+      "P013",
+      "P014",
+      "P015",
+      "P016",
+      "P017",
+      "P018",
+      "P025",
+      "P019",
+      "P020",
+      "P021",
+      "P022",
+      "P023",
+      "P024"
+    ],
+    "manifest_sha256": "e16822d39018f95bf05bfc9e51fcd8e2f4f030a4d88b0dd057b664013c803d2e"
+  },
   "items": [
     {
       "id": "P001",

@@ -91,3 +91,25 @@ def test_calibrator_runs_on_the_patent_golden(golden, store):
     assert 0.0 < c.threshold < 30.0
     assert c.n_present >= 8 and c.n_absent >= 5
     assert c.excluded >= 8                # corrections/partials/refusals are not floor data
+
+
+def test_ratified_labels_are_frozen(golden):
+    """Oracle-is-sacred, mechanically (D23): once ratified, the labels are append-only.
+
+    Recompute the manifest hash over the ratified item ids and compare to the stamp.
+    Editing or deleting any frozen item breaks this; adding a NEW item (id not in the
+    manifest) does not. This runs in the Layer-0 CI gate (no store needed), so a
+    silent oracle edit fails the build — you must re-ratify (new decision + re-stamp).
+    """
+    from attest.layer_e import ratified_manifest_sha256
+
+    r = golden.get("ratified")
+    assert r, "golden_patent.json is ratified — a `ratified` block must be present"
+    ids = {it["id"] for it in golden["items"]}
+    missing = [i for i in r["item_ids"] if i not in ids]
+    assert not missing, f"ratified items deleted from the set: {missing}"
+    recomputed = ratified_manifest_sha256(golden["items"], r["item_ids"])
+    assert recomputed == r["manifest_sha256"], (
+        "a ratified label changed without re-ratifying — the oracle is sacred (D23). "
+        "To change a frozen item: log a new decision and re-stamp manifest_sha256."
+    )
