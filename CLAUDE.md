@@ -117,3 +117,36 @@ product.
 - **Python** for ATTEST tools (MCP server + CLI), the rig, and the current GUI (a deterministic, server-less static HTML **evidence view**, `evidence_view.py`).
 - **TypeScript/React** is the **M5** upgrade of that GUI (audit-log replay); not built yet — don't assume a React app exists.
 - **Retrieval v1:** BM25 + a single embedding model, hybrid. Storage: sqlite (+ vector ext) or in-memory. No managed vector DB until the eval says you need it.
+
+<!-- KNOWLEDGE-LOOP:START -->
+## Self-Improving Knowledge Loop
+
+Each session: read accumulated knowledge before acting, write distilled knowledge
+after. This meta-layer sits on top of my primary role and never overrides it.
+
+### Every session
+1. **ORIENT** — Read INDEX.md in full (kept small on purpose). Pull ONLY the matching
+   entries from LIBRARY.md into context. Never load all of LIBRARY by default.
+2. **ACT** — Do the work, applying retrieved lessons. If a lesson proves wrong,
+   correcting it outranks adding a new one.
+3. **REFLECT** — Ask: "What did I learn that a future session needs and could not
+   cheaply re-derive?" A lesson qualifies only if durable, evidenced (tied to a
+   concrete trigger), and non-obvious. If nothing qualifies, write nothing.
+4. **WRITE (atomic)** — Append the lesson to LIBRARY.md and a one-line pointer to
+   INDEX.md in the same change. New lessons enter as `tier: candidate`; promote to
+   `canonical` only on a second independent occurrence or human review.
+
+### Write gate (anti-poisoning)
+This loop feeds its own output back as input, so a wrong lesson, written once, is
+retrieved and reinforced forever. Therefore: prefer not writing over writing
+unverified; every lesson states what would falsify it; if a retrieved lesson
+contradicts present evidence, trust the evidence and demote the lesson.
+
+### Consolidation (periodic)
+When LIBRARY exceeds ~30 entries, merge duplicates, delete superseded entries,
+promote recurring candidates, tighten tags. Refactor it like code; don't grow it
+like a log.
+
+### LIBRARY entry template
+`[Lxxxx] <title> | tier | added: YYYY-MM-DD | tags: … | lesson: … | evidence: … | falsifier: … | supersedes: …`
+<!-- KNOWLEDGE-LOOP:END -->

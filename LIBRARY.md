@@ -1,0 +1,3 @@
+# LIBRARY — durable lessons (retrieve via INDEX; never load whole)
+
+[L0001] Echo-then-proceed is gate-masking | candidate | added: 2026-07-06 | tags: gate-discipline | lesson: Shell chains of the form `gate; echo "exit: $?"; git commit && push` ship red gates — the commit must be CONDITIONED on the gate (`gate && git commit`), not follow an echoed report of it. This is the same failure class as piping pytest through `tail` (already banned in CLAUDE.md), in a new costume. | evidence: 2026-07-06 PE-4 commit pushed with a red gate (fixable import-sort); CI run 28772040687 failed; fixed in the follow-up "restores the gate" commit. | falsifier: a red gate that such a chain correctly blocks. | supersedes: —
