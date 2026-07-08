@@ -56,6 +56,20 @@ def main() -> int:  # pragma: no cover - requires the mcp SDK + a stdio client
     store_dir = os.environ.get("ATTEST_STORE", "corpus/store")
     audit_path = os.environ.get("ATTEST_AUDIT", "audit_log/agent.jsonl")
     threshold = os.environ.get("ATTEST_SUPPORT_THRESHOLD")
+
+    # Session delimiter (RT-1): each server spawn = one working session. The clock
+    # lives here in the adapter (I6 cores stay clock-free); label via env.
+    import time
+
+    from .audit import AuditLog
+    from .session import session_start_record
+
+    Path(audit_path).parent.mkdir(parents=True, exist_ok=True)
+    AuditLog(audit_path).append(session_start_record(
+        label=os.environ.get("ATTEST_SESSION_LABEL"),
+        ts=time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    ))
+
     server = build_server(
         store_dir, audit_path,
         support_threshold=float(threshold) if threshold else SUPPORT_THRESHOLD,

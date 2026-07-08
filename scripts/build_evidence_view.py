@@ -26,7 +26,12 @@ from pathlib import Path
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
 from attest.audit import AuditLog
-from attest.evidence_view import Interaction, interactions_from_audit, render_evidence_view
+from attest.evidence_view import (
+    Interaction,
+    interactions_from_audit,
+    render_evidence_view,
+    sessions_from_audit,
+)
 from attest.frame import Constraint, QuestionFrame
 from attest.ingest import DocumentStore
 from attest.retrieval import Retriever
@@ -40,13 +45,37 @@ OUT = ROOT / "evidence_view.html"
 AUDIT = ROOT / "audit_log" / "agent.jsonl"
 
 
-def build_from_audit(audit_path: Path, out: Path, last: int = 0) -> int:
-    store = SpanStore.from_store(DocumentStore(ROOT / "corpus" / "store"))
+def build_from_audit(audit_path: Path, out: Path, last: int = 0,
+                     session: int | None = None, list_sessions: bool = False,
+                     store_dir: Path | None = None) -> int:
+    store = SpanStore.from_store(DocumentStore(store_dir or ROOT / "corpus" / "store"))
     if not audit_path.exists():
         print(f"No audit log at {audit_path} — run a live session first "
               "(or scripts/run_layer_e.py).")
         return 1
     entries = [e.payload for e in AuditLog(audit_path).entries()]
+
+    if list_sessions or session is not None:         # RT-1: browse history per session
+        groups = sessions_from_audit(entries, store)
+        if list_sessions:
+            print(f"{len(groups)} session(s) in {audit_path}:")
+            for i, g in enumerate(groups, 1):
+                ts = f"  {g['ts']}" if g["ts"] else ""
+                print(f"  {i:>2}. {g['label']:<40}{ts}  ({len(g['interactions'])} presented)")
+            print("render one:  --from-audit --session N")
+            return 0
+        idx = session - 1 if session > 0 else len(groups) + session  # -1 = last
+        if not (0 <= idx < len(groups)):
+            print(f"error: session {session} out of range (1–{len(groups)})")
+            return 1
+        g = groups[idx]
+        title = f"ATTEST — session: {g['label']}" + (f" · {g['ts']}" if g["ts"] else "")
+        out.write_text(render_evidence_view(g["interactions"], store, title=title),
+                       encoding="utf-8")
+        print(f"OK — wrote {out} (session {idx + 1}/{len(groups)} "
+              f"'{g['label']}', {len(g['interactions'])} interaction(s))")
+        return 0
+
     interactions = interactions_from_audit(entries, store)
     if not interactions:
         print(f"No presented (verify-ok) interactions in {audit_path} — nothing to render.")
@@ -73,10 +102,20 @@ def main() -> int:
                     help="with --from-audit, render only the last N interactions (0 = all)")
     ap.add_argument("--latest", action="store_true",
                     help="with --from-audit, render only the most recent interaction")
+    ap.add_argument("--sessions", action="store_true",
+                    help="with --from-audit, list the log's sessions (RT-1)")
+    ap.add_argument("--session", type=int, default=None, metavar="N",
+                    help="with --from-audit, render session N (1-based; -1 = last)")
+    ap.add_argument("--store", default=None, metavar="DIR",
+                    help="corpus store the log's citations resolve against "
+                         "(default: the EDGAR reference store; set per engagement)")
     ap.add_argument("--out", default=str(OUT), help="output HTML path")
     ns = ap.parse_args()
     if ns.from_audit is not None:
-        return build_from_audit(Path(ns.from_audit), Path(ns.out), 1 if ns.latest else ns.last)
+        return build_from_audit(Path(ns.from_audit), Path(ns.out),
+                                1 if ns.latest else ns.last,
+                                session=ns.session, list_sessions=ns.sessions,
+                                store_dir=Path(ns.store) if ns.store else None)
 
     store = SpanStore.from_store(DocumentStore(ROOT / "corpus" / "store"))
     retriever = Retriever(store)

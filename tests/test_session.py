@@ -120,3 +120,18 @@ def test_verify_record_with_frame_replays_byte_identically(retriever):
     rec = verify_record(answer_json, verify(answer, store), "answer", frame_json, cov)
     assert rec["coverage"]["complete"] is True
     assert replays_identically(rec, store)
+
+
+def test_session_marker_replays_and_chains(retriever, tmp_path):
+    """RT-1: the marker is pure metadata — chain-covered (I5), trivially replayable."""
+    from attest.session import session_start_record
+
+    rec = session_start_record("run", "2026-07-06T00:00:00")
+    assert rec == {"kind": "session_start", "label": "run", "ts": "2026-07-06T00:00:00"}
+    assert session_start_record() == {"kind": "session_start"}
+    log = AuditLog(tmp_path / "a.jsonl")
+    log.append(rec)
+    q = "How much term debt does Apple carry?"
+    log.append(support_record(q, check_support(q, retriever)))
+    log.verify_chain()
+    assert all(replays_identically(e.payload, retriever) for e in log.entries())

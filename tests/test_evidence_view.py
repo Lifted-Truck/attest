@@ -201,3 +201,28 @@ def test_refuse_renders_distinctly(store):
     assert '<section class="card refuse" id="i0">' in html
     assert '<span class="badge refuse">refuse</span>' in html
     assert "--refuse:" in html and ".card.refuse.active" in html   # its own colour
+
+
+def test_sessions_from_audit_groups_by_marker(store):
+    """RT-1: session_start markers delimit history; pre-marker entries stay browsable."""
+    from attest.evidence_view import sessions_from_audit
+    from attest.session import session_start_record
+
+    atom = _bind(store, "364,980", TOTAL_ASSETS)
+    ans = {"sentences": [{"text": "Total assets were $364,980 million.",
+                          "atoms": [{"text": atom.text, "doc_id": atom.doc_id,
+                                     "char_start": atom.char_start,
+                                     "char_end": atom.char_end}]}]}
+    entries = [
+        {"kind": "check_support", "query": "pre-marker q", "status": "supported"},
+        {"kind": "verify", "ok": True, "answer": ans},               # unmarked preamble
+        session_start_record("morning review", "2026-07-06T09:00:00"),
+        {"kind": "check_support", "query": "total assets?", "status": "supported"},
+        {"kind": "verify", "ok": True, "answer": ans},
+        session_start_record("afternoon", "2026-07-06T14:00:00"),   # empty session kept
+    ]
+    groups = sessions_from_audit(entries, store)
+    assert [g["label"] for g in groups] == ["(unmarked)", "morning review", "afternoon"]
+    assert [len(g["interactions"]) for g in groups] == [1, 1, 0]
+    assert groups[1]["ts"] == "2026-07-06T09:00:00"
+    assert groups[1]["interactions"][0].question == "total assets?"

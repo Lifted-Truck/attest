@@ -77,6 +77,34 @@ def interactions_from_audit(entries: list[dict], store: SpanStore) -> list[Inter
     return out
 
 
+def sessions_from_audit(entries: list[dict], store: SpanStore) -> list[dict]:
+    """Group audit entries into sessions (RT-1) delimited by `session_start` markers.
+
+    Returns `[{label, ts, interactions}]` in log order. Entries before the first
+    marker (pre-RT-1 logs) form an "(unmarked)" session so old logs stay browsable.
+    Sessions whose interactions are empty (e.g. all-abstain) are kept — an empty
+    session is still history.
+    """
+    groups: list[tuple[str, str, list[dict]]] = []
+    current: list[dict] = []
+    label, ts = "(unmarked)", ""
+    started = False                                  # a marker has opened a session
+    for e in entries:
+        if e.get("kind") == "session_start":
+            if started or current:                   # close the prior session / non-empty preamble
+                groups.append((label, ts, current))
+            label, ts = e.get("label") or "(unlabeled)", e.get("ts", "")
+            current, started = [], True
+        else:
+            current.append(e)
+    if started or current:
+        groups.append((label, ts, current))
+    return [
+        {"label": lb, "ts": t, "interactions": interactions_from_audit(es, store)}
+        for lb, t, es in groups
+    ]
+
+
 def _provenance_line(verify_prov: dict, support_prov: dict) -> str:
     """The rigor a logged answer was produced under (TC-2/D21), for the trace."""
     bits = []

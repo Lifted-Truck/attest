@@ -42,6 +42,7 @@ from attest.layer_e import (
     reliability,
     score_item,
 )
+from attest.session import session_start_record
 from attest.spans import SpanStore
 
 _CONF = re.compile(r"confidence[:\s]+(0?\.\d+|1(?:\.0+)?|0)", re.IGNORECASE)
@@ -148,6 +149,7 @@ def main() -> int:
 
     audit_dir.mkdir(parents=True, exist_ok=True)
     audit.write_text("", encoding="utf-8")  # fresh log for this run
+    AuditLog(audit).append(session_start_record(label=ns.timestamp or "layer-e run"))
     write_mcp_config(mcp_config, ns.store, audit, ns.threshold)
     flags = claude_flags(mcp_config)
     log = AuditLog(audit)

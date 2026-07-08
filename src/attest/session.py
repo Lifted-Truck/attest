@@ -123,11 +123,27 @@ def replay_verify(payload: dict, store: SpanStore) -> dict:
     return rec
 
 
+def session_start_record(label: str | None = None, ts: str | None = None) -> dict:
+    """Session delimiter for the audit log (RT-1): marks where a working session
+    begins so history can be browsed per session. Pure metadata — `ts` is supplied
+    by the calling adapter (this module reads no clock); the evidence records
+    around it are untouched and replay exactly as before."""
+    rec: dict = {"kind": "session_start"}
+    if label:
+        rec["label"] = label
+    if ts:
+        rec["ts"] = ts
+    return rec
+
+
 def replays_identically(payload: dict, engine) -> bool:
     """True iff replaying the record reproduces it byte-identically (I6).
 
     `engine` is a `Retriever` for support/claim records, a `SpanStore` for verify.
     """
-    if payload.get("kind") == "verify":
+    kind = payload.get("kind")
+    if kind == "session_start":
+        return True                      # pure metadata: nothing to re-derive
+    if kind == "verify":
         return replay_verify(payload, engine) == payload
     return replay_support(payload, engine) == payload
