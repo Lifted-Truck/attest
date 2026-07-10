@@ -24,7 +24,8 @@ SUMMARY
 
 BRIEF DESCRIPTION OF THE DRAWINGS
 
-[0003] FIG. 1 is a perspective view of the device.
+[0003] FIG. 1 is a perspective view of the device; FIG. 2 is a cross-sectional view
+of the sprocket.
 
 DETAILED DESCRIPTION
 

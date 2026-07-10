@@ -185,3 +185,75 @@ def test_front_matter_parses_the_real_patent(tmp_path):
     assert fm.application_number == "08/053,402"
     rf = regime_flag(fm)
     assert rf["flag"] == "pre-AIA" and rf["effective_filing_date"] == "1993-04-28"
+
+
+# --- RT-4 / PE-1 remainder: figures + references + reference numerals ---
+
+
+def test_parse_figures_reads_the_drawings_captions():
+    from attest.patents import parse_figures
+    text = _text()
+    figs = parse_figures(text)
+    assert [f.label for f in figs] == ["FIG. 1", "FIG. 2"]
+    assert [f.number for f in figs] == ["1", "2"]
+    assert figs[0].description.startswith("FIG. 1 is a perspective view")
+    assert "cross-sectional view" in figs[1].description
+    for f in figs:                                       # each caption self-addresses
+        assert text[f.char_start:f.char_end] == f.description
+
+
+def test_figure_references_carry_offsets():
+    from attest.patents import figure_references
+    text = _text()
+    refs = figure_references(text)
+    assert {r.number for r in refs} == {"1", "2"}        # FIG.1 (×2) + FIG.2
+    assert sum(r.number == "1" for r in refs) == 2       # caption + detailed-description
+    for r in refs:                                       # the offset points at "FIG"
+        assert text[r.char_start:].upper().startswith("FIG")
+
+
+def test_reference_numerals_map_number_to_element():
+    from attest.patents import reference_numerals
+    nums = {n.number: n.element for n in reference_numerals(_text())}
+    assert set(nums) == {100, 12, 14, 10}                # the four ≥10 numerals
+    assert "device" in nums[100] and "housing" in nums[10]
+    assert "sprocket" in nums[12] and "controller" in nums[14]
+
+
+def test_reference_numerals_ignore_claim_and_list_noise():
+    """MIN_NUMERAL=10 drops the claim references ('of claim 1/2/4') and small ints
+    the claims section is full of — only true reference numerals survive."""
+    from attest.patents import reference_numerals
+    numbers = {n.number for n in reference_numerals(_text())}
+    assert not any(n < 10 for n in numbers)              # no 1/2/4/5 from claim refs
+
+
+def test_figure_and_numeral_spans_resolve_through_the_span_store(tmp_path):
+    from attest.patents import parse_figures, reference_numerals
+    store_dir = tmp_path / "store"
+    ingest_paths([str(SAMPLE)], store_dir, kind="patent")
+    store = SpanStore.from_store(DocumentStore(store_dir))
+    doc = SAMPLE.stem
+    text = store.get_document(doc)
+    for f in parse_figures(text):
+        assert store.get_span(doc, f.char_start, f.char_end) == f.description
+    for n in reference_numerals(text):                   # the first-mention span is real
+        assert store.get_span(doc, n.char_start, n.char_end)
+
+
+def test_figures_validate_on_the_real_patent():
+    """Sanity on US5447630A: the drawings block yields its figures, the ≥10 numerals
+    include the known-good bindings (locate-only; not an exhaustive gate)."""
+    import pathlib
+    real = pathlib.Path("corpus/engagements/US5447630A/US5447630A.txt")
+    if not real.exists():
+        import pytest as _pytest
+        _pytest.skip("engagement corpus not present (local-only)")
+    from attest.patents import parse_figures, reference_numerals
+    t = real.read_text(encoding="utf-8")
+    labels = [f.label for f in parse_figures(t)]
+    assert labels == ["FIG. 1", "FIG. 2", "FIG. 4", "FIG. 5", "FIG. 6"]  # clean block
+    nums = {n.number: n.element for n in reference_numerals(t)}
+    assert "microwave reactor chamber" in nums[12]
+    assert "ceramic filter material" in nums[38]
+    assert "necked portion" in nums[89]

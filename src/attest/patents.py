@@ -355,3 +355,129 @@ def regime_flag(fm: FrontMatter) -> dict | None:
         "note": "date arithmetic over the cited filing/priority text; regime "
                 "applicability to specific claims is a professional determination (D10)",
     }
+
+
+# --- figures + reference numerals (PE-1 remainder; the model RT-4 renders) ---------
+# Patents are read through their drawings: claims and the spec turn on reference
+# numerals that point into the figures. This models three addressable, text-only
+# things — (1) each figure's caption from the "brief description of the drawings",
+# (2) every in-text FIG. N reference, (3) the numeral→element first-mention map — so
+# the GUI can surface the drawing when a cited numeral / FIG. N is in view.
+#
+# **Truth-contract boundary (D21/RT-4):** a figure is *displayed evidence*, not a
+# text span. Grounding still binds a claim to the TEXT that recites a numeral; the
+# drawing is shown alongside via a typed SPEC→FIGURE edge, never asserted as a
+# textual citation. Locate-only (D10): this surfaces structure, never construes it.
+
+# A figure caption in the drawings description: "FIG. 1 is an overall schematic …".
+# The verb must follow the label directly, which distinguishes a *caption* from a
+# detailed-description reference ("FIG. 4, a perspective view …" — comma, no verb).
+_FIG_CAPTION = re.compile(
+    r"FIGS?\.?\s*(\d+[A-Z]?)\s+(?:is|are|shows?|depicts?|illustrates?|"
+    r"comprises?|represents?)\b",
+    re.IGNORECASE,
+)
+# Any FIG reference (offset-bearing), incl. "FIGS. 4-5" and "FIG.5".
+_FIG_REF = re.compile(r"FIGS?\.?\s*(\d+[A-Z]?)(?:\s*[-–]\s*(\d+[A-Z]?))?", re.IGNORECASE)
+# Numeral first mention: "<element phrase> NN" — 1–3 words naming the element, then
+# the number. Leading article stripped; a preposition/adverb right before the number
+# is not an element (drops "shown at 18", "generally by reference numeral 26"). Patent
+# reference numerals are ≥10 by convention (MIN_NUMERAL), which drops the claim/list/
+# quantity noise ("of claim 6", "toilet 2") a bare small integer would swallow.
+MIN_NUMERAL = 10
+_NUMERAL = re.compile(r"\b((?:the |a |an |said )?(?:[a-z]+ ){0,2}[a-z]+)\s+(\d{2,3})\b")
+_NOT_ELEMENT = frozenset(
+    "at by to of from in on and or is are than about over under approximately "
+    "reference numeral generally designated designate shown between within claim claims".split()
+)
+SPEC_FIGURE_EDGE = "SPEC→FIGURE"     # typed provenance (§4): displayed, not cited
+_CAPTION_GAP = 400                   # max chars between consecutive drawings captions
+
+
+@dataclass(frozen=True)
+class Figure:
+    label: str                # "FIG. 1"
+    number: str               # "1", "3A"
+    description: str          # the caption text (from the drawings description)
+    char_start: int
+    char_end: int
+
+
+@dataclass(frozen=True)
+class FigureRef:
+    number: str               # the figure this reference points at
+    char_start: int           # offset of the "FIG. N" token (SPEC→FIGURE anchor)
+    char_end: int
+
+
+@dataclass(frozen=True)
+class Numeral:
+    number: int
+    element: str              # the noun phrase the numeral labels ("separator")
+    char_start: int          # first-mention offset (element+number), resolvable
+    char_end: int
+
+
+def parse_figures(text: str) -> list[Figure]:
+    """Each figure's caption, from the drawings description, as an addressable span.
+
+    Keys off the `FIG. N <verb>` caption pattern rather than a section header —
+    older patents (e.g. US5447630A) introduce the captions inline ("…the drawings
+    in which: FIG. 1 is …") with no "Brief Description of the Drawings" heading. The
+    captions are a single **contiguous run** (semicolon-joined); we take the first
+    such run and stop at the first large gap, so a later "…the dimensions in FIG. 1
+    are provided…" in the detailed description is not mistaken for a caption. Each
+    caption runs from its label to the next (or the terminating period), so
+    `text[f.char_start:f.char_end] == f.description` resolves through `SpanStore`.
+    Locate-only — the caption is the patent's own words (D10). Range/sub-figure
+    captions ("FIGS. 3A-3C are …") are not yet split per sub-figure — refinable.
+    """
+    caps = list(_FIG_CAPTION.finditer(text))
+    block: list[re.Match] = []
+    for m in caps:                                     # first contiguous caption run
+        if block and m.start() - block[-1].end() > _CAPTION_GAP:
+            break
+        block.append(m)
+    out: list[Figure] = []
+    for i, m in enumerate(block):
+        if i + 1 < len(block):
+            end = block[i + 1].start()
+        else:                                          # last caption: end at a period
+            dot = text.find(".", m.end())
+            end = dot + 1 if dot != -1 else len(text)
+        desc = text[m.start():end].rstrip(" ;\n\t")
+        out.append(Figure(f"FIG. {m.group(1)}", m.group(1), desc, m.start(), m.start() + len(desc)))
+    return out
+
+
+def figure_references(text: str) -> list[FigureRef]:
+    """Every in-text FIG. N reference with its offset (a range like FIGS. 4-5 yields
+    one ref per endpoint) — the SPEC→FIGURE anchors the GUI lights when a cited span
+    is in view."""
+    out: list[FigureRef] = []
+    for m in _FIG_REF.finditer(text):
+        out.append(FigureRef(m.group(1), m.start(), m.end()))
+        if m.group(2):                                 # "FIGS. 4-5" → also the 5
+            out.append(FigureRef(m.group(2), m.start(), m.end()))
+    return out
+
+
+def reference_numerals(text: str) -> list[Numeral]:
+    """The numeral→element first-mention map (one entry per numeral, first mention).
+
+    Deterministic heuristic over `<element phrase> NN`; a leading article is trimmed
+    and prepositional/adverbial lead-ins are rejected (so "shown at 18" is not an
+    element). Surfaces the labelling the drawings use; it never claims which figure
+    depicts a numeral (that needs the image) — locate-only (D10). Refinable.
+    """
+    seen: dict[int, Numeral] = {}
+    for m in _NUMERAL.finditer(text):
+        phrase = re.sub(r"^(the|a|an|said)\s+", "", m.group(1).strip())
+        if not phrase or phrase.split()[-1] in _NOT_ELEMENT:
+            continue
+        num = int(m.group(2))
+        if num < MIN_NUMERAL or num in seen:           # ≥10 convention; first mention only
+            continue
+        s = m.start() + (m.group(0).find(phrase))
+        seen[num] = Numeral(num, phrase, s, m.end())
+    return [seen[n] for n in sorted(seen)]
