@@ -29,6 +29,17 @@ from .verify import Answer, VerifyResult, answer_from_json, equation
 from .verify import verify as run_verify
 
 
+@dataclass(frozen=True)
+class FigurePanel:
+    """A companion drawing shown beside the document (RT-4). Corpus-agnostic — the
+    view renders what it is given; the caller (a patent script) supplies the label,
+    caption, and an embedded image (a data: URI). D21: displayed evidence, never a
+    text citation — so a FigurePanel carries no span and is never `verify`-checked."""
+    label: str                # "FIG. 4" — the key an Interaction.figures entry names
+    caption: str
+    image: str                # a self-contained data: URI (server-less, like the view)
+
+
 @dataclass
 class Interaction:
     question: str
@@ -40,6 +51,7 @@ class Interaction:
     note: str = ""
     trace: str = ""
     frame: QuestionFrame | None = None
+    figures: list[str] = field(default_factory=list)  # FigurePanel labels to surface (RT-4)
 
 
 # Outcome classes that PRESENT something (D16) — they get cited-span highlights and
@@ -145,6 +157,13 @@ header a { color:var(--chipb); }
 .doc h3 { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
   margin:0 0 8px; }
 .docbody { font-size:12px; line-height:1.5; font-family:ui-monospace,Menlo,monospace; margin:0; }
+.figstrip { position:sticky; top:0; z-index:5; display:flex; gap:10px; flex-wrap:wrap; }
+.figstrip:has(.figpanel.on) { padding:8px 0 12px; margin-bottom:6px;
+  border-bottom:1px solid var(--line); background:var(--bg); }
+.figpanel { display:none; margin:0; max-width:230px; }
+.figpanel.on { display:block; }
+.figpanel img { width:100%; border:1px solid var(--line); border-radius:6px; background:#fff; }
+.figpanel figcaption { font-size:10.5px; color:var(--muted); margin-top:3px; line-height:1.35; }
 .docln { white-space:pre-wrap; word-break:break-word; color:#aab2c0; padding:0 6px;
   border-left:2px solid transparent; border-right:2px solid transparent; }
 .docln.h { color:var(--ink); font-weight:700; font-size:13px; margin-top:12px; }
@@ -208,10 +227,12 @@ mark.qlbl { background:none; color:inherit; border-radius:3px; padding:0 1px; }
 
 _JS = """
 const CLUSTERS = %s;
+const FIGMAP = %s;
 function clearAll(){
   document.querySelectorAll('.card.active').forEach(c=>c.classList.remove('active'));
   document.querySelectorAll('mark.m.on').forEach(m=>m.classList.remove('on'));
   document.querySelectorAll('mark.flash').forEach(m=>m.classList.remove('flash'));
+  document.querySelectorAll('.figpanel.on').forEach(f=>f.classList.remove('on'));
   document.querySelectorAll('.docln.bx,.docln.bx-top,.docln.bx-bot')
     .forEach(e=>e.classList.remove('bx','bx-top','bx-bot'));
 }
@@ -219,6 +240,11 @@ function light(id){
   const card=document.getElementById(id); if(card) card.classList.add('active');
   document.querySelectorAll('mark.m').forEach(m=>{
     if((m.dataset.int||'').split(' ').includes(id)) m.classList.add('on');
+  });
+  (FIGMAP[id]||[]).forEach(lab=>{
+    document.querySelectorAll('.figpanel').forEach(f=>{
+      if(f.dataset.fig===lab) f.classList.add('on');
+    });
   });
   (CLUSTERS[id]||[]).forEach(lines=>lines.forEach((lid,i)=>{
     const e=document.getElementById(lid); if(!e) return;
@@ -412,7 +438,7 @@ def _splice(text: str, a: int, b: int, marks) -> str:
     return "".join(out)
 
 
-def _doc_pane(store: SpanStore, doc_id: str, painted, label: str) -> str:
+def _doc_pane(store: SpanStore, doc_id: str, painted, label: str, prepend: str = "") -> str:
     text = store.get_document(doc_id)
     marks = sorted(painted)
     lines, offset, mi = [], 0, 0
@@ -442,7 +468,7 @@ def _doc_pane(store: SpanStore, doc_id: str, painted, label: str) -> str:
                          f'{_splice(text, offset, line_end, lmarks)}</div>')
         offset = line_end + 1
     return (
-        f'<aside class="doc"><h3>{_esc(label)}</h3>'
+        f'<aside class="doc"><h3>{_esc(label)}</h3>{prepend}'
         f'<div class="docbody">{"".join(lines)}</div></aside>'
     )
 
@@ -522,7 +548,8 @@ def _abstain_card(inter: Interaction, seg_id) -> str:
 
 
 def render_evidence_view(
-    interactions: list[Interaction], store: SpanStore, *, title: str = "ATTEST — evidence view"
+    interactions: list[Interaction], store: SpanStore, *,
+    title: str = "ATTEST — evidence view", figures: list[FigurePanel] | None = None,
 ) -> str:
     raw = _gather(interactions, store)
     painted = {doc_id: _paint(rs) for doc_id, rs in raw.items()}
@@ -530,13 +557,30 @@ def render_evidence_view(
     def seg_id(doc_id: str, pos: int) -> str:
         return _seg_id(painted.get(doc_id, []), pos)
 
+    # RT-4: companion drawings, surfaced per-interaction. The strip is sticky at the
+    # top of the (first) document pane and stays empty until a card that names figures
+    # is active — so a cited numeral/FIG can show its drawing IN the document view.
+    figstrip, figmap = "", {}
+    if figures:
+        panels = "".join(
+            f'<figure class="figpanel" data-fig="{_esc(f.label)}">'
+            f'<img src="{f.image}" alt="{_esc(f.label)}">'
+            f'<figcaption>{_esc(f.label)} · {_esc(f.caption)}</figcaption></figure>'
+            for f in figures
+        )
+        figstrip = f'<div class="figstrip">{panels}</div>'
+        known = {f.label for f in figures}
+        figmap = {f"i{idx}": [lab for lab in inter.figures if lab in known]
+                  for idx, inter in enumerate(interactions) if inter.figures}
+
     doc_ids = list(painted) or list(store._docs)[:1]
     clusters: dict[str, list[list[str]]] = {}
     panes = []
-    for doc_id in doc_ids:
+    for pi, doc_id in enumerate(doc_ids):
         m = store._docs[doc_id].metadata
         label = f"{m.get('company', doc_id)} {m.get('form', '')}".strip() + " — canonical text"
-        panes.append(_doc_pane(store, doc_id, painted.get(doc_id, []), label))
+        panes.append(_doc_pane(store, doc_id, painted.get(doc_id, []), label,
+                               prepend=figstrip if pi == 0 else ""))
         clusters.update(_clusters(raw.get(doc_id, []), _line_starts(store.get_document(doc_id))))
 
     cards = []
@@ -563,7 +607,7 @@ def render_evidence_view(
         "(entailment — not gated in v1)</p></header>"
         f'<div class="layout">{"".join(panes)}'
         f'<main class="cards">{"".join(cards)}</main></div>'
-        f"<script>{_JS % json.dumps(clusters)}</script></body></html>"
+        f"<script>{_JS % (json.dumps(clusters), json.dumps(figmap))}</script></body></html>"
     )
 
 

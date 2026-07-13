@@ -226,3 +226,44 @@ def test_sessions_from_audit_groups_by_marker(store):
     assert [len(g["interactions"]) for g in groups] == [1, 1, 0]
     assert groups[1]["ts"] == "2026-07-06T09:00:00"
     assert groups[1]["interactions"][0].question == "total assets?"
+
+
+# --- RT-4: companion figures in the document view ---
+
+_STUB_PNG = ("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC"
+             "AAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+
+
+def test_figures_render_and_wire_to_the_interaction(store):
+    from attest.evidence_view import FigurePanel
+    inter = _clean(store)
+    inter.figures = ["FIG. 4"]
+    figs = [FigurePanel("FIG. 4", "a disassembled separator", _STUB_PNG),
+            FigurePanel("FIG. 5", "a side cross-section", _STUB_PNG)]
+    html = render_evidence_view([inter], store, figures=figs)
+    # the strip and both panels render, inside the document pane (before .docbody)
+    assert '<div class="figstrip">' in html
+    assert html.index('class="figstrip"') < html.index('class="docbody"')
+    assert 'data-fig="FIG. 4"' in html and 'data-fig="FIG. 5"' in html
+    assert _STUB_PNG in html                             # embedded, self-contained
+    # only the interaction's own figure is wired (FIG. 4, not FIG. 5)
+    assert re.search(r'const FIGMAP = \{[^}]*"i0":\s*\["FIG\. 4"\]', html)
+    assert '.figpanel.on { display:block; }' in html    # revealed only when active
+
+
+def test_figures_absent_leaves_the_view_unchanged(store):
+    """No figures passed → no strip, empty FIGMAP — the EDGAR/default path is inert."""
+    html = render_evidence_view([_clean(store)], store)
+    assert '<div class="figstrip">' not in html         # the CSS rule may exist; the div must not
+    assert "const FIGMAP = {};" in html
+
+
+def test_interaction_figure_not_in_catalog_is_dropped(store):
+    """An interaction naming a figure the caller didn't supply is filtered, not faked."""
+    from attest.evidence_view import FigurePanel
+    inter = _clean(store)
+    inter.figures = ["FIG. 4", "FIG. 99"]               # 99 has no panel
+    html = render_evidence_view([inter], store,
+                                figures=[FigurePanel("FIG. 4", "cap", _STUB_PNG)])
+    assert re.search(r'"i0":\s*\["FIG\. 4"\]', html)    # 99 dropped
+    assert "FIG. 99" not in html
