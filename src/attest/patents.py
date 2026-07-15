@@ -379,15 +379,27 @@ _FIG_CAPTION = re.compile(
 )
 # Any FIG reference (offset-bearing), incl. "FIGS. 4-5" and "FIG.5".
 _FIG_REF = re.compile(r"FIGS?\.?\s*(\d+[A-Z]?)(?:\s*[-–]\s*(\d+[A-Z]?))?", re.IGNORECASE)
-# Numeral first mention: "<element phrase> NN" — 1–3 words naming the element, then
-# the number. Leading article stripped; a preposition/adverb right before the number
-# is not an element (drops "shown at 18", "generally by reference numeral 26"). Patent
-# reference numerals are ≥10 by convention (MIN_NUMERAL), which drops the claim/list/
-# quantity noise ("of claim 6", "toilet 2") a bare small integer would swallow.
-MIN_NUMERAL = 10
-_NUMERAL = re.compile(r"\b((?:the |a |an |said )?(?:[a-z]+ ){0,2}[a-z]+)\s+(\d{2,3})\b")
+# Numeral first mention: "<element phrase> N" — 1–3 words naming the element, then the
+# number. Leading article stripped; a preposition/adverb right before the number is not
+# an element (drops "shown at 18", "generally by reference numeral 26").
+#
+# **No magnitude floor.** An earlier cut required numerals ≥10 on the folk rule that
+# "patent numerals start at 10". That is NOT a safe general rule and it was wrong here:
+# US5447630A labels its FIG. 1 greywater sources "bathtub or shower 1, toilet 2, …
+# dishwasher 4 and clothes washer 5" — the floor silently deleted five real numerals.
+# The actual discriminators are structural, not numeric:
+#   · REGION — reference numerals live in the specification; "of claim 6" noise is an
+#     artefact of scanning the claims, so we simply don't scan them.
+#   · DECIMALS — "measured as 0.24 mg/l" must not yield numeral 0.
+#   · UNITS — "400 W", "60 degrees" are quantities, not pointers.
+_NUMERAL = re.compile(r"\b((?:the |a |an |said )?(?:[a-z]+ ){0,2}[a-z]+)\s+(\d{1,3})\b(?!\.\d)")
+_UNIT_AFTER = re.compile(
+    r"^\s*(?:W|watts?|mm|cm|m|in|inch(?:es)?|ft|kg|lbs?|°|degrees?|%|percent|hours?|"
+    r"minutes?|seconds?|volts?|V|Hz|psi|gal|gallons?|l(?:iters?)?|N\.T\.U\.|mg)\b",
+    re.IGNORECASE,
+)
 _NOT_ELEMENT = frozenset(
-    "at by to of from in on and or is are than about over under approximately "
+    "at by to of from in on and or is are than about over under approximately as "
     "reference numeral generally designated designate shown between within claim claims".split()
 )
 SPEC_FIGURE_EDGE = "SPEC→FIGURE"     # typed provenance (§4): displayed, not cited
@@ -465,18 +477,29 @@ def figure_references(text: str) -> list[FigureRef]:
 def reference_numerals(text: str) -> list[Numeral]:
     """The numeral→element first-mention map (one entry per numeral, first mention).
 
-    Deterministic heuristic over `<element phrase> NN`; a leading article is trimmed
-    and prepositional/adverbial lead-ins are rejected (so "shown at 18" is not an
-    element). Surfaces the labelling the drawings use; it never claims which figure
-    depicts a numeral (that needs the image) — locate-only (D10). Refinable.
+    Scans the **specification only** (the claims are excluded — that is what removes
+    "of claim 6"-style noise, structurally, rather than by guessing at magnitudes).
+    Rejects decimals ("measured as 0.24 mg/l" is not numeral 0) and quantities carrying
+    a unit ("400 W"). A leading article is trimmed and prepositional lead-ins rejected.
+
+    **Deliberately permissive on value:** there is no minimum numeral — single-digit
+    reference numerals are real (US5447630A: "toilet 2", "dishwasher 4"). Over-filtering
+    silently deletes evidence, which is the worse failure for this system; a loose
+    element phrase is a visible hint a reviewer can discount, a dropped numeral is
+    invisible. Locate-only (D10): never claims which figure depicts a numeral — that
+    needs the image. Element-phrase precision remains refinable.
     """
+    cm = _CLAIMS_MARKER.search(text)
+    region = text[:cm.start()] if cm else text          # specification only
     seen: dict[int, Numeral] = {}
-    for m in _NUMERAL.finditer(text):
+    for m in _NUMERAL.finditer(region):
         phrase = re.sub(r"^(the|a|an|said)\s+", "", m.group(1).strip())
         if not phrase or phrase.split()[-1] in _NOT_ELEMENT:
             continue
+        if _UNIT_AFTER.match(region[m.end():m.end() + 14]):    # a quantity, not a pointer
+            continue
         num = int(m.group(2))
-        if num < MIN_NUMERAL or num in seen:           # ≥10 convention; first mention only
+        if num in seen:                                # first mention only
             continue
         s = m.start() + (m.group(0).find(phrase))
         seen[num] = Numeral(num, phrase, s, m.end())

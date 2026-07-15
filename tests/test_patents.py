@@ -220,12 +220,46 @@ def test_reference_numerals_map_number_to_element():
     assert "sprocket" in nums[12] and "controller" in nums[14]
 
 
-def test_reference_numerals_ignore_claim_and_list_noise():
-    """MIN_NUMERAL=10 drops the claim references ('of claim 1/2/4') and small ints
-    the claims section is full of — only true reference numerals survive."""
+def test_reference_numerals_ignore_claim_noise_without_a_magnitude_floor():
+    """Claim references ('of claim 1/2/4') are excluded STRUCTURALLY — by scanning the
+    specification only — not by a minimum-numeral guess. The fixture's claims recite
+    "of claim 1/2/4", none of which may appear as numerals."""
+    from attest.patents import parse_claims, reference_numerals
+    text = _text()
+    nums = {n.number: n.element for n in reference_numerals(text)}
+    claim_starts = {c.char_start for c in parse_claims(text)}
+    assert claim_starts, "fixture must have claims for this test to mean anything"
+    for n in reference_numerals(text):                   # nothing sourced from the claims
+        assert n.char_start < min(claim_starts)
+    assert "claim" not in " ".join(nums.values())
+
+
+def test_single_digit_reference_numerals_are_kept():
+    """Regression (2026-07-08): a MIN_NUMERAL=10 floor silently deleted five REAL
+    numerals from US5447630A ("bathtub or shower 1, toilet 2, … dishwasher 4 and
+    clothes washer 5" — the FIG. 1 sources). "Numerals start at 10" is a folk rule,
+    not a spec. Over-filtering deletes evidence invisibly; that is the worse failure."""
+    import pathlib
+    real = pathlib.Path("corpus/engagements/US5447630A/US5447630A.txt")
+    if not real.exists():
+        import pytest as _pytest
+        _pytest.skip("engagement corpus not present (local-only)")
     from attest.patents import reference_numerals
-    numbers = {n.number for n in reference_numerals(_text())}
-    assert not any(n < 10 for n in numbers)              # no 1/2/4/5 from claim refs
+    nums = {n.number: n.element for n in reference_numerals(real.read_text(encoding="utf-8"))}
+    assert "bathtub" in nums[1] and "toilet" in nums[2]
+    assert "dishwasher" in nums[4] and "clothes washer" in nums[5]
+
+
+def test_reference_numerals_reject_decimals_and_quantities():
+    """A decimal ("measured as 0.24 mg/l") is not numeral 0; a quantity with a unit
+    ("400 W", "60 degrees") is a measurement, not a pointer into a drawing."""
+    from attest.patents import reference_numerals
+    sample = ("The chlorine residual has been measured as 0.24 mg/l in the tank 42. "
+              "The magnetron 44 draws 400 W and the chamber holds 60 degrees.")
+    nums = {n.number: n.element for n in reference_numerals(sample)}
+    assert 0 not in nums                                # the decimal
+    assert 400 not in nums and 60 not in nums           # quantities carrying units
+    assert "tank" in nums[42] and "magnetron" in nums[44]
 
 
 def test_figure_and_numeral_spans_resolve_through_the_span_store(tmp_path):
