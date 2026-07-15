@@ -7,6 +7,11 @@ cardinal rule is **ground or abstain — never invent.** Every assertion it make
 to a verifiable source span, or it is not made; where the evidence isn't there, it returns
 a structured refusal instead of a guess.
 
+> **New here? Start with the illustrated tour:** [`docs/system_overview.html`](docs/system_overview.html)
+> — how the mechanisms actually work (the AI/deterministic split, the data model, the loop,
+> the five outcomes, what `verify` does, the audit chain, and the two eval layers), diagram-first
+> and readable without touching the code.
+
 ## What v1 actually guarantees
 
 The honest, defensible claim — and it is deliberately precise:

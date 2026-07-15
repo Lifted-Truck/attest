@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATTEST — RT-4 (figures) + what's next</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --bd:#30363d; --tx:#c9d1d9;
+    --mut:#8b949e; --acc:#58a6ff; --ok:#3fb950; --warn:#d29922; --bad:#f85149;
+    --fig:#f0883e; --ai:#a371f7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+    font:15.5px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  .wrap{max-width:980px;margin:0 auto;padding:32px 24px 90px}
+  h1{font-size:28px;margin:0 0 6px;letter-spacing:-.5px}
+  h2{font-size:20px;margin:40px 0 10px;letter-spacing:-.3px;padding-bottom:7px;border-bottom:1px solid var(--bd)}
+  h3{font-size:15.5px;margin:20px 0 6px}
+  .lede{color:var(--mut);font-size:16.5px;margin:0 0 16px}
+  p{margin:9px 0}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:.86em;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .card{background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:15px 17px;margin:14px 0}
+  .card.key{border-left:3px solid var(--acc)}
+  .card.warn{border-left:3px solid var(--warn)}
+  .card.ok{border-left:3px solid var(--ok)}
+  .card.bad{border-left:3px solid var(--bad)}
+  .mut{color:var(--mut)}
+  .fig{margin:16px 0;background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:14px}
+  .fig svg{display:block;width:100%;height:auto}
+  .cap{color:var(--mut);font-size:12.5px;margin-top:9px;line-height:1.5}
+  .pill{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:20px;
+    border:1px solid currentColor;white-space:nowrap}
+  .p-done{color:var(--ok)} .p-block{color:var(--bad)} .p-part{color:var(--warn)}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+  th,td{border:1px solid var(--bd);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  .opt{background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:16px 18px;margin:12px 0}
+  .opt.lean{border-color:var(--ok);border-left:4px solid var(--ok)}
+  .opt h3{margin:0 0 4px}
+  .tag{font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+  .foot{margin-top:40px;padding-top:14px;border-top:1px solid var(--bd);color:var(--mut);font-size:12.5px}
+</style>
+</head>
+<body>
+<h2 class="sr-only">An explainer of the RT-4 patent figures work: the figure model, the image fetch, the two views, the honest blocker, and the three proposed next steps.</h2>
+<div class="wrap">
+
+<h1>RT-4 — making the drawings real</h1>
+<p class="lede">Why a patent can't be read without its figures, the three layers I built, the wall I hit,
+and the three ways forward.</p>
+
+<!-- WHY -->
+<h2>1 · Why figures are not a nice-to-have</h2>
+<div class="card key">
+A patent claim is a legal sentence about a <b>machine</b>. It says things like
+<i>“a spring arrangement disposed in said necked portion”</i> — and the specification explains it with
+<b>reference numerals</b>: <i>“the necked portion <b>89</b>”</i>. Those numbers are pointers into the
+drawings. <b>A patent professional reading a claim without the drawing is reading half the document.</b>
+That's why you flagged this as imperative for real work — and you were right.
+</div>
+
+<div class="fig">
+<svg viewBox="0 0 900 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing how claim text, specification text with reference numerals, and the drawing sheet relate.">
+  <rect x="8" y="16" width="270" height="86" rx="9" fill="#1a1430" stroke="#a371f7"/>
+  <text x="22" y="38" fill="#a371f7" font-size="11.5" font-weight="700" font-family="ui-monospace,monospace">CLAIM 9 (the legal scope)</text>
+  <text x="22" y="60" fill="#c9d1d9" font-size="11.5">“The treatment system of claim 1,</text>
+  <text x="22" y="78" fill="#c9d1d9" font-size="11.5">further including a spring arrangement</text>
+  <text x="22" y="94" fill="#c9d1d9" font-size="11.5">disposed in said <tspan fill="#f0883e" font-weight="700">necked portion</tspan>.”</text>
+
+  <rect x="8" y="120" width="270" height="80" rx="9" fill="#1c2230" stroke="#30363d"/>
+  <text x="22" y="142" fill="#8b949e" font-size="11.5" font-weight="700" font-family="ui-monospace,monospace">SPEC (the explanation)</text>
+  <text x="22" y="164" fill="#c9d1d9" font-size="11.5">“…a <tspan fill="#f0883e" font-weight="700">necked portion 89</tspan> is provided</text>
+  <text x="22" y="182" fill="#c9d1d9" font-size="11.5">between the upper and lower chambers.”</text>
+
+  <path d="M278 82 L340 120" stroke="#8b949e" stroke-width="1.4" marker-end="url(#h)"/>
+  <text x="286" y="108" fill="#8b949e" font-size="10">defined in</text>
+
+  <rect x="344" y="60" width="180" height="66" rx="9" fill="#2a1a0d" stroke="#f0883e" stroke-width="1.5"/>
+  <text x="434" y="86" fill="#f0883e" font-size="15" text-anchor="middle" font-weight="700" font-family="ui-monospace,monospace">89</text>
+  <text x="434" y="106" fill="#c9d1d9" font-size="10.5" text-anchor="middle">a reference numeral —</text>
+  <text x="434" y="119" fill="#c9d1d9" font-size="10.5" text-anchor="middle">a pointer, not a quantity</text>
+  <path d="M278 160 L342 104" stroke="#f0883e" stroke-width="1.4" marker-end="url(#h2)"/>
+
+  <path d="M524 93 L588 93" stroke="#f0883e" stroke-width="1.5" marker-end="url(#h2)"/>
+  <text x="556" y="86" fill="#8b949e" font-size="10" text-anchor="middle">points into</text>
+
+  <rect x="592" y="20" width="140" height="170" rx="6" fill="#fff" stroke="#30363d"/>
+  <text x="662" y="44" fill="#333" font-size="10.5" text-anchor="middle" font-family="ui-monospace,monospace">FIG. 5</text>
+  <path d="M622 60 L702 60 L694 112 L630 112 z" fill="none" stroke="#333" stroke-width="1.4"/>
+  <path d="M630 112 L638 132 L686 132 L694 112" fill="none" stroke="#333" stroke-width="1.4"/>
+  <path d="M638 132 L638 172 L686 172 L686 132" fill="none" stroke="#333" stroke-width="1.4"/>
+  <text x="712" y="128" fill="#c00" font-size="11" font-weight="700">89</text>
+  <path d="M708 124 L690 122" stroke="#c00" stroke-width="1.2"/>
+  <text x="662" y="196" fill="#8b949e" font-size="9.5" text-anchor="middle">the drawing sheet</text>
+
+  <text x="770" y="80" fill="#8b949e" font-size="11">Without the drawing,</text>
+  <text x="770" y="98" fill="#8b949e" font-size="11">“necked portion 89”</text>
+  <text x="770" y="116" fill="#8b949e" font-size="11">is just a noise word.</text>
+  <defs>
+    <marker id="h" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#8b949e"/></marker>
+    <marker id="h2" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#f0883e"/></marker>
+  </defs>
+</svg>
+<p class="cap">The chain the software now models: <b>claim → spec text → numeral → figure</b>. Three of those
+four links are done. The last one — numeral to the actual <i>picture</i> — is where I hit the wall (§4).</p>
+</div>
+
+<!-- WHAT I BUILT -->
+<h2>2 · What I built — three layers</h2>
+<div class="fig">
+<svg viewBox="0 0 900 148" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three layers built: the text-only engine model, the image fetch, and the two views.">
+  <rect x="8" y="16" width="280" height="116" rx="9" fill="#0f2417" stroke="#3fb950"/>
+  <text x="24" y="40" fill="#3fb950" font-size="12" font-weight="700">① ENGINE MODEL (text only)</text>
+  <text x="24" y="62" fill="#c9d1d9" font-size="11">parse_figures → captions</text>
+  <text x="24" y="80" fill="#c9d1d9" font-size="11">figure_references → FIG. N + offsets</text>
+  <text x="24" y="98" fill="#c9d1d9" font-size="11">reference_numerals → 89 → “necked portion”</text>
+  <text x="24" y="122" fill="#8b949e" font-size="10">CI-tested · 6 tests · in the gate</text>
+
+  <rect x="304" y="16" width="272" height="116" rx="9" fill="#1c2230" stroke="#58a6ff"/>
+  <text x="320" y="40" fill="#58a6ff" font-size="12" font-weight="700">② FETCH (the images)</text>
+  <text x="320" y="62" fill="#c9d1d9" font-size="11">8 full-res drawing sheets</text>
+  <text x="320" y="80" fill="#c9d1d9" font-size="11">2320 × 3408 · each sha256'd</text>
+  <text x="320" y="98" fill="#c9d1d9" font-size="11">local-only (gitignored, like the store)</text>
+  <text x="320" y="122" fill="#8b949e" font-size="10">generic script · any patent id</text>
+
+  <rect x="592" y="16" width="300" height="116" rx="9" fill="#2a1a0d" stroke="#f0883e"/>
+  <text x="608" y="40" fill="#f0883e" font-size="12" font-weight="700">③ VIEWS (visible)</text>
+  <text x="608" y="62" fill="#c9d1d9" font-size="11">standalone: sheets + captions + legend</text>
+  <text x="608" y="80" fill="#c9d1d9" font-size="11">main view: companion figures capability</text>
+  <text x="608" y="98" fill="#c9d1d9" font-size="11">sticky strip, per-interaction</text>
+  <text x="608" y="122" fill="#8b949e" font-size="10">CI-tested with a stub PNG · 3 tests</text>
+
+  <path d="M288 74 L302 74" stroke="#8b949e" stroke-width="1.4"/>
+  <path d="M576 74 L590 74" stroke="#8b949e" stroke-width="1.4"/>
+</svg>
+</div>
+
+<h3>The two mechanisms worth understanding</h3>
+<div class="card">
+<b>(a) “A reference numeral is ≥ 10.”</b> My first numeral extractor returned garbage:
+<code>“toilet 2”</code>, <code>“system of claim 6”</code>. Patent drafters follow a convention —
+reference numerals start at 10 and go up. Flooring at 10 dropped the claim-number and quantity noise
+in one line, and kept every real binding (<code>12 microwave reactor chamber</code>,
+<code>38 ceramic filter material</code>, <code>89 necked portion</code>). <span class="mut">Domain
+convention beat clever parsing.</span>
+</div>
+<div class="card">
+<b>(b) “Captions come in a contiguous run.”</b> The parser first mis-read a sentence deep in the
+specification (<i>“…the dimensions in FIG. 1 <b>are</b> provided merely as an example…”</i>) as a figure
+caption, because it looked like <code>FIG. N + verb</code>. Real captions are a single unbroken run
+near the front. Taking only the <b>first contiguous run</b> fixed it. <span class="mut">Also: this
+patent has no “Brief Description of the Drawings” heading at all — it introduces captions inline. So
+the parser keys off the caption <i>pattern</i>, never a section header.</span>
+</div>
+
+<!-- THE BOUNDARY -->
+<h2>3 · The boundary I had to hold: a drawing is <i>not</i> a citation</h2>
+<div class="fig">
+<svg viewBox="0 0 900 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram contrasting a text citation, which is verified, with a displayed figure, which is shown but never verified.">
+  <rect x="8" y="18" width="420" height="124" rx="9" fill="#0f2417" stroke="#3fb950"/>
+  <text x="24" y="42" fill="#3fb950" font-size="12" font-weight="700">TEXT — a citation</text>
+  <text x="24" y="66" fill="#c9d1d9" font-size="11.5">“a spring arrangement disposed in said necked portion”</text>
+  <text x="24" y="88" fill="#8b949e" font-size="10.5" font-family="ui-monospace,monospace">US5447630A · chars 41822–41871</text>
+  <text x="24" y="112" fill="#3fb950" font-size="11">✓ resolves at its offset ✓ hash-matches ✓ verify-checked</text>
+  <text x="24" y="132" fill="#8b949e" font-size="10">this is what a claim is grounded ON</text>
+
+  <rect x="444" y="18" width="448" height="124" rx="9" fill="#2a1a0d" stroke="#f0883e"/>
+  <text x="460" y="42" fill="#f0883e" font-size="12" font-weight="700">DRAWING — displayed evidence</text>
+  <text x="460" y="66" fill="#c9d1d9" font-size="11.5">FIG. 5 — the sheet showing the separator</text>
+  <text x="460" y="88" fill="#8b949e" font-size="10.5" font-family="ui-monospace,monospace">no span · no offsets · no hash binding to prose</text>
+  <text x="460" y="112" fill="#f0883e" font-size="11">shown ALONGSIDE — never asserted as a source</text>
+  <text x="460" y="132" fill="#8b949e" font-size="10">a picture cannot be “resolved at an offset”</text>
+</svg>
+<p class="cap"><b>Why this rule exists.</b> If a figure could count as a citation, the whole guarantee
+leaks: you'd be “grounding” a claim in a picture that no deterministic checker can read. So a
+<code>FigurePanel</code> deliberately carries <b>no span</b> and is <b>never</b> passed through
+<code>verify</code>. Grounding still binds to the <i>text</i> that recites the numeral; the drawing
+rides alongside to help the human. Same reason the numeral→figure tag says <i>“first discussed with
+FIG. 5”</i> and not <i>“depicted in FIG. 5”</i> — the first is a fact about the text, the second would
+be a claim about a picture I haven't read.</p>
+</div>
+
+<!-- THE WALL -->
+<h2>4 · The wall — and why I stopped instead of shipping</h2>
+<p>The goal was: <i>click an answer about “necked portion 89” → its drawing appears in the document
+pane.</i> The machinery for that is built and tested. It can't be pointed at anything yet, for one
+concrete reason:</p>
+
+<div class="fig">
+<svg viewBox="0 0 900 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="What exists: eight whole drawing sheets. What is missing: which figure is on which sheet.">
+  <rect x="8" y="18" width="400" height="146" rx="9" fill="#0f2417" stroke="#3fb950"/>
+  <text x="24" y="42" fill="#3fb950" font-size="12" font-weight="700">WHAT EXISTS ✓</text>
+  <g fill="#fff" stroke="#30363d">
+    <rect x="26" y="56" width="40" height="54" rx="3"/><rect x="72" y="56" width="40" height="54" rx="3"/>
+    <rect x="118" y="56" width="40" height="54" rx="3"/><rect x="164" y="56" width="40" height="54" rx="3"/>
+    <rect x="210" y="56" width="40" height="54" rx="3"/><rect x="256" y="56" width="40" height="54" rx="3"/>
+    <rect x="302" y="56" width="40" height="54" rx="3"/><rect x="348" y="56" width="40" height="54" rx="3"/>
+  </g>
+  <text x="207" y="130" fill="#c9d1d9" font-size="11" text-anchor="middle">8 whole drawing SHEETS (pages 2–9)</text>
+  <text x="207" y="150" fill="#8b949e" font-size="10" text-anchor="middle">full-res scans · that's all Google Patents publishes</text>
+
+  <rect x="428" y="18" width="464" height="146" rx="9" fill="#2a1215" stroke="#f85149"/>
+  <text x="444" y="42" fill="#f85149" font-size="12" font-weight="700">WHAT'S MISSING ✗</text>
+  <text x="444" y="70" fill="#c9d1d9" font-size="12">Which sheet is <tspan fill="#f0883e" font-weight="700">FIG. 5</tspan> on?</text>
+  <text x="444" y="92" fill="#c9d1d9" font-size="12">Which sheet shows numeral <tspan fill="#f0883e" font-weight="700">89</tspan>?</text>
+  <text x="444" y="122" fill="#8b949e" font-size="11">Nothing in the text says. Nothing in the metadata says.</text>
+  <text x="444" y="140" fill="#8b949e" font-size="11">The answer is only <i>inside the pixels</i> of the scans.</text>
+  <text x="444" y="158" fill="#8b949e" font-size="10">(a sheet can hold several figures; sub-figures 3A–3C exist)</text>
+</svg>
+<p class="cap">I have the <b>text</b> side of the numeral (89 → “necked portion”, first discussed near
+FIG. 5) and I have the <b>pictures</b> (8 sheets). What's missing is the join: <b>FIG → sheet</b>.</p>
+</div>
+
+<div class="card bad">
+<b>The tempting shortcut I refused.</b> I could have wired it up so that clicking <i>any</i> answer
+dumps <i>all 8 sheets</i> into the pane. It would have demoed as “figures in the document view” and
+let me tick the box. But that isn't the feature — it's noise wearing the feature's clothes, and the
+whole thesis of this project is that <b>legibility to a non-specialist is the product</b>. So I built
+the capability, proved it with tests, wrote down exactly why the real wiring is blocked, and stopped.
+<span class="mut">The ROADMAP now says so in as many words.</span>
+</div>
+
+<h3>Where RT-4 actually stands</h3>
+<table>
+<tr><th>Piece</th><th>State</th></tr>
+<tr><td>Figure/numeral engine model (captions, refs, numerals)</td><td><span class="pill p-done">DONE · CI-tested</span></td></tr>
+<tr><td>Full-res drawing sheets fetched + hashed</td><td><span class="pill p-done">DONE</span></td></tr>
+<tr><td>Standalone figures artifact (sheets + captions + legend)</td><td><span class="pill p-done">DONE · you've seen it</span></td></tr>
+<tr><td>Main-view companion-figures capability</td><td><span class="pill p-done">DONE · CI-tested</span></td></tr>
+<tr><td>Per-numeral targeting (“show FIG. 5 for numeral 89”)</td><td><span class="pill p-block">BLOCKED on FIG→sheet</span></td></tr>
+<tr><td>Element-phrase + sub-figure (3A–3C) precision</td><td><span class="pill p-part">rough · documented</span></td></tr>
+</table>
+
+<!-- NEXT -->
+<h2>5 · The three ways forward</h2>
+
+<div class="opt">
+<span class="tag" style="color:var(--fig)">OPTION 1 · finish RT-4</span>
+<h3>Teach it to read the drawings (OCR)</h3>
+<p>Run character recognition over the 8 sheets to find where <code>89</code>, <code>12</code>, <code>38</code>
+physically sit. That yields <b>numeral → sheet</b>, which completes the chain and lights up the
+capability that's already built and tested.</p>
+<p class="mut"><b>For:</b> it's the only path to the thing you actually asked for. <b>Against:</b> it pulls
+a real OCR dependency into a project whose stated rule is “choose the boring option”; OCR on 1995
+scans is imperfect, so it needs its own honest confidence story. <b>Cost:</b> a solid session.</p>
+</div>
+
+<div class="opt lean">
+<span class="tag" style="color:var(--ok)">OPTION 2 · my lean</span>
+<h3>PE-2 — the structural checks</h3>
+<p>Deterministic, no-model checks over claim structure that surface facts for a professional:
+dependency integrity is done; the remaining §112-style checks (antecedent basis, element/numeral
+consistency) are the candidates.</p>
+<p class="mut"><b>For:</b> unblocked, no new dependencies, pure engine work in the deterministic core
+where this project is strongest. <b>Against:</b> the honest one — a naive version of these checks
+flagged <b>34 of 67</b> numerals as problems, nearly all false positives. Shipping that would bury the
+real issues. So this is only worth doing if it can be done at high precision, which is exactly the
+open question. <b>Cost:</b> moderate.</p>
+</div>
+
+<div class="opt">
+<span class="tag" style="color:var(--acc)">OPTION 3 · measure</span>
+<h3>Billed run-3 (~$4 of your API credits)</h3>
+<p>Drives the real agent over all 25 golden items again to verify the two loop-guidance fixes from
+last time (the “a claim never names itself” frame bug, and the claim-tail decoy that made it miss
+P007 twice).</p>
+<p class="mut"><b>For:</b> those fixes are currently <b>unverified</b> — I reasoned about them but haven't
+measured them; the project's own doctrine says a comfortable conclusion deserves more scrutiny, not
+less. <b>Against:</b> it spends real money and confirms rather than builds. <b>Needs your explicit
+yes</b> — I won't fire a billed run on my own initiative.</p>
+</div>
+
+<div class="card key">
+<b>My honest read.</b> Option 2 is my lean <i>only</i> because it's unblocked and dependency-free —
+but note its own catch above: the valuable half of PE-2 is the half that's hard to do precisely. If
+what you most want is the drawings working for real client reading, <b>Option 1 is the one that gets
+you there</b>, and the OCR dependency is a deliberate, reversible trade rather than a slide. And
+Option 3 is cheap insurance against the quiet possibility that my two “fixes” didn't actually work.
+</div>
+
+<p class="foot">Companion to <a href="system_overview.html" style="color:var(--acc)">system_overview.html</a> ·
+reflects <code>main</code> @ 2026-07-08 · RT-4 commits: engine core, visible layer, main-view capability,
+roadmap state · 163 Layer-0 tests green.</p>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATTEST — how the system works</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --bd:#30363d; --tx:#c9d1d9;
+    --mut:#8b949e; --acc:#58a6ff; --ok:#3fb950; --warn:#d29922; --bad:#f85149;
+    --corr:#a371f7; --refuse:#f0883e; --ai:#a371f7; --det:#3fb950;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+    font:15.5px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  .wrap{display:grid;grid-template-columns:210px minmax(0,1fr);gap:0;max-width:1180px;margin:0 auto}
+  nav{position:sticky;top:0;height:100vh;overflow:auto;padding:26px 14px;border-right:1px solid var(--bd)}
+  nav h4{font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--mut);margin:16px 0 7px}
+  nav a{display:block;color:var(--tx);text-decoration:none;font-size:13px;padding:4px 8px;
+    border-radius:5px;opacity:.8}
+  nav a:hover{background:var(--panel);opacity:1;color:var(--acc)}
+  main{padding:30px 34px 100px;min-width:0}
+  h1{font-size:29px;margin:0 0 6px;letter-spacing:-.5px}
+  h2{font-size:20px;margin:44px 0 10px;letter-spacing:-.3px;padding-bottom:7px;
+    border-bottom:1px solid var(--bd);scroll-margin-top:16px}
+  h3{font-size:15.5px;margin:22px 0 7px}
+  p{margin:9px 0}
+  .lede{color:var(--mut);font-size:16.5px;margin:0 0 18px}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:.86em;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .card{background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:15px 17px;margin:14px 0}
+  .card.key{border-left:3px solid var(--acc)}
+  .card.warn{border-left:3px solid var(--warn)}
+  .card.ok{border-left:3px solid var(--ok)}
+  .mut{color:var(--mut)}
+  .fig{margin:16px 0;background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:14px}
+  .fig svg{display:block;width:100%;height:auto}
+  .cap{color:var(--mut);font-size:12.5px;margin-top:9px;line-height:1.5}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+  th,td{border:1px solid var(--bd);padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  .pill{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:20px;
+    border:1px solid currentColor;white-space:nowrap}
+  .p-hard{color:var(--ok)} .p-meas{color:var(--warn)} .p-ai{color:var(--ai)} .p-det{color:var(--det)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:900px){.wrap{grid-template-columns:1fr}nav{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--bd)}.grid2{grid-template-columns:1fr}}
+  .bar{height:9px;border-radius:5px;background:var(--panel2);overflow:hidden;margin:3px 0 1px}
+  .bar i{display:block;height:100%;border-radius:5px}
+  .metric{font-family:ui-monospace,monospace;font-size:12px;color:var(--mut)}
+  .foot{margin-top:40px;padding-top:14px;border-top:1px solid var(--bd);color:var(--mut);font-size:12.5px}
+</style>
+</head>
+<body>
+<h2 class="sr-only">An illustrated explainer of how ATTEST works: the AI/deterministic split, the data model, the runtime loop, the five outcomes, verification, the audit log, and the two evaluation layers.</h2>
+<div class="wrap">
+<nav>
+  <h4>Foundations</h4>
+  <a href="#promise">1 · The promise</a>
+  <a href="#split">2 · The split</a>
+  <a href="#datamodel">3 · The data model</a>
+  <h4>Runtime</h4>
+  <a href="#loop">4 · The loop</a>
+  <a href="#outcomes">5 · Five outcomes</a>
+  <a href="#abstain">6 · Two abstentions</a>
+  <a href="#verify">7 · What verify does</a>
+  <a href="#coverage">8 · Coverage</a>
+  <a href="#audit">9 · Audit + replay</a>
+  <h4>Guarantees</h4>
+  <a href="#invariants">10 · Invariants</a>
+  <a href="#contract">11 · Truth contract</a>
+  <h4>Proof</h4>
+  <a href="#evals">12 · Two eval layers</a>
+  <a href="#oracle">13 · The oracle</a>
+  <h4>Domain</h4>
+  <a href="#corpora">14 · Two corpora</a>
+  <a href="#patents">15 · Patent model</a>
+  <a href="#map">16 · Module map</a>
+</nav>
+<main>
+
+<h1>ATTEST — how it actually works</h1>
+<p class="lede">An illustrated tour of the mechanisms: what enforces the guarantee, what merely
+measures it, and exactly where the line between the two sits.</p>
+
+<div class="card key">
+<b>The one sentence.</b> ATTEST is a <b>grounded-retrieval system</b>: every claim it presents is
+bound to a verifiable source span, or it is not presented — <b>ground or abstain, never invent</b>.
+It ships as <b>deterministic tools</b> that Claude calls. <b>ATTEST itself makes zero model calls at
+runtime.</b>
+</div>
+
+<!-- ─────────────── 1 ─────────────── -->
+<h2 id="promise">1 · The promise — and its honest limit</h2>
+<p>The failure this exists to kill: a model that invents a citation, or cites a real document for a
+claim it doesn't make. ATTEST attacks that by refusing to let a claim out the door unless a
+deterministic checker can resolve it to a real span.</p>
+
+<div class="card warn">
+<b>The limit you must state out loud: “verified” ≠ “entailed”.</b><br>
+<code>verify</code> proves a cited span <b>exists, is real, and hashes correctly</b>. It does <b>not</b>
+prove that the span <i>supports</i> the claim. Whether the evidence truly entails the sentence is
+<b>measured offline</b> (Layer&nbsp;E), not enforced at runtime in v1. Never let a doc or a demo
+overclaim this — it is the single most important honesty boundary in the system.
+</div>
+
+<p>What v1 <i>does</i> add on top of mere existence is <b>constraint coverage</b> (§8): a deterministic
+check that the cited span actually carries the question's terms. That converts a chunk of "does this
+evidence answer <i>this</i> question" from opinion into a runtime flag — but not all of it.</p>
+
+<!-- ─────────────── 2 ─────────────── -->
+<h2 id="split">2 · The split — who decides what</h2>
+<p>The architectural spine. AI may interpret, propose, and draft. AI is <b>never</b> in the path of
+deciding whether a claim is grounded. Deterministic code decides.</p>
+
+<div class="fig">
+<svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram: Claude drafts prose and proposes bindings; ATTEST's deterministic tools resolve, check and decide; the audit log records.">
+  <rect x="8" y="14" width="352" height="176" rx="10" fill="#1a1430" stroke="#a371f7" stroke-width="1.5"/>
+  <text x="22" y="36" fill="#a371f7" font-size="12" font-weight="700" font-family="ui-monospace,monospace">CLAUDE (the agent) — judgment</text>
+  <text x="22" y="60" fill="#c9d1d9" font-size="12.5">· reads the corpus freely</text>
+  <text x="22" y="80" fill="#c9d1d9" font-size="12.5">· decides the outcome class</text>
+  <text x="22" y="100" fill="#c9d1d9" font-size="12.5">· drafts the prose</text>
+  <text x="22" y="120" fill="#c9d1d9" font-size="12.5">· proposes atom → span bindings</text>
+  <text x="22" y="140" fill="#c9d1d9" font-size="12.5">· emits the question frame</text>
+  <text x="22" y="170" fill="#8b949e" font-size="11" font-style="italic">non-deterministic · measured at Layer-E</text>
+
+  <rect x="400" y="14" width="352" height="176" rx="10" fill="#0f2417" stroke="#3fb950" stroke-width="1.5"/>
+  <text x="414" y="36" fill="#3fb950" font-size="12" font-weight="700" font-family="ui-monospace,monospace">ATTEST (the tools) — decision</text>
+  <text x="414" y="60" fill="#c9d1d9" font-size="12.5">· resolves each atom at its offset</text>
+  <text x="414" y="80" fill="#c9d1d9" font-size="12.5">· re-checks the content hash</text>
+  <text x="414" y="100" fill="#c9d1d9" font-size="12.5">· re-extracts figures independently</text>
+  <text x="414" y="120" fill="#c9d1d9" font-size="12.5">· recomputes derived values</text>
+  <text x="414" y="140" fill="#c9d1d9" font-size="12.5">· computes constraint coverage</text>
+  <text x="414" y="170" fill="#8b949e" font-size="11" font-style="italic">seeded · temperature-0 · NO model calls</text>
+
+  <path d="M362 78 L396 78" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="368" y="72" fill="#8b949e" font-size="10">draft + bindings</text>
+  <path d="M396 128 L362 128" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="366" y="144" fill="#8b949e" font-size="10">ok / not-ok</text>
+
+  <rect x="196" y="208" width="368" height="34" rx="8" fill="#161b22" stroke="#30363d"/>
+  <text x="380" y="230" fill="#8b949e" font-size="12" text-anchor="middle">append-only audit log — the only writable surface (I4/I5)</text>
+  <path d="M186 190 L300 206" stroke="#30363d" stroke-width="1.2"/>
+  <path d="M576 190 L462 206" stroke="#30363d" stroke-width="1.2"/>
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L7,3 z" fill="#8b949e"/></marker></defs>
+</svg>
+<p class="cap"><b>Why this matters:</b> the guarantee doesn't depend on the model behaving. The model can
+propose anything; the deterministic side is what lets it through. That's why "a better model" isn't
+the safety story here — the checker is.</p>
+</div>
+
+<!-- ─────────────── 3 ─────────────── -->
+<h2 id="datamodel">3 · The data model — how "grounding" is represented</h2>
+<p>Everything rests on one primitive: a <b>span</b> — a character range in a hash-verified document.
+Grounding is nothing more mystical than "this token lives at these exact offsets, and the document
+still hashes to what it hashed at ingest."</p>
+
+<div class="fig">
+<svg viewBox="0 0 760 268" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ladder diagram: document with content hash, canonical text, span with offsets, atom bound to span, sentence, answer.">
+  <rect x="10" y="10" width="196" height="52" rx="8" fill="#1c2230" stroke="#30363d"/>
+  <text x="24" y="30" fill="#c9d1d9" font-size="12.5" font-weight="600">Document</text>
+  <text x="24" y="49" fill="#8b949e" font-size="11" font-family="ui-monospace,monospace">+ sha256 at ingest (I3)</text>
+
+  <rect x="10" y="80" width="196" height="52" rx="8" fill="#1c2230" stroke="#30363d"/>
+  <text x="24" y="100" fill="#c9d1d9" font-size="12.5" font-weight="600">Canonical text</text>
+  <text x="24" y="119" fill="#8b949e" font-size="11">one normalized string</text>
+
+  <rect x="10" y="150" width="196" height="60" rx="8" fill="#0f2417" stroke="#3fb950"/>
+  <text x="24" y="170" fill="#3fb950" font-size="12.5" font-weight="700">Span</text>
+  <text x="24" y="189" fill="#c9d1d9" font-size="11" font-family="ui-monospace,monospace">(doc_id, start, end)</text>
+  <text x="24" y="204" fill="#8b949e" font-size="10.5">the atomic unit of provenance</text>
+
+  <path d="M108 62 L108 78" stroke="#8b949e" stroke-width="1.4" marker-end="url(#b)"/>
+  <path d="M108 132 L108 148" stroke="#8b949e" stroke-width="1.4" marker-end="url(#b)"/>
+
+  <rect x="268" y="150" width="220" height="60" rx="8" fill="#1a1430" stroke="#a371f7"/>
+  <text x="282" y="170" fill="#a371f7" font-size="12.5" font-weight="700">Atom</text>
+  <text x="282" y="189" fill="#c9d1d9" font-size="11">a load-bearing token…</text>
+  <text x="282" y="204" fill="#8b949e" font-size="10.5">figure · date · entity · %</text>
+  <path d="M206 180 L266 180" stroke="#8b949e" stroke-width="1.4" marker-end="url(#b)"/>
+  <text x="212" y="174" fill="#8b949e" font-size="9.5">bound to</text>
+
+  <rect x="548" y="122" width="200" height="44" rx="8" fill="#1c2230" stroke="#30363d"/>
+  <text x="562" y="141" fill="#c9d1d9" font-size="12.5" font-weight="600">Sentence</text>
+  <text x="562" y="158" fill="#8b949e" font-size="10.5">text + its atoms</text>
+  <rect x="548" y="182" width="200" height="44" rx="8" fill="#1c2230" stroke="#30363d"/>
+  <text x="562" y="201" fill="#c9d1d9" font-size="12.5" font-weight="600">Answer</text>
+  <text x="562" y="218" fill="#8b949e" font-size="10.5">the presented unit</text>
+  <path d="M488 172 L546 150" stroke="#8b949e" stroke-width="1.4" marker-end="url(#b)"/>
+  <path d="M648 166 L648 180" stroke="#8b949e" stroke-width="1.4" marker-end="url(#b)"/>
+
+  <rect x="268" y="26" width="480" height="72" rx="8" fill="#161b22" stroke="#d29922" stroke-dasharray="3 3"/>
+  <text x="282" y="46" fill="#d29922" font-size="12" font-weight="700">Derived atom — the anti-fabrication trick</text>
+  <text x="282" y="65" fill="#c9d1d9" font-size="11.5">A computed number is NEVER cited. It declares its operands…</text>
+  <text x="282" y="83" fill="#c9d1d9" font-size="11.5">…each a real atom — and the checker <tspan fill="#3fb950" font-weight="700">recomputes</tspan> the result itself.</text>
+  <defs><marker id="b" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L7,3 z" fill="#8b949e"/></marker></defs>
+</svg>
+<p class="cap"><b>The derived-atom idea is worth internalising:</b> if an answer says "assets rose by
+$12,397M", that number appears nowhere in the document. Rather than let the model cite something for
+it, the model must declare <i>“this = 364,980 − 352,583”</i>, each operand bound to a real span — and
+ATTEST does the arithmetic itself. A wrong sum fails; an invented sum has nothing to bind to.</p>
+</div>
+
+<!-- ─────────────── 4 ─────────────── -->
+<h2 id="loop">4 · The runtime loop — what happens on every question</h2>
+
+<div class="fig">
+<svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Flowchart of the runtime loop: locate, choose outcome, compose and bind, frame, verify, gate on ok and coverage complete, log, present or re-bind.">
+  <rect x="286" y="8" width="188" height="34" rx="17" fill="#1c2230" stroke="#58a6ff"/>
+  <text x="380" y="30" fill="#58a6ff" font-size="12.5" text-anchor="middle" font-weight="700">question</text>
+
+  <rect x="256" y="60" width="248" height="46" rx="8" fill="#0f2417" stroke="#3fb950"/>
+  <text x="380" y="79" fill="#3fb950" font-size="12.5" text-anchor="middle" font-weight="700">1 · LOCATE  <tspan fill="#8b949e" font-weight="400">(deterministic)</tspan></text>
+  <text x="380" y="97" fill="#c9d1d9" font-size="11" text-anchor="middle">check_support / search_corpus · BM25 · read freely</text>
+
+  <rect x="256" y="124" width="248" height="46" rx="8" fill="#1a1430" stroke="#a371f7"/>
+  <text x="380" y="143" fill="#a371f7" font-size="12.5" text-anchor="middle" font-weight="700">2 · CHOOSE OUTCOME  <tspan fill="#8b949e" font-weight="400">(judgment)</tspan></text>
+  <text x="380" y="161" fill="#c9d1d9" font-size="11" text-anchor="middle">answer · abstain · correction · partial · refuse</text>
+
+  <rect x="256" y="188" width="248" height="46" rx="8" fill="#1a1430" stroke="#a371f7"/>
+  <text x="380" y="207" fill="#a371f7" font-size="12.5" text-anchor="middle" font-weight="700">3 · COMPOSE + BIND + FRAME</text>
+  <text x="380" y="225" fill="#c9d1d9" font-size="11" text-anchor="middle">draft prose · bind every atom · typed constraints</text>
+
+  <rect x="256" y="252" width="248" height="46" rx="8" fill="#0f2417" stroke="#3fb950"/>
+  <text x="380" y="271" fill="#3fb950" font-size="12.5" text-anchor="middle" font-weight="700">4 · VERIFY(answer, frame)</text>
+  <text x="380" y="289" fill="#c9d1d9" font-size="11" text-anchor="middle">resolve · hash · re-extract · recompute · cover</text>
+
+  <path d="M380 42 L380 58" stroke="#8b949e" stroke-width="1.5" marker-end="url(#c)"/>
+  <path d="M380 106 L380 122" stroke="#8b949e" stroke-width="1.5" marker-end="url(#c)"/>
+  <path d="M380 170 L380 186" stroke="#8b949e" stroke-width="1.5" marker-end="url(#c)"/>
+  <path d="M380 234 L380 250" stroke="#8b949e" stroke-width="1.5" marker-end="url(#c)"/>
+
+  <path d="M380 298 L380 316" stroke="#8b949e" stroke-width="1.5"/>
+  <path d="M300 340 L380 316 L460 340 L380 364 z" fill="#161b22" stroke="#d29922" stroke-width="1.5"/>
+  <text x="380" y="336" fill="#d29922" font-size="10.5" text-anchor="middle" font-weight="700">ok AND</text>
+  <text x="380" y="349" fill="#d29922" font-size="10.5" text-anchor="middle" font-weight="700">coverage.complete?</text>
+
+  <path d="M460 340 L560 340" stroke="#3fb950" stroke-width="1.5" marker-end="url(#c2)"/>
+  <rect x="562" y="322" width="190" height="36" rx="8" fill="#0f2417" stroke="#3fb950"/>
+  <text x="657" y="345" fill="#3fb950" font-size="12" text-anchor="middle" font-weight="700">PRESENT (+ log)</text>
+
+  <path d="M300 340 L200 340" stroke="#f85149" stroke-width="1.5" marker-end="url(#c3)"/>
+  <rect x="8" y="314" width="190" height="52" rx="8" fill="#2a1215" stroke="#f85149"/>
+  <text x="103" y="334" fill="#f85149" font-size="12" text-anchor="middle" font-weight="700">BLOCKED</text>
+  <text x="103" y="352" fill="#c9d1d9" font-size="10.5" text-anchor="middle">re-bind, or downgrade</text>
+  <path d="M103 314 L103 211 L254 211" stroke="#f85149" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#c3)"/>
+
+  <defs>
+    <marker id="c" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#8b949e"/></marker>
+    <marker id="c2" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#3fb950"/></marker>
+    <marker id="c3" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#f85149"/></marker>
+  </defs>
+</svg>
+<p class="cap"><b>The gate is the product.</b> An answer that verifies but whose evidence doesn't carry the
+question's terms is <i>blocked</i>, not presented. In the last live run this gate blocked <b>29 drafts</b>
+before they reached a human.</p>
+</div>
+
+<!-- ─────────────── 5 ─────────────── -->
+<h2 id="outcomes">5 · Five outcomes — “ground or abstain” is not binary</h2>
+<p>The naive framing is answer-or-silence. That's wrong in both directions: silence in the face of a
+<i>false premise</i> is unhelpful, and silence about a <i>legal conclusion</i> hides the most important
+thing the system does — declining it on purpose.</p>
+
+<div class="fig">
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Decision tree of the five outcome classes: answer, correction, partial, abstain, refuse.">
+  <rect x="290" y="8" width="180" height="32" rx="8" fill="#1c2230" stroke="#58a6ff"/>
+  <text x="380" y="29" fill="#58a6ff" font-size="12" text-anchor="middle" font-weight="700">question + evidence</text>
+
+  <path d="M380 40 L380 60" stroke="#8b949e" stroke-width="1.4"/>
+  <path d="M120 60 L640 60" stroke="#8b949e" stroke-width="1.4"/>
+  <path d="M120 60 L120 78 M300 60 L300 78 M460 60 L460 78 M640 60 L640 78"
+        stroke="#8b949e" stroke-width="1.4" marker-end="url(#d)"/>
+
+  <rect x="34" y="80" width="172" height="58" rx="8" fill="#161b22" stroke="#f0883e"/>
+  <text x="120" y="99" fill="#f0883e" font-size="11.5" text-anchor="middle" font-weight="700">asks a LEGAL conclusion?</text>
+  <text x="120" y="117" fill="#c9d1d9" font-size="10.5" text-anchor="middle">validity · infringement</text>
+  <text x="120" y="131" fill="#c9d1d9" font-size="10.5" text-anchor="middle">claim construction · FTO</text>
+  <path d="M120 138 L120 160" stroke="#f0883e" stroke-width="1.4" marker-end="url(#d2)"/>
+  <rect x="34" y="162" width="172" height="52" rx="8" fill="#2a1a0d" stroke="#f0883e" stroke-width="1.5"/>
+  <text x="120" y="182" fill="#f0883e" font-size="13" text-anchor="middle" font-weight="700">REFUSE</text>
+  <text x="120" y="200" fill="#c9d1d9" font-size="10.5" text-anchor="middle">locate first, then decline</text>
+
+  <rect x="222" y="80" width="156" height="58" rx="8" fill="#161b22" stroke="#a371f7"/>
+  <text x="300" y="99" fill="#a371f7" font-size="11.5" text-anchor="middle" font-weight="700">premise is FALSE?</text>
+  <text x="300" y="119" fill="#c9d1d9" font-size="10.5" text-anchor="middle">doc contradicts it</text>
+  <path d="M300 138 L300 160" stroke="#a371f7" stroke-width="1.4" marker-end="url(#d3)"/>
+  <rect x="222" y="162" width="156" height="52" rx="8" fill="#1a1430" stroke="#a371f7" stroke-width="1.5"/>
+  <text x="300" y="182" fill="#a371f7" font-size="13" text-anchor="middle" font-weight="700">CORRECTION</text>
+  <text x="300" y="200" fill="#c9d1d9" font-size="10.5" text-anchor="middle">refute WITH the span</text>
+
+  <rect x="392" y="80" width="140" height="58" rx="8" fill="#161b22" stroke="#58a6ff"/>
+  <text x="462" y="99" fill="#58a6ff" font-size="11.5" text-anchor="middle" font-weight="700">only PART is in?</text>
+  <text x="462" y="119" fill="#c9d1d9" font-size="10.5" text-anchor="middle">rest is out of corpus</text>
+  <path d="M462 138 L462 160" stroke="#58a6ff" stroke-width="1.4" marker-end="url(#d4)"/>
+  <rect x="392" y="162" width="140" height="52" rx="8" fill="#12233a" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="462" y="182" fill="#58a6ff" font-size="13" text-anchor="middle" font-weight="700">PARTIAL</text>
+  <text x="462" y="200" fill="#c9d1d9" font-size="10.5" text-anchor="middle">answer + flag the gap</text>
+
+  <rect x="556" y="80" width="172" height="58" rx="8" fill="#161b22" stroke="#d29922"/>
+  <text x="642" y="99" fill="#d29922" font-size="11.5" text-anchor="middle" font-weight="700">evidence ABSENT /</text>
+  <text x="642" y="114" fill="#d29922" font-size="11.5" text-anchor="middle" font-weight="700">doesn't answer this?</text>
+  <text x="642" y="131" fill="#c9d1d9" font-size="10.5" text-anchor="middle">wrong period/entity</text>
+  <path d="M642 138 L642 160" stroke="#d29922" stroke-width="1.4" marker-end="url(#d5)"/>
+  <rect x="556" y="162" width="172" height="52" rx="8" fill="#2a2412" stroke="#d29922" stroke-width="1.5"/>
+  <text x="642" y="182" fill="#d29922" font-size="13" text-anchor="middle" font-weight="700">ABSTAIN</text>
+  <text x="642" y="200" fill="#c9d1d9" font-size="10.5" text-anchor="middle">+ show the closest spans</text>
+
+  <rect x="222" y="238" width="310" height="46" rx="8" fill="#0f2417" stroke="#3fb950" stroke-width="1.5"/>
+  <text x="377" y="257" fill="#3fb950" font-size="13" text-anchor="middle" font-weight="700">ANSWER — else</text>
+  <text x="377" y="275" fill="#c9d1d9" font-size="10.5" text-anchor="middle">grounded, bound, covered, verified</text>
+
+  <text x="120" y="232" fill="#8b949e" font-size="9.5" text-anchor="middle">evidence PRESENT —</text>
+  <text x="120" y="244" fill="#8b949e" font-size="9.5" text-anchor="middle">the conclusion is declined</text>
+  <text x="642" y="232" fill="#8b949e" font-size="9.5" text-anchor="middle">evidence ABSENT —</text>
+  <text x="642" y="244" fill="#8b949e" font-size="9.5" text-anchor="middle">nothing to say</text>
+  <defs>
+    <marker id="d" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#8b949e"/></marker>
+    <marker id="d2" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#f0883e"/></marker>
+    <marker id="d3" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#a371f7"/></marker>
+    <marker id="d4" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#58a6ff"/></marker>
+    <marker id="d5" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#d29922"/></marker>
+  </defs>
+</svg>
+<p class="cap"><b>The distinction that matters most for the patent client:</b> <span class="pill" style="color:var(--refuse)">refuse</span>
+is <i>not</i> <span class="pill" style="color:var(--warn)">abstain</span>. Abstain means "I found nothing."
+Refuse means "I found it, and I am declining to draw the legal conclusion — here is the evidence for
+your professional to do that." Blurring them would hide the single most important behaviour in the
+engagement. That's why refuse became its own first-class outcome.</p>
+</div>
+
+<!-- ─────────────── 6 ─────────────── -->
+<h2 id="abstain">6 · Two abstention mechanisms — and an honest finding</h2>
+<div class="grid2">
+  <div class="card ok">
+    <b>(a) Deterministic — content absence</b><br>
+    <span class="mut">Retrieval scores every span. Below the calibrated support floor →
+    <code>insufficient</code> → structured refusal. No model involved.</span><br><br>
+    <span class="pill p-hard">HARD · gated</span>
+  </div>
+  <div class="card">
+    <b>(b) Agent reasoning — the traps</b><br>
+    <span class="mut">Spans clear the floor but don't answer <i>this</i> question: wrong period, wrong
+    entity, false premise, plausible-but-absent.</span><br><br>
+    <span class="pill p-meas">MEASURED at Layer-E</span>
+  </div>
+</div>
+
+<div class="card warn">
+<b>The finding we chose to publish rather than hide.</b> On the patent corpus, the "present" and
+"absent" score distributions <b>overlap</b> — a question naming “US 5,447,630” hits the title line at
+score 22.9 even when the answer is nowhere in the document. So the deterministic floor catches only
+<b>truly alien</b> absents (e.g. "what is the price?" — score 4.9). Everything else falls to mechanism
+(b). <b>Live result: the agent caught all 4 of those header-magnet traps.</b> The mechanism split is
+real, and the honest version of the story is "one half is guaranteed, the other is measured" — not
+"we detect absence."
+</div>
+
+<!-- ─────────────── 7 ─────────────── -->
+<h2 id="verify">7 · What <code>verify</code> actually does — four independent checks</h2>
+<div class="fig">
+<svg viewBox="0 0 760 168" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four checks verify performs: resolve at offset, hash match, independent re-extraction, recompute derived values.">
+  <rect x="8" y="18" width="176" height="122" rx="9" fill="#0f2417" stroke="#3fb950"/>
+  <text x="96" y="42" fill="#3fb950" font-size="12" text-anchor="middle" font-weight="700">1 · RESOLVE</text>
+  <text x="96" y="66" fill="#c9d1d9" font-size="10.5" text-anchor="middle">the text at the exact</text>
+  <text x="96" y="81" fill="#c9d1d9" font-size="10.5" text-anchor="middle">offset must equal the</text>
+  <text x="96" y="96" fill="#c9d1d9" font-size="10.5" text-anchor="middle">atom, literally</text>
+  <text x="96" y="122" fill="#8b949e" font-size="9.5" text-anchor="middle">kills invented citations</text>
+
+  <rect x="200" y="18" width="176" height="122" rx="9" fill="#0f2417" stroke="#3fb950"/>
+  <text x="288" y="42" fill="#3fb950" font-size="12" text-anchor="middle" font-weight="700">2 · HASH</text>
+  <text x="288" y="66" fill="#c9d1d9" font-size="10.5" text-anchor="middle">the document still</text>
+  <text x="288" y="81" fill="#c9d1d9" font-size="10.5" text-anchor="middle">hashes to its ingest</text>
+  <text x="288" y="96" fill="#c9d1d9" font-size="10.5" text-anchor="middle">value (I3)</text>
+  <text x="288" y="122" fill="#8b949e" font-size="9.5" text-anchor="middle">kills silent drift</text>
+
+  <rect x="392" y="18" width="176" height="122" rx="9" fill="#1c2230" stroke="#d29922"/>
+  <text x="480" y="42" fill="#d29922" font-size="12" text-anchor="middle" font-weight="700">3 · RE-EXTRACT</text>
+  <text x="480" y="66" fill="#c9d1d9" font-size="10.5" text-anchor="middle">verify finds the figures</text>
+  <text x="480" y="81" fill="#c9d1d9" font-size="10.5" text-anchor="middle">in the prose ITSELF and</text>
+  <text x="480" y="96" fill="#c9d1d9" font-size="10.5" text-anchor="middle">demands each be bound</text>
+  <text x="480" y="122" fill="#8b949e" font-size="9.5" text-anchor="middle">kills “just don't tag it”</text>
+
+  <rect x="584" y="18" width="168" height="122" rx="9" fill="#1c2230" stroke="#58a6ff"/>
+  <text x="668" y="42" fill="#58a6ff" font-size="12" text-anchor="middle" font-weight="700">4 · RECOMPUTE</text>
+  <text x="668" y="66" fill="#c9d1d9" font-size="10.5" text-anchor="middle">derived values are</text>
+  <text x="668" y="81" fill="#c9d1d9" font-size="10.5" text-anchor="middle">re-done from operands</text>
+  <text x="668" y="96" fill="#c9d1d9" font-size="10.5" text-anchor="middle">at the written precision</text>
+  <text x="668" y="122" fill="#8b949e" font-size="9.5" text-anchor="middle">kills bad arithmetic</text>
+</svg>
+<p class="cap"><b>Check 3 is the subtle one.</b> Without it, a model could evade grounding simply by not
+tagging a number. So <code>verify</code> runs its <i>own</i> extraction over the final prose and fails
+if any load-bearing token is unbound. The agent doesn't get to choose what counts as a claim.</p>
+</div>
+
+<!-- ─────────────── 8 ─────────────── -->
+<h2 id="coverage">8 · Constraint coverage — “does this evidence answer <i>this</i> question?”</h2>
+<p>The newest hard guarantee (contract v1.2). The agent decomposes the question into <b>typed
+constraints</b>; <code>verify</code> checks the cited spans literally contain every <i>required</i> one.</p>
+
+<div class="card">
+<b>The canonical example — why existence isn't enough.</b><br>
+Question: <i>“What were total assets?”</i> · Answer: <i>“$364,980 million.”</i><br>
+The model binds <code>364,980</code> to a real span that really does say 364,980 — but it's the
+<b>“Total liabilities and shareholders' equity”</b> line, not the assets line. The number is identical.
+<span class="mut">(A balance sheet balances — that's the whole trap.)</span><br><br>
+<span class="pill p-hard">verify: ✓ ok</span> &nbsp; <span class="pill" style="color:var(--bad)">coverage: ✗ missing “Total assets”</span><br><br>
+→ <b>blocked.</b> Right number, wrong line — caught deterministically, at runtime, with no model call.
+</div>
+
+<p>Constraint roles: <code>entity · metric · attribute · subject · period · unit · scope · comparison</code>.
+Two authoring rules learned the hard way, both now enforced in guidance:</p>
+<ul>
+<li><b>Constraint text must be a short literal</b> you expect verbatim in the span — not a paraphrase.</li>
+<li><b>A claim never names itself.</b> Citing claim 9 to prove “claim 9” can never cover: claim 9's text
+reads <i>“The system of claim 1…”</i>. Locator-style constraints are marked not-required; the binding's
+<i>location</i> satisfies them.</li>
+</ul>
+
+<!-- ─────────────── 9 ─────────────── -->
+<h2 id="audit">9 · The audit log — append-only, tamper-evident, replayable</h2>
+<div class="fig">
+<svg viewBox="0 0 760 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Hash chain diagram: each entry carries the previous entry's hash, so editing any entry breaks the chain.">
+  <rect x="8" y="30" width="150" height="64" rx="8" fill="#1c2230" stroke="#30363d"/>
+  <text x="83" y="52" fill="#c9d1d9" font-size="11.5" text-anchor="middle" font-weight="600">session_start</text>
+  <text x="83" y="70" fill="#8b949e" font-size="9.5" text-anchor="middle" font-family="ui-monospace,monospace">prev = 000…0</text>
+  <text x="83" y="84" fill="#8b949e" font-size="9.5" text-anchor="middle">label · ts</text>
+
+  <rect x="188" y="30" width="150" height="64" rx="8" fill="#1c2230" stroke="#30363d"/>
+  <text x="263" y="52" fill="#c9d1d9" font-size="11.5" text-anchor="middle" font-weight="600">check_support</text>
+  <text x="263" y="70" fill="#8b949e" font-size="9.5" text-anchor="middle" font-family="ui-monospace,monospace">prev = h(#1)</text>
+  <text x="263" y="84" fill="#8b949e" font-size="9.5" text-anchor="middle">query · status · floor</text>
+
+  <rect x="368" y="30" width="150" height="64" rx="8" fill="#1c2230" stroke="#30363d"/>
+  <text x="443" y="52" fill="#c9d1d9" font-size="11.5" text-anchor="middle" font-weight="600">verify</text>
+  <text x="443" y="70" fill="#8b949e" font-size="9.5" text-anchor="middle" font-family="ui-monospace,monospace">prev = h(#2)</text>
+  <text x="443" y="84" fill="#8b949e" font-size="9.5" text-anchor="middle">answer · frame · coverage</text>
+
+  <rect x="548" y="30" width="204" height="64" rx="8" fill="#0f2417" stroke="#3fb950"/>
+  <text x="650" y="50" fill="#3fb950" font-size="11.5" text-anchor="middle" font-weight="700">provenance on every record</text>
+  <text x="650" y="68" fill="#c9d1d9" font-size="9.5" text-anchor="middle">contract 1.2 · retrieval bm25</text>
+  <text x="650" y="82" fill="#c9d1d9" font-size="9.5" text-anchor="middle">floor 6.2 · verify-ops</text>
+
+  <path d="M158 62 L186 62" stroke="#8b949e" stroke-width="1.4" marker-end="url(#e)"/>
+  <path d="M338 62 L366 62" stroke="#8b949e" stroke-width="1.4" marker-end="url(#e)"/>
+  <path d="M518 62 L546 62" stroke="#30363d" stroke-width="1.2" stroke-dasharray="3 3"/>
+
+  <text x="263" y="122" fill="#f85149" font-size="11" text-anchor="middle">edit any entry → every later hash breaks → the log fails its own test</text>
+  <text x="443" y="140" fill="#8b949e" font-size="10.5" text-anchor="middle">replay re-derives each record from the log alone — byte-identical, or it's a bug (I6)</text>
+  <defs><marker id="e" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#8b949e"/></marker></defs>
+</svg>
+<p class="cap"><b>Why provenance stamps matter:</b> a record made under contract 1.0 replays as 1.0 — the
+stamp describes the conditions it was <i>produced</i> under, so tightening the rules later never
+retroactively rewrites what a past output promised. That's what makes the contract safely
+upgradeable.</p>
+</div>
+
+<!-- ─────────────── 10 ─────────────── -->
+<h2 id="invariants">10 · The six invariants — and what enforces each</h2>
+<table>
+<tr><th>Invariant</th><th>Promise</th><th>Enforced by</th><th>Strength</th></tr>
+<tr><td><b>I1</b> span provenance</td><td>every cited atom points at a real <code>(doc, start, end)</code></td><td><code>verify</code> atom resolver</td><td><span class="pill p-hard">hard</span></td></tr>
+<tr><td><b>I2</b> abstain over fabricate</td><td>below the floor → refusal, not an answer</td><td><code>check_support</code> + agent reasoning</td><td><span class="pill p-hard">hard</span> / <span class="pill p-meas">measured</span></td></tr>
+<tr><td><b>I3</b> verified immutability</td><td>content-hash at ingest; drift is a hard failure</td><td>hash check in <code>verify</code></td><td><span class="pill p-hard">hard</span></td></tr>
+<tr><td><b>I4</b> read/write asymmetry</td><td>corpus read-only; only the log is writable</td><td>structural — only write tools hold the log</td><td><span class="pill p-hard">hard</span></td></tr>
+<tr><td><b>I5</b> append-only audit</td><td>every interaction logged immutably</td><td>hash-chained <code>AuditLog</code></td><td><span class="pill p-hard">hard</span></td></tr>
+<tr><td><b>I6</b> determinism</td><td>same corpus + query → same result; no model calls</td><td>seeded / temperature-0 evidence path</td><td><span class="pill p-hard">hard</span></td></tr>
+</table>
+<p class="mut">Each maps to a standing test. A change that violates one does not merge — that's not a
+convention, it's the CI gate.</p>
+
+<!-- ─────────────── 11 ─────────────── -->
+<h2 id="contract">11 · The truth contract — how rigor rises without a rewrite</h2>
+<div class="card key">
+<b>The monotonic rule.</b> Rigor may be <b>strengthened freely</b> (minor version bump). <b>Weakening</b>
+requires a new <b>major</b> version + written rationale + the oracle's blessing. Outputs are stamped
+with the version they were produced under.<br><br>
+<span class="metric">1.0 initial → 1.1 refuse-to-adjudicate → <b>1.2 live constraint coverage</b> (today)</span>
+</div>
+<p>This is what lets the system get stricter over time without invalidating old work or forcing a
+rebuild — and it's why "we tightened the rules" can never silently become "your old report meant
+something different."</p>
+
+<!-- ─────────────── 12 ─────────────── -->
+<h2 id="evals">12 · Two evaluation layers — never conflate them</h2>
+<div class="grid2">
+<div class="card ok">
+<b>Layer 0 — the gate</b><br>
+<span class="mut">Deterministic, seeded, <b>no model calls</b>. Runs on every push. Blocking:
+red = not done.</span><br><br>
+<span class="metric">163 tests · runs in ~2s · CI-enforced</span><br><br>
+<span class="pill p-hard">GUARANTEED</span>
+</div>
+<div class="card warn">
+<b>Layer E — the measurement</b><br>
+<span class="mut">Drives the <i>real</i> agent over the golden set. Billed, non-deterministic,
+<b>periodic — never a gate</b>. This is where entailment lives.</span><br><br>
+<span class="metric">~$4/run · judges + calibration</span><br><br>
+<span class="pill p-meas">MEASURED</span>
+</div>
+</div>
+
+<h3>What the last two live patent runs showed</h3>
+<p>Run 2 turned the constraint-coverage gate on. Read this as the system trading <i>recall</i> for
+<i>precision</i> — deliberately:</p>
+<table>
+<tr><th>Metric</th><th>Run 1 (baseline)</th><th>Run 2 (coverage gate)</th><th>Reading</th></tr>
+<tr><td><b>entailment rate</b></td><td>0.82</td><td style="color:var(--ok)"><b>1.00</b></td><td>everything that survived was airtight</td></tr>
+<tr><td><b>calibration (Brier)</b></td><td>0.17</td><td style="color:var(--ok)"><b>0.0015</b></td><td>its confidence became trustworthy</td></tr>
+<tr><td><b>refusal accuracy</b></td><td>6/6</td><td style="color:var(--ok)"><b>6/6</b></td><td>the UPL boundary never cracked</td></tr>
+<tr><td>decision accuracy</td><td>0.88</td><td style="color:var(--warn)">0.80</td><td><b>the cost:</b> 2 conservative misses</td></tr>
+<tr><td>drafts blocked by the gate</td><td>—</td><td><b>29</b></td><td>the gate does real work</td></tr>
+</table>
+<div class="card">
+<b>Why we accept a <i>lower</i> decision score.</b> For this product, "never wrong" beats "always
+answered". A miss is recoverable — a confident, well-cited, wrong answer is the thing that ends a
+client relationship. The eval headline is therefore never the answer rate.
+</div>
+
+<!-- ─────────────── 13 ─────────────── -->
+<h2 id="oracle">13 · The oracle — and why it's now frozen</h2>
+<p>The golden sets are the answer key Layer-E scores against. The danger is obvious: if you can edit
+the answer key, every score is theatre.</p>
+<div class="fig">
+<svg viewBox="0 0 760 132" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram: ratified golden items are hashed into a manifest; a CI test recomputes it; editing fails, appending passes.">
+  <rect x="8" y="18" width="188" height="60" rx="8" fill="#1c2230" stroke="#30363d"/>
+  <text x="102" y="40" fill="#c9d1d9" font-size="12" text-anchor="middle" font-weight="600">25 ratified items</text>
+  <text x="102" y="60" fill="#8b949e" font-size="10.5" text-anchor="middle">labels signed off by the</text>
+  <text x="102" y="72" fill="#8b949e" font-size="10.5" text-anchor="middle">domain authority</text>
+
+  <path d="M196 48 L236 48" stroke="#8b949e" stroke-width="1.4" marker-end="url(#f)"/>
+  <rect x="238" y="18" width="188" height="60" rx="8" fill="#0f2417" stroke="#3fb950"/>
+  <text x="332" y="40" fill="#3fb950" font-size="12" text-anchor="middle" font-weight="700">manifest sha256</text>
+  <text x="332" y="60" fill="#c9d1d9" font-size="10.5" text-anchor="middle">hashes ONLY the frozen ids</text>
+  <text x="332" y="72" fill="#8b949e" font-size="10" text-anchor="middle">→ that's what makes it append-only</text>
+
+  <path d="M426 48 L466 48" stroke="#8b949e" stroke-width="1.4" marker-end="url(#f)"/>
+  <rect x="468" y="18" width="284" height="60" rx="8" fill="#1c2230" stroke="#58a6ff"/>
+  <text x="610" y="40" fill="#58a6ff" font-size="12" text-anchor="middle" font-weight="700">Layer-0 CI test recomputes it</text>
+  <text x="610" y="60" fill="#c9d1d9" font-size="10.5" text-anchor="middle">reads only the JSON → runs in CI,</text>
+  <text x="610" y="72" fill="#c9d1d9" font-size="10.5" text-anchor="middle">not just on someone's laptop</text>
+
+  <text x="140" y="106" fill="#f85149" font-size="11.5" font-weight="700">edit a label → FAILS</text>
+  <text x="380" y="106" fill="#3fb950" font-size="11.5" font-weight="700" text-anchor="middle">append a new item → PASSES</text>
+  <text x="700" y="106" fill="#f85149" font-size="11.5" font-weight="700" text-anchor="end">delete → CAUGHT</text>
+  <text x="380" y="124" fill="#8b949e" font-size="10" text-anchor="middle">all three proven before the mechanism was trusted</text>
+  <defs><marker id="f" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#8b949e"/></marker></defs>
+</svg>
+<p class="cap">“The oracle is sacred” is now <b>mechanical, not honour-system</b>. Changing a frozen label
+fails the build; the only sanctioned path is a new logged decision + a re-stamp.</p>
+</div>
+
+<!-- ─────────────── 14 ─────────────── -->
+<h2 id="corpora">14 · Two corpora, one engine</h2>
+<div class="grid2">
+<div class="card">
+<b>EDGAR 10-K</b> <span class="pill" style="color:var(--acc)">reference</span><br>
+<span class="mut">Apple FY2024. The architecture-proving build. 20 golden items.
+Public, committed, the shared engine's proving ground.</span>
+</div>
+<div class="card ok">
+<b>US 5,447,630 A</b> <span class="pill p-hard">the paying engagement</span><br>
+<span class="mut">A patent refresh. 25 golden items, <b>ratified + frozen</b>. Local-only store
+(never committed).</span>
+</div>
+</div>
+<div class="card warn">
+<b>The patent cardinal rule — sharper than “ground or abstain”:</b><br>
+<b>Locate &amp; evidence, never adjudicate.</b> ATTEST never concludes on novelty, obviousness,
+validity, infringement, freedom-to-operate, or definitive claim construction. A patent professional
+is in the loop; this is the unauthorised-practice-of-law boundary. It is expressed in the engine as
+the first-class <span class="pill" style="color:var(--refuse)">refuse</span> outcome — and it held
+<b>6/6</b> on both live runs.
+</div>
+
+<!-- ─────────────── 15 ─────────────── -->
+<h2 id="patents">15 · The patent document model</h2>
+<p>The shared engine is corpus-agnostic. The patent domain adds structure on top of the same
+canonical text — every object still resolves to real char offsets.</p>
+<div class="fig">
+<svg viewBox="0 0 760 176" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Patent model: front matter, claims into limitations, spec paragraphs, support edges, figures and numerals.">
+  <rect x="8" y="14" width="150" height="52" rx="8" fill="#1c2230" stroke="#30363d"/>
+  <text x="83" y="34" fill="#c9d1d9" font-size="11.5" text-anchor="middle" font-weight="600">Front matter</text>
+  <text x="83" y="52" fill="#8b949e" font-size="9.5" text-anchor="middle">filed · inventor · priority</text>
+
+  <rect x="8" y="82" width="150" height="52" rx="8" fill="#1c2230" stroke="#30363d"/>
+  <text x="83" y="102" fill="#c9d1d9" font-size="11.5" text-anchor="middle" font-weight="600">Claims (22)</text>
+  <text x="83" y="120" fill="#8b949e" font-size="9.5" text-anchor="middle">independent / dependent</text>
+
+  <rect x="188" y="82" width="150" height="52" rx="8" fill="#1c2230" stroke="#30363d"/>
+  <text x="263" y="102" fill="#c9d1d9" font-size="11.5" text-anchor="middle" font-weight="600">Limitations</text>
+  <text x="263" y="120" fill="#8b949e" font-size="9.5" text-anchor="middle">the claim's elements</text>
+  <path d="M158 108 L186 108" stroke="#8b949e" stroke-width="1.3" marker-end="url(#g)"/>
+
+  <rect x="368" y="82" width="176" height="52" rx="8" fill="#0f2417" stroke="#3fb950"/>
+  <text x="456" y="102" fill="#3fb950" font-size="11.5" text-anchor="middle" font-weight="700">SUPPORT EDGE</text>
+  <text x="456" y="120" fill="#c9d1d9" font-size="9.5" text-anchor="middle">limitation → spec ¶ (ranked)</text>
+  <path d="M338 108 L366 108" stroke="#8b949e" stroke-width="1.3" marker-end="url(#g)"/>
+
+  <rect x="574" y="82" width="178" height="52" rx="8" fill="#1c2230" stroke="#30363d"/>
+  <text x="663" y="102" fill="#c9d1d9" font-size="11.5" text-anchor="middle" font-weight="600">Spec paragraphs (64)</text>
+  <text x="663" y="120" fill="#8b949e" font-size="9.5" text-anchor="middle">each addressable</text>
+  <path d="M544 108 L572 108" stroke="#8b949e" stroke-width="1.3" marker-end="url(#g)"/>
+
+  <rect x="188" y="14" width="356" height="52" rx="8" fill="#2a1a0d" stroke="#f0883e"/>
+  <text x="366" y="34" fill="#f0883e" font-size="11.5" text-anchor="middle" font-weight="700">Figures + reference numerals  (newest)</text>
+  <text x="366" y="52" fill="#c9d1d9" font-size="9.5" text-anchor="middle">captions · FIG refs · numeral → element · drawing sheets</text>
+
+  <rect x="574" y="14" width="178" height="52" rx="8" fill="#161b22" stroke="#d29922" stroke-dasharray="3 3"/>
+  <text x="663" y="34" fill="#d29922" font-size="10.5" text-anchor="middle" font-weight="700">an empty support list =</text>
+  <text x="663" y="50" fill="#c9d1d9" font-size="9.5" text-anchor="middle">a surfaced GAP, never a</text>
+  <text x="663" y="62" fill="#c9d1d9" font-size="9.5" text-anchor="middle">validity conclusion (D10)</text>
+  <defs><marker id="g" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#8b949e"/></marker></defs>
+</svg>
+<p class="cap">Note the dotted box: when the engine finds no support for a claim limitation, that is
+reported as <i>“no clear support located — for your review”</i>. It is <b>never</b> “this claim lacks
+written description”. The difference between those two sentences is the difference between a tool and
+a lawsuit.</p>
+</div>
+
+<!-- ─────────────── 16 ─────────────── -->
+<h2 id="map">16 · The module map</h2>
+<table>
+<tr><th>Module</th><th>Does</th></tr>
+<tr><td><code>ingest/</code></td><td>Document + content hash (I3), the store. <code>edgar.py</code> is the only corpus-specific file.</td></tr>
+<tr><td><code>spans.py</code></td><td>char-offset spans + the resolution invariant</td></tr>
+<tr><td><code>retrieval.py</code></td><td>BM25 behind a swappable backend seam (I6)</td></tr>
+<tr><td><code>support.py</code></td><td><code>check_support</code> / the abstention floor (I2)</td></tr>
+<tr><td><code>verify.py</code></td><td>the atom resolver — the heart (D9/I1)</td></tr>
+<tr><td><code>frame.py</code></td><td>question frame + constraint coverage (D13)</td></tr>
+<tr><td><code>audit.py</code></td><td>hash-chained append-only log (I5)</td></tr>
+<tr><td><code>session.py</code></td><td>record / replay / provenance stamps</td></tr>
+<tr><td><code>patents.py</code></td><td>claims, limitations, paragraphs, support edges, front matter, figures, numerals</td></tr>
+<tr><td><code>layer_e.py</code></td><td>the behavioural scorer + the oracle freeze primitive</td></tr>
+<tr><td><code>evidence_view.py</code></td><td>the review GUI (server-less HTML)</td></tr>
+<tr><td><code>tools.py</code> / <code>cli.py</code> / <code>mcp_server.py</code></td><td>the 6-tool MCP + CLI surface</td></tr>
+</table>
+
+<div class="card key">
+<b>The trap the project explicitly guards against.</b> The temptation is to make ATTEST <i>cleverer</i> —
+exotic retrieval, a richer ontology — until it's a research project only its author can read.
+All architectural ambition goes into the <b>eval harness</b>, where depth is the selling point.
+Everywhere else: choose the boring, legible option. <b>Legibility to a non-specialist is the product.</b>
+</div>
+
+<p class="foot">Generated for the ATTEST engagement · reflects <code>main</code> @ truth-contract <b>v1.2</b>,
+23 logged decisions, 163 Layer-0 tests green · <b>last verified 2026-07-08</b>.
+This file is documentation — if it disagrees with <code>ROADMAP.md</code>, the roadmap wins.</p>
+
+</main>
+</div>
+</body>
+</html>
