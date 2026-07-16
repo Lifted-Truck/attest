@@ -3,9 +3,9 @@ export const meta = {
   description: 'Research swarm: formal/statistical routes to stronger deterministic claim checking in ATTEST',
   whenToUse: 'Queued 2026-07-08 at Julian\'s request. Explores decomposing complex claims into formal logic + statistical guarantees, so ATTEST can push runtime checking closer to its theoretical ceiling. Fire when ready — it is research-only and writes no code.',
   phases: [
-    { title: 'Sweep', detail: '8 literature lenses in parallel (Sonnet)' },
-    { title: 'Interrogate', detail: 'adversarial reality-check of each candidate (Opus)' },
-    { title: 'Synthesise', detail: 'map onto ATTEST decisions + testing protocol + the honest ceiling (Opus)' },
+    { title: 'Sweep', detail: '8 literature lenses in parallel (Opus 4.8, per Julian 2026-07-16)' },
+    { title: 'Interrogate', detail: 'adversarial reality-check of each candidate (Opus 4.8)' },
+    { title: 'Synthesise', detail: 'map onto ATTEST decisions + testing protocol + the honest ceiling (Opus 4.8)' },
   ],
 }
 
@@ -199,7 +199,7 @@ Return findings per the schema. For every candidate technique, the field
 "no" is a perfectly good and useful answer. Prefer 3-6 well-understood candidates over a
 long shallow list. The 'ceiling' field is not optional: say what this lens proves or
 strongly suggests is IMPOSSIBLE.`,
-    { label: `sweep:${l.key}`, phase: 'Sweep', schema: FINDINGS, model: 'sonnet', effort: 'high' }
+    { label: `sweep:${l.key}`, phase: 'Sweep', schema: FINDINGS, model: 'opus', effort: 'high' }
   )
 ))
 
