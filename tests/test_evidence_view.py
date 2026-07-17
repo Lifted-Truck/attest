@@ -267,3 +267,37 @@ def test_interaction_figure_not_in_catalog_is_dropped(store):
                                 figures=[FigurePanel("FIG. 4", "cap", _STUB_PNG)])
     assert re.search(r'"i0":\s*\["FIG\. 4"\]', html)    # 99 dropped
     assert "FIG. 99" not in html
+
+
+def test_denial_cue_advisory_renders_non_blocking(tmp_path):
+    """D24: a cited span carrying a span-local denial cue gets the advisory line —
+    while verify stays ✓ (it gates nothing). Built on a synthetic store so the
+    fixture is hermetic."""
+    from attest.ingest import DocumentStore
+    from attest.ingest.files import ingest_paths
+
+    doc_text = ("Financial note.\n"
+                "When speaking of total assets and liabilities, the number $2,000,000 has "
+                "been claimed, but in fact this is incorrect when accounting for the "
+                "revaluation.\n")
+    src = tmp_path / "note.txt"
+    src.write_text(doc_text, encoding="utf-8")
+    store_dir = tmp_path / "store"
+    ingest_paths([str(src)], store_dir, kind="filing")
+    s = SpanStore.from_store(DocumentStore(store_dir))
+    text = s.get_document("note")
+    off = text.index("2,000,000")
+    ans = Answer([Sentence("Total assets and liabilities are $2,000,000.",
+                           atoms=[AtomBinding("2,000,000", "note", off, off + 9)])])
+    inter = Interaction("What are the total assets and liabilities?", "answer",
+                        answer=ans, verify=verify(ans, s))
+    html = render_evidence_view([inter], s)
+    assert "✓ verify" in html                              # NOT blocked — advisory only
+    assert "denial/correction cue in cited span" in html
+    assert "“incorrect”" in html and "(advisory, D24)" in html
+
+
+def test_no_cue_no_advisory(store):
+    """Benign citations stay clean — no advisory noise on the normal path."""
+    html = render_evidence_view([_clean(store)], store)
+    assert "denial/correction cue" not in html

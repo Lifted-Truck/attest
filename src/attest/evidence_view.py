@@ -22,6 +22,7 @@ import re
 from bisect import bisect_right
 from dataclasses import dataclass, field
 
+from .cues import denial_cue_hits
 from .frame import QuestionFrame, check_coverage, frame_from_json
 from .retrieval import Hit
 from .spans import SpanStore
@@ -215,6 +216,7 @@ mark.qlbl { background:none; color:inherit; border-radius:3px; padding:0 1px; }
 .closest a { color:var(--chipb); cursor:pointer; text-decoration:none; }
 .vstatus { font-size:12px; margin-top:8px; }
 .vstatus.ok{ color:var(--ok); } .vstatus.bad{ color:var(--bad); }
+.vstatus.cue{ color:#d29922; }
 .cover { font-size:12px; margin:6px 0 0; display:flex; flex-wrap:wrap; gap:6px; }
 .cover span { border-radius:4px; padding:0 6px; border:1px solid var(--line); }
 .cov-ok { color:var(--ok); } .cov-bad { color:var(--bad); border-color:var(--bad)!important; }
@@ -531,6 +533,21 @@ def _answer_card(inter: Interaction, store: SpanStore, seg_id) -> str:
         head = "✓ question coverage" if cov.complete else "✗ question coverage — incomplete"
         parts.append(f'<div class="vstatus {"ok" if cov.complete else "bad"}">{head}</div>')
         parts.append(f'<p class="cover">{" · ".join(bits)}</p>')
+
+    # D24 advisory (non-blocking): an evaluative denial/correction cue span-local to
+    # a cited figure. Worded as "cue near citation — review", never "refuted" (a
+    # discourse claim the scan cannot substantiate). Gates nothing.
+    cue_notes = []
+    for s in inter.answer.sentences:
+        for a in list(s.atoms) + [o for d in s.derived for o in d.operands]:
+            sp = store.span_containing(a.doc_id, a.char_start)
+            if sp is None:
+                continue
+            for h in denial_cue_hits(sp.text, [a.char_start - sp.char_start]):
+                cue_notes.append(f'“{_esc(h.cue)}” {h.distance} chars from {_esc(a.text)}')
+    if cue_notes:
+        parts.append('<div class="vstatus cue">⚠ denial/correction cue in cited span — '
+                     f'review (advisory, D24): {" · ".join(sorted(set(cue_notes)))}</div>')
     return "".join(parts)
 
 

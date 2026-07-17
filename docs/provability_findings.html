@@ -193,15 +193,28 @@ than a redesign.</p>
 
 <table>
 <tr><th>Candidate</th><th>What it changes</th><th>Status</th><th>Contract</th></tr>
-<tr><td><b>D24</b> cue-scan as measurement + advisory flag</td><td>learns the real base rate; gates nothing</td><td><span class="pill p-meas">MEASURED</span></td><td>no bump</td></tr>
-<tr><td><b>D25</b> cue-scan promoted to abstain-trigger</td><td>the marked-refutation slice becomes guaranteed</td><td><span class="pill p-hard">GUARANTEED</span></td><td>minor bump (strengthening)</td></tr>
-<tr><td><b>D26</b> NLI/veridicality stays Layer-E only</td><td>quantifies the permanent cue-less hole</td><td><span class="pill p-meas">MEASURED</span></td><td>no bump (runtime use = major)</td></tr>
-<tr><td><b>D27</b> GL + general FOL recorded inapplicable</td><td>stops re-litigation; documentary</td><td><span class="pill p-no">CLOSED</span></td><td>no bump</td></tr>
+<tr><td><b>D24</b> cue-scan as measurement + advisory flag</td><td><b>ADOPTED + BUILT</b> — census run on both corpora</td><td><span class="pill p-meas">MEASURED</span></td><td>no bump</td></tr>
+<tr><td><b>D25</b> cue-scan promoted to abstain-trigger</td><td><b>DEPRIORITIZED ON EVIDENCE</b> — census found only benign hits; re-check per engagement</td><td><span class="pill p-no">NOT BUILT</span></td><td>—</td></tr>
+<tr><td><b>D26</b> NLI/veridicality stays Layer-E only</td><td><b>ADOPTED</b> (standing posture) — quantifies the permanent cue-less hole</td><td><span class="pill p-meas">MEASURED</span></td><td>no bump (runtime use = major)</td></tr>
+<tr><td><b>D27</b> GL + general FOL recorded inapplicable</td><td><b>ADOPTED</b> — stops re-litigation; documentary</td><td><span class="pill p-no">CLOSED</span></td><td>no bump</td></tr>
 </table>
-<p class="mut">All four are <b>candidates</b> awaiting your triage — the research doc authorizes no work
+<p class="mut">Triage executed 2026-07-17 (rows D24–D27 in the ROADMAP Decisions table). Originally: candidates awaiting triage — the research doc authorizes no work
 (same rule as the landscape doc). The synthesis also specifies the full testing protocol per rung:
 fixture tables asserted exactly, benign-span false-positive gates as the load-bearing tests, zero
 golden-label flips (the frozen oracle), and the upgrade ratchet applied mechanically.</p>
+
+<div class="card warn">
+<b>2026-07-17 — the Rung-1 measurement came back, and it settled Rung 2.</b> The D24 census
+(<code>scripts/census_denial_cues.py</code>) scanned both real corpora for closed-set cues near
+figure-like tokens. <b>EDGAR:</b> 5 hits — all five the word "restated" inside benign legal boilerplate
+("amended and <i>restated</i> bylaws/stock plan"), zero true refutations. <b>Patent:</b> zero cues
+anywhere. So the D25 gate, had it shipped, would have fired <i>only false positives</i> — pure
+answer-rate cost, nothing caught. <b>Outcome (D25): the gate is deprioritized on evidence</b> — the
+advisory flag stays, the census re-runs per new engagement corpus (one command), and promotion waits
+for a corpus that actually exhibits cue-marked refutation. This is the staircase working as designed:
+a cheap measurement spent <i>instead of</i> a gate, and a negative result recorded instead of shipped
+rigor theatre.
+</div>
 
 <div class="card ok">
 <b>What this bought, in one paragraph.</b> Before the swarm, "can we catch refuted citations?" was an
@@ -215,7 +228,7 @@ we now never have to argue about again.
 
 <p class="foot">Companion to <a href="provability_research.md" style="color:var(--acc)">the full synthesis</a> ·
 swarm run <code>wf_0522ac48-3e1</code>, 2026-07-16 · 51 Opus 4.8 agents, 8 lenses, 42 candidates, 0 clean
-survivors · candidate rows D24–D27 pending triage · <b>last verified 2026-07-16</b>.</p>
+survivors · D24–D27 triaged &amp; logged 2026-07-17 · <b>last verified 2026-07-17</b>.</p>
 
 </div>
 </body>
