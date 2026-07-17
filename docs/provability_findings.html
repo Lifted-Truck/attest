@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATTEST — provability research: findings</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --bd:#30363d; --tx:#c9d1d9;
+    --mut:#8b949e; --acc:#58a6ff; --ok:#3fb950; --warn:#d29922; --bad:#f85149; --ai:#a371f7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+    font:15.5px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  .wrap{max-width:980px;margin:0 auto;padding:32px 24px 90px}
+  h1{font-size:28px;margin:0 0 6px;letter-spacing:-.5px}
+  h2{font-size:20px;margin:40px 0 10px;letter-spacing:-.3px;padding-bottom:7px;border-bottom:1px solid var(--bd)}
+  .lede{color:var(--mut);font-size:16.5px;margin:0 0 16px}
+  p{margin:9px 0}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:.86em;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .card{background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:15px 17px;margin:14px 0}
+  .card.key{border-left:3px solid var(--acc)}
+  .card.warn{border-left:3px solid var(--warn)}
+  .card.ok{border-left:3px solid var(--ok)}
+  .card.bad{border-left:3px solid var(--bad)}
+  .mut{color:var(--mut)}
+  .fig{margin:16px 0;background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:14px}
+  .fig svg{display:block;width:100%;height:auto}
+  .cap{color:var(--mut);font-size:12.5px;margin-top:9px;line-height:1.5}
+  .pill{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:20px;
+    border:1px solid currentColor;white-space:nowrap}
+  .p-hard{color:var(--ok)} .p-meas{color:var(--warn)} .p-no{color:var(--bad)}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+  th,td{border:1px solid var(--bd);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  .foot{margin-top:40px;padding-top:14px;border-top:1px solid var(--bd);color:var(--mut);font-size:12.5px}
+</style>
+</head>
+<body>
+<h2 class="sr-only">Findings of the provability research swarm: the verdict on catching refuted citations deterministically, the two real ceilings, the 42-to-zero refutation funnel, and the three-rung staircase ATTEST could build.</h2>
+<div class="wrap">
+
+<h1>Can the “$2,000,000 refutation” be caught — deterministically, at runtime?</h1>
+<p class="lede">Findings of the 51-agent research swarm (8 literature lenses · 42 candidate techniques ·
+hostile review · full synthesis in <a href="provability_research.md" style="color:var(--acc)">provability_research.md</a>).</p>
+
+<div class="card key">
+<b>The verdict.</b> <b>In general: no — and the swarm can say precisely why.</b> Whether a figure is
+<i>asserted</i> or <i>mentioned-and-denied</i> is a <b>pragmatic</b> property of a speaker, not a formal
+property of the text; a refutation with no surface cue leaves nothing for a deterministic method to see.
+<b>For exactly one slice: yes.</b> When the denial is <i>lexically marked and sits next to the cited
+figure</i> ("…claimed $2M, <b>but in fact this is incorrect</b>"), a closed cue-list scan can
+deterministically force a downgrade to partial/abstain. That slice — and only that slice — can become a
+hard Layer-0 guarantee. It is <b>one-directional</b>: it can only add abstentions, never permit a
+present, so it can't create the confident-wrong answer, and it's contract-legal as a monotonic
+strengthening.
+</div>
+
+<!-- ── the walls ── -->
+<h2>1 · Where the ceiling actually is — two walls, and one famous non-wall</h2>
+
+<div class="fig">
+<svg viewBox="0 0 900 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram of three walls: the near wall of pragmatics is real, the far wall of undecidability only bites on the logic route, and Gödel-Löb is not a wall for this problem at all.">
+  <rect x="8" y="70" width="240" height="120" rx="9" fill="#2a1215" stroke="#f85149" stroke-width="2"/>
+  <text x="128" y="96" fill="#f85149" font-size="12.5" text-anchor="middle" font-weight="700">THE NEAR WALL — real</text>
+  <text x="128" y="118" fill="#c9d1d9" font-size="11" text-anchor="middle">“asserted vs. denied” is pragmatic,</text>
+  <text x="128" y="134" fill="#c9d1d9" font-size="11" text-anchor="middle">not formal. Cue-less refutation is</text>
+  <text x="128" y="150" fill="#c9d1d9" font-size="11" text-anchor="middle">invisible to EVERY deterministic</text>
+  <text x="128" y="166" fill="#c9d1d9" font-size="11" text-anchor="middle">surface method. Recall is</text>
+  <text x="128" y="182" fill="#c9d1d9" font-size="11" text-anchor="middle">unbounded-below — permanently.</text>
+
+  <rect x="330" y="70" width="240" height="120" rx="9" fill="#2a2412" stroke="#d29922" stroke-width="1.5"/>
+  <text x="450" y="96" fill="#d29922" font-size="12.5" text-anchor="middle" font-weight="700">THE FAR WALL — conditional</text>
+  <text x="450" y="118" fill="#c9d1d9" font-size="11" text-anchor="middle">General FOL entailment is</text>
+  <text x="450" y="134" fill="#c9d1d9" font-size="11" text-anchor="middle">undecidable (Church/Turing). Only</text>
+  <text x="450" y="150" fill="#c9d1d9" font-size="11" text-anchor="middle">bites if you take the logic route —</text>
+  <text x="450" y="166" fill="#c9d1d9" font-size="11" text-anchor="middle">and decidable fragments can't express</text>
+  <text x="450" y="182" fill="#c9d1d9" font-size="11" text-anchor="middle">the numeric reasoning anyway.</text>
+
+  <rect x="652" y="70" width="240" height="120" rx="9" fill="#161b22" stroke="#30363d" stroke-dasharray="5 4"/>
+  <text x="772" y="96" fill="#8b949e" font-size="12.5" text-anchor="middle" font-weight="700">GÖDEL–LÖB — not a wall here</text>
+  <text x="772" y="118" fill="#c9d1d9" font-size="11" text-anchor="middle">GL is about arithmetic proving</text>
+  <text x="772" y="134" fill="#c9d1d9" font-size="11" text-anchor="middle">its own theorems. “Does this passage</text>
+  <text x="772" y="150" fill="#c9d1d9" font-size="11" text-anchor="middle">assert Q” never reduces to it.</text>
+  <text x="772" y="166" fill="#c9d1d9" font-size="11" text-anchor="middle">A category error — recorded so we</text>
+  <text x="772" y="182" fill="#c9d1d9" font-size="11" text-anchor="middle">stop re-litigating it (candidate D27).</text>
+
+  <text x="128" y="42" fill="#8b949e" font-size="11" text-anchor="middle">you hit this one immediately</text>
+  <text x="450" y="42" fill="#8b949e" font-size="11" text-anchor="middle">you hit this one only on the logic route</text>
+  <text x="772" y="42" fill="#8b949e" font-size="11" text-anchor="middle">you never hit this one at all</text>
+
+  <text x="450" y="222" fill="#8b949e" font-size="11.5" text-anchor="middle">The limit is made of <tspan fill="#f85149" font-weight="700">linguistic pragmatics</tspan>, not incompleteness — which means it is engineered against span-by-span, never abolished.</text>
+</svg>
+<p class="cap">This independently confirms your curriculum map's own triangulation ("the Gödel/Löb ceiling is
+usually over-invoked") — the swarm was licensed to be deflationary and it was, with the same conclusion
+from a different direction. Your map's clusters 1–2 (natural logic, veridicality) did the real work;
+cluster 11 (provability logic) returned an honest null.</p>
+</div>
+
+<div class="card warn">
+<b>The load-bearing honesty note (the synthesis's own words, sharpened):</b> the $2,000,000 sentence is
+<b>synthetic</b> — nothing shaped like it occurs in either golden corpus. The <i>actual</i> false-premise
+trap in the golden set ("did total assets decline?") is refuted by <b>arithmetic in a table row</b>,
+which no negation/veridicality machinery touches. That's why the staircase starts with a
+<b>measurement</b>: before spending a gate on lexically-marked refutation, find out whether it exists
+in real filings and patents at any meaningful rate.
+</div>
+
+<!-- ── the funnel ── -->
+<h2>2 · The funnel — 42 candidates in, zero clean survivors</h2>
+
+<div class="fig">
+<svg viewBox="0 0 900 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Funnel: 8 lenses produced 42 candidates, hostile review refuted all 42, and the synthesis salvaged demoted cores into a three-rung staircase.">
+  <rect x="8" y="30" width="180" height="120" rx="9" fill="#1c2230" stroke="#30363d"/>
+  <text x="98" y="56" fill="#c9d1d9" font-size="13" text-anchor="middle" font-weight="700">8 lenses</text>
+  <text x="98" y="78" fill="#8b949e" font-size="10.5" text-anchor="middle">natural logic · veridicality</text>
+  <text x="98" y="93" fill="#8b949e" font-size="10.5" text-anchor="middle">logical form · SMT/proofs</text>
+  <text x="98" y="108" fill="#8b949e" font-size="10.5" text-anchor="middle">conformal · Gödel-Löb</text>
+  <text x="98" y="123" fill="#8b949e" font-size="10.5" text-anchor="middle">decomposition · discourse</text>
+  <text x="98" y="142" fill="#8b949e" font-size="10" text-anchor="middle" font-style="italic">= your curriculum's 8 clusters</text>
+
+  <path d="M188 90 L240 90" stroke="#8b949e" stroke-width="1.5" marker-end="url(#m)"/>
+  <rect x="244" y="48" width="150" height="84" rx="9" fill="#1c2230" stroke="#58a6ff"/>
+  <text x="319" y="82" fill="#58a6ff" font-size="20" text-anchor="middle" font-weight="700">42</text>
+  <text x="319" y="104" fill="#c9d1d9" font-size="11" text-anchor="middle">candidate techniques</text>
+
+  <path d="M394 90 L446 90" stroke="#8b949e" stroke-width="1.5" marker-end="url(#m)"/>
+  <rect x="450" y="36" width="180" height="108" rx="9" fill="#2a1215" stroke="#f85149" stroke-width="1.5"/>
+  <text x="540" y="62" fill="#f85149" font-size="12" text-anchor="middle" font-weight="700">hostile review</text>
+  <text x="540" y="84" fill="#c9d1d9" font-size="10.5" text-anchor="middle">one Opus critic per candidate,</text>
+  <text x="540" y="99" fill="#c9d1d9" font-size="10.5" text-anchor="middle">default verdict: refuted</text>
+  <text x="540" y="126" fill="#f85149" font-size="16" text-anchor="middle" font-weight="700">0 survive clean</text>
+
+  <path d="M630 90 L682 90" stroke="#8b949e" stroke-width="1.5" marker-end="url(#m)"/>
+  <rect x="686" y="48" width="206" height="84" rx="9" fill="#0f2417" stroke="#3fb950" stroke-width="1.5"/>
+  <text x="789" y="74" fill="#3fb950" font-size="12" text-anchor="middle" font-weight="700">demoted cores salvaged</text>
+  <text x="789" y="96" fill="#c9d1d9" font-size="10.5" text-anchor="middle">each stripped to the smaller claim</text>
+  <text x="789" y="111" fill="#c9d1d9" font-size="10.5" text-anchor="middle">the evidence actually supports</text>
+
+  <text x="450" y="186" fill="#8b949e" font-size="11.5" text-anchor="middle">“0 of 42” is the system working, not failing: the swarm was built default-refute, and the negative results</text>
+  <text x="450" y="202" fill="#8b949e" font-size="11.5" text-anchor="middle">(33 named techniques, each with its concrete failure mode) are what stop us re-buying these ideas later.</text>
+  <defs><marker id="m" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#8b949e"/></marker></defs>
+</svg>
+<p class="cap">Recurring kill-reasons, worth knowing by name: <b>a model on the deciding path</b> (breaks I6 —
+the most common); <b>fails in the forbidden direction</b> (passes a bad answer rather than blocking a good
+one — e.g. NLI's documented numeric blind spot, ~43% of its false positives, landing exactly on ATTEST's
+flagship class); <b>marginal ≠ per-answer</b> (conformal's guarantee averages over a population and is
+provably silent about your one catastrophic query); <b>benchmark-to-real collapse</b> (10-word clean-parse
+sentences vs. a 300-page filing).</p>
+</div>
+
+<!-- ── the staircase ── -->
+<h2>3 · The staircase — what ATTEST could actually build</h2>
+
+<div class="fig">
+<svg viewBox="0 0 900 290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three-rung staircase: rung 1 measurement, rung 2 the single Layer-0 guarantee, rung 3 Layer-E yardstick; rung 0 is do-not-build.">
+  <rect x="8" y="216" width="286" height="62" rx="9" fill="#161b22" stroke="#30363d" stroke-dasharray="4 3"/>
+  <text x="24" y="238" fill="#8b949e" font-size="12" font-weight="700">RUNG 0 — do not build</text>
+  <text x="24" y="256" fill="#c9d1d9" font-size="10.5">“proof-carrying certificates”: already shipped in</text>
+  <text x="24" y="270" fill="#c9d1d9" font-size="10.5">substance (contract + stamps + audit log). Vocabulary, not rigor.</text>
+
+  <rect x="80" y="132" width="286" height="72" rx="9" fill="#12233a" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="96" y="154" fill="#58a6ff" font-size="12" font-weight="700">RUNG 1 — measure first  (candidate D24)</text>
+  <text x="96" y="172" fill="#c9d1d9" font-size="10.5">Deterministic denial-cue scan as a NON-blocking flag +</text>
+  <text x="96" y="186" fill="#c9d1d9" font-size="10.5">corpus census: does cue-marked refutation even OCCUR here?</text>
+  <text x="96" y="199" fill="#8b949e" font-size="10">stdlib regex · gates nothing · decides Rung 2's fate</text>
+
+  <rect x="152" y="44" width="330" height="76" rx="9" fill="#0f2417" stroke="#3fb950" stroke-width="2"/>
+  <text x="168" y="66" fill="#3fb950" font-size="12" font-weight="700">RUNG 2 — the one real guarantee  (candidate D25)</text>
+  <text x="168" y="84" fill="#c9d1d9" font-size="10.5">Cue in scope of the cited figure → verify DOWNGRADES answer</text>
+  <text x="168" y="98" fill="#c9d1d9" font-size="10.5">to partial/abstain. Deterministic, model-free, one-directional.</text>
+  <text x="168" y="112" fill="#8b949e" font-size="10">converts a Layer-E residual → Layer-0 GUARANTEE · minor contract bump</text>
+
+  <rect x="556" y="44" width="336" height="76" rx="9" fill="#2a2412" stroke="#d29922" stroke-width="1.5"/>
+  <text x="572" y="66" fill="#d29922" font-size="12" font-weight="700">RUNG 3 — measure the permanent hole  (candidate D26)</text>
+  <text x="572" y="84" fill="#c9d1d9" font-size="10.5">The existing Layer-E entailment judges quantify how much</text>
+  <text x="572" y="98" fill="#c9d1d9" font-size="10.5">cue-LESS refutation slips past Rung 2. Billed, offline,</text>
+  <text x="572" y="112" fill="#c9d1d9" font-size="10.5">never a gate. Reads as a FLOOR on the residual, not a truth.</text>
+
+  <path d="M294 247 L80 200 M366 168 L152 122 M482 82 L554 82" stroke="#8b949e" stroke-width="1.2" stroke-dasharray="4 3"/>
+
+  <text x="20" y="30" fill="#8b949e" font-size="11">gate condition for each step up: the rung below proved it worth the answer-rate cost</text>
+  <text x="450" y="288" fill="#8b949e" font-size="10.5" text-anchor="middle">The cue list must EXCLUDE attribution verbs (reported/claimed/stated) — they are the corpora's own assertion vocabulary; including them fires on nearly every good citation.</text>
+</svg>
+<p class="cap"><b>Why the one-directionality matters so much:</b> Rung 2 can only move outcomes <i>toward</i>
+abstention. It can wrongly block a good answer (recoverable, and measured by Rung 1 before we ship it);
+it can never wrongly pass a bad one. That's the same precision-over-recall trade the coverage gate made
+in run 2 — and it's what makes it a legal <i>monotonic strengthening</i> under the truth contract rather
+than a redesign.</p>
+</div>
+
+<table>
+<tr><th>Candidate</th><th>What it changes</th><th>Status</th><th>Contract</th></tr>
+<tr><td><b>D24</b> cue-scan as measurement + advisory flag</td><td>learns the real base rate; gates nothing</td><td><span class="pill p-meas">MEASURED</span></td><td>no bump</td></tr>
+<tr><td><b>D25</b> cue-scan promoted to abstain-trigger</td><td>the marked-refutation slice becomes guaranteed</td><td><span class="pill p-hard">GUARANTEED</span></td><td>minor bump (strengthening)</td></tr>
+<tr><td><b>D26</b> NLI/veridicality stays Layer-E only</td><td>quantifies the permanent cue-less hole</td><td><span class="pill p-meas">MEASURED</span></td><td>no bump (runtime use = major)</td></tr>
+<tr><td><b>D27</b> GL + general FOL recorded inapplicable</td><td>stops re-litigation; documentary</td><td><span class="pill p-no">CLOSED</span></td><td>no bump</td></tr>
+</table>
+<p class="mut">All four are <b>candidates</b> awaiting your triage — the research doc authorizes no work
+(same rule as the landscape doc). The synthesis also specifies the full testing protocol per rung:
+fixture tables asserted exactly, benign-span false-positive gates as the load-bearing tests, zero
+golden-label flips (the frozen oracle), and the upgrade ratchet applied mechanically.</p>
+
+<div class="card ok">
+<b>What this bought, in one paragraph.</b> Before the swarm, "can we catch refuted citations?" was an
+open anxiety. Now it has a shape: <b>one small deterministic win is available</b> (marked, span-local
+denials → forced abstention), <b>its cost must be measured before it ships</b> (D24 before D25), <b>the
+rest of the hole is permanent and quantifiable</b> (D26), and <b>the two seductive big-gun routes —
+logic engines and per-answer statistical certificates — are closed with reasons</b> that took 42
+adversarial reviews to earn (D27). The most valuable output is the negative space: 33 named techniques
+we now never have to argue about again.
+</div>
+
+<p class="foot">Companion to <a href="provability_research.md" style="color:var(--acc)">the full synthesis</a> ·
+swarm run <code>wf_0522ac48-3e1</code>, 2026-07-16 · 51 Opus 4.8 agents, 8 lenses, 42 candidates, 0 clean
+survivors · candidate rows D24–D27 pending triage · <b>last verified 2026-07-16</b>.</p>
+
+</div>
+</body>
+</html>
