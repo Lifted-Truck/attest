@@ -377,8 +377,14 @@ _FIG_CAPTION = re.compile(
     r"comprises?|represents?)\b",
     re.IGNORECASE,
 )
-# Any FIG reference (offset-bearing), incl. "FIGS. 4-5" and "FIG.5".
-_FIG_REF = re.compile(r"FIGS?\.?\s*(\d+[A-Z]?)(?:\s*[-–]\s*(\d+[A-Z]?))?", re.IGNORECASE)
+# Any FIG reference (offset-bearing), incl. "FIGS. 4-5", "FIG.5", and the
+# letter-range form "FIGS. 3 A-C" (US5447630A's own caption style — the space
+# split an earlier regex into a phantom bare "3").
+_FIG_REF = re.compile(
+    r"FIGS?\.?\s*(\d+)\s?([A-Z])\s*[-–]\s*([A-Z])\b"     # 3 A-C  → letter range
+    r"|FIGS?\.?\s*(\d+[A-Z]?)(?:\s*[-–]\s*(\d+[A-Z]?))?",  # 4-5 / 5 / 3A
+    re.IGNORECASE,
+)
 # Numeral first mention: "<element phrase> N" — 1–3 words naming the element, then the
 # number. Leading article stripped; a preposition/adverb right before the number is not
 # an element (drops "shown at 18", "generally by reference numeral 26").
@@ -468,9 +474,14 @@ def figure_references(text: str) -> list[FigureRef]:
     is in view."""
     out: list[FigureRef] = []
     for m in _FIG_REF.finditer(text):
-        out.append(FigureRef(m.group(1), m.start(), m.end()))
-        if m.group(2):                                 # "FIGS. 4-5" → also the 5
-            out.append(FigureRef(m.group(2), m.start(), m.end()))
+        if m.group(1):                                 # "FIGS. 3 A-C" → 3A, 3B, 3C
+            num, lo, hi = m.group(1), m.group(2).upper(), m.group(3).upper()
+            for letter in (chr(c) for c in range(ord(lo), ord(hi) + 1)):
+                out.append(FigureRef(f"{num}{letter}", m.start(), m.end()))
+        else:
+            out.append(FigureRef(m.group(4), m.start(), m.end()))
+            if m.group(5):                             # "FIGS. 4-5" → also the 5
+                out.append(FigureRef(m.group(5), m.start(), m.end()))
     return out
 
 

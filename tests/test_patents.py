@@ -291,3 +291,13 @@ def test_figures_validate_on_the_real_patent():
     assert "microwave reactor chamber" in nums[12]
     assert "ceramic filter material" in nums[38]
     assert "necked portion" in nums[89]
+
+
+def test_figure_reference_letter_range_expands():
+    """Regression (D28 work): "FIGS. 3 A-C" (US5447630A's own caption style) must
+    expand to 3A/3B/3C — an earlier regex read it as a phantom bare "3", which
+    blocked the FIG→sheet elimination."""
+    from attest.patents import figure_references
+    refs = figure_references("as shown in FIGS. 3 A-C are respective views; see FIG. 4.")
+    assert [r.number for r in refs] == ["3A", "3B", "3C", "4"]
+    assert "3" not in {r.number for r in refs}

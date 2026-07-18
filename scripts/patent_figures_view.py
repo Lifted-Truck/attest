@@ -31,6 +31,12 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
+from attest.figures_map import (
+    element_numeral_issues,
+    fig_to_sheets,
+    load_manifest,
+    numeral_sightings,
+)
 from attest.ingest import DocumentStore
 from attest.patents import (
     figure_references,
@@ -99,6 +105,11 @@ padding:4px 9px;font-size:12.5px;cursor:pointer;transition:.12s;white-space:nowr
 .num.dim{{opacity:.28}}
 .num b{{color:var(--num);font-family:ui-monospace,monospace}}
 .num .fg{{color:var(--fig);font-family:ui-monospace,monospace;font-size:11px;margin-left:4px}}
+.sh{{color:var(--num);font-family:ui-monospace,monospace;font-size:10.5px;margin-left:5px;
+cursor:pointer;border:1px solid var(--bd);border-radius:4px;padding:0 4px}}
+.sh:hover{{border-color:var(--num)}}
+.pe2{{color:var(--mut);font-size:12px;line-height:1.55;padding-left:18px;margin:0}}
+.pe2 li{{margin:0 0 6px}}
 #ctx{{position:sticky;bottom:0;background:#0b0f16f2;border:1px solid var(--bd);
 border-radius:8px;padding:11px 13px;font-size:12.5px;min-height:20px;color:var(--mut)}}
 #ctx b{{color:var(--tx);background:#243; padding:0 2px;border-radius:3px}}
@@ -113,6 +124,7 @@ border-radius:8px;padding:11px 13px;font-size:12.5px;min-height:20px;color:var(-
     <h2 style="margin-top:20px">Reference numerals ({nnums})</h2>
     <div class="legend" id="legend">{nums}</div>
     <div id="ctx">Click a numeral to see where it is first named; click a figure to filter.</div>
+    {issues}
     <p class="note">{note}</p>
   </div>
 </div>
@@ -134,6 +146,11 @@ function filter(fig){{
 document.querySelectorAll('.fig').forEach(f=>f.addEventListener('click',()=>filter(f.dataset.fig)));
 document.querySelectorAll('.num').forEach(n=>n.addEventListener('click',()=>{{
   ctx.innerHTML = CTX[n.dataset.n] || '(no context)';
+}}));
+document.querySelectorAll('.sh').forEach(t=>t.addEventListener('click',e=>{{
+  e.stopPropagation();
+  const el=document.getElementById('sheet-'+t.dataset.page);
+  if(el) el.scrollIntoView({{behavior:'smooth', block:'start'}});
 }}));
 </script>
 </body></html>"""
@@ -159,8 +176,19 @@ def main() -> int:
         return 1
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
+    # D28: the OCR manifest (if present) supplies FIG→sheet + numeral→sheet ground
+    # truth; without it the view falls back to text-proximity tags alone.
+    assignments, sightings_by_num, pe2_issues = {}, {}, []
+    if (fig_dir / "ocr_manifest.json").exists():
+        ocr = load_manifest(ns.store)
+        known = sorted({f.number for f in figs} | {r.number for r in refs})
+        assignments = {a.fig: a for a in fig_to_sheets(ocr, known)}
+        for s in numeral_sightings(ocr):
+            sightings_by_num.setdefault(s.numeral, []).append(s)
+        pe2_issues = element_numeral_issues(nums, ocr)
+
     sheets_html = "".join(
-        f'<div class="sheet"><div class="cap">sheet · page {s["page"]} '
+        f'<div class="sheet" id="sheet-{s["page"]}"><div class="cap">sheet · page {s["page"]} '
         f'· sha256 {s["sha256"][:12]}…</div>'
         f'<img loading="lazy" alt="drawing sheet page {s["page"]}" '
         f'src="{data_uri(fig_dir / s["file"])}"></div>'
@@ -168,8 +196,19 @@ def main() -> int:
     )
     def _cap_body(f):                                   # caption text minus the "FIG. N is" lead
         return html.escape(f.description.split(" ", 3)[-1] if f.description else "")
+    def _sheet_tag(fig_number: str) -> str:
+        a = assignments.get(fig_number)
+        if not a:
+            return ""
+        how = f"OCR conf {a.confidence}" if a.method == "ocr" else "by elimination"
+        return (f' <span class="sh" data-page="{a.page}" title="{how}">'
+                f"sheet p.{a.page}{'*' if a.method != 'ocr' else ''}</span>")
+    def _page_of(fig_number: str) -> str:
+        a = assignments.get(fig_number)
+        return str(a.page) if a else ""
     figs_html = "".join(
-        f'<div class="fig" data-fig="{f.number}"><span class="fl">{f.label}</span>'
+        f'<div class="fig" data-fig="{f.number}" data-page="{_page_of(f.number)}">'
+        f'<span class="fl">{f.label}</span>{_sheet_tag(f.number)}'
         f'<div class="fd">{_cap_body(f)}</div></div>'
         for f in figs
     )
@@ -178,23 +217,32 @@ def main() -> int:
         fig = numeral_figure(n.char_start, refs)
         ctx_json[str(n.number)] = snippet(text, n.char_start, n.char_end)
         fg = f'<span class="fg">FIG. {fig}</span>' if fig else ""
+        pages = sorted({s.page for s in sightings_by_num.get(n.number, [])})
+        located = "".join(f'<span class="sh" data-page="{p}">p.{p}</span>' for p in pages)
         nums_html.append(
             f'<span class="num" data-n="{n.number}" data-fig="{fig or ""}">'
-            f'<b>{n.number}</b> {html.escape(n.element)}{fg}</span>'
+            f'<b>{n.number}</b> {html.escape(n.element)}{fg}{located}</span>'
         )
+    issues_html = ""
+    if pe2_issues:
+        rows = "".join(f'<li>{html.escape(i["message"])}</li>' for i in pe2_issues)
+        issues_html = (f'<h2 style="margin-top:20px">Structural review — element/numeral '
+                       f'({len(pe2_issues)})</h2><ul class="pe2">{rows}</ul>')
     note = (
         "Drawings are <i>displayed evidence</i>, not text citations (truth-contract D21): "
         "grounding binds a claim to the text that recites a numeral; the sheet rides alongside. "
-        "The FIG. N tag on a numeral is where it is <i>first discussed</i> in the text (nearest "
-        "reference), a locate-only aid (D10) — not a claim about what the figure depicts. "
-        "Element phrases and sub-figure captions are heuristic; refinable."
+        "The FIG. N tag on a numeral is where it is <i>first discussed</i> in the text; a "
+        "<b>p.N</b> tag is where OCR <i>located</i> it on a sheet (D28 — ingestion-time OCR, "
+        "frozen manifest, confidence-carrying, not 100% reliable; * = assigned by elimination). "
+        "Locate-only aids (D10) — never claims about what a figure depicts. The structural-review "
+        "list surfaces facts for a professional; it draws no §112 conclusions."
     )
     page = PAGE.format(
         title=f"{ns.doc} — drawings", h1=f"{ns.doc} · drawings",
         sub=f"{len(manifest['sheets'])} sheets · {len(figs)} figures · "
             f"{len(nums)} reference numerals",
         nsheets=len(manifest["sheets"]), nfigs=len(figs), nnums=len(nums),
-        sheets=sheets_html, figs=figs_html, nums="".join(nums_html),
+        sheets=sheets_html, figs=figs_html, nums="".join(nums_html), issues=issues_html,
         ctx_json=json.dumps(ctx_json), note=note,
     )
     Path(ns.out).write_text(page, encoding="utf-8")

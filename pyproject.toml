@@ -20,6 +20,13 @@ dev = [
 mcp = [
   "mcp>=1.0",   # the MCP server adapter (mcp_server.py); not needed for the Layer-0 gate
 ]
+ocr = [
+  # Ingestion-time drawing-sheet OCR (scripts/ocr_patent_figures.py, D28). macOS-only
+  # (Apple Vision, on-device); NEVER a runtime or CI dependency — runtime/CI consume
+  # only the frozen ocr_manifest.json via attest.figures_map.
+  "pyobjc-framework-Vision; sys_platform == 'darwin'",
+  "pyobjc-framework-Quartz; sys_platform == 'darwin'",
+]
 
 [project.scripts]
 attest = "attest.cli:main"
