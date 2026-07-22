@@ -8,3 +8,4 @@ Tags: `gate-discipline` · `corpus-calibration` · `frame-coverage` · `patent-d
 - L0003 · patent-domain, harness-lifecycle · Google Patents serves drawing sheets as thumbnail AND full-res under one name — fetch candidates, keep the largest; verify resolution after download.
 - L0004 · eval-lessons, corpus-calibration · Census a proposed gate's firing condition on the real corpus first; all-benign hits → record the negative result, ship the advisory, don't build the gate.
 - L0005 · patent-domain, corpus-calibration · Patent-sheet OCR traps: D1-D6 dimension labels → phantom numerals; spaced letter-ranges (FIGS. 3 A-C) → phantom figures. Inspect what extraction keeps AND discards.
+- L0006 · corpus-calibration, eval-lessons · A noise filter can delete signal — measure what a floor/filter DISCARDS on real data first (≥10 numerals, denial-cue gate, OCR leader-line confidence: all three deleted real signal). Precision>>recall governs OUTPUT, not input pruning.
