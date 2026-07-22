@@ -45,10 +45,74 @@ OUT = ROOT / "evidence_view.html"
 AUDIT = ROOT / "audit_log" / "agent.jsonl"
 
 
+def _patent_figure_context(store: SpanStore, store_dir: Path):
+    """RT-4 payoff: if the store is a patent engagement with fetched sheets + an OCR
+    manifest, build the FigurePanel catalog (one per OCR-assigned figure, showing its
+    sheet) and the deterministic signals `relevant_figures` needs. Returns None for a
+    non-patent / un-OCR'd store, so the main view stays inert (EDGAR unaffected)."""
+    import base64
+    import json
+
+    from attest.evidence_view import FigurePanel
+    from attest.figures_map import fig_to_sheets, load_manifest, numeral_sightings
+    from attest.patents import figure_references, parse_figures, reference_numerals
+
+    fig_dir = store_dir.parent / "figures"
+    if not ((fig_dir / "ocr_manifest.json").exists()
+            and (fig_dir / "figures_manifest.json").exists()):
+        return None
+    ocr = load_manifest(store_dir)
+    sheet_file = {s["page"]: fig_dir / s["file"]
+                  for s in json.loads((fig_dir / "figures_manifest.json").read_text())["sheets"]}
+
+    doc_id = next((d for d in store._docs if parse_figures(store.get_document(d))), None)
+    if doc_id is None:
+        return None
+    text = store.get_document(doc_id)
+    figs = parse_figures(text)
+    caption = {f.number: f.description for f in figs}
+    known_figs = sorted({f.number for f in figs} | {r.number for r in figure_references(text)})
+    assigns = fig_to_sheets(ocr, known_figs)
+
+    panels = []
+    for a in assigns:
+        img = sheet_file.get(a.page)
+        if img is None:
+            continue
+        how = (f"located by OCR, conf {a.confidence}" if a.method == "ocr"
+               else "assigned by elimination")
+        uri = "data:image/png;base64," + base64.b64encode(img.read_bytes()).decode()
+        panels.append(FigurePanel(f"FIG. {a.fig}",
+                                  f"{caption.get(a.fig, '')} — sheet p.{a.page} ({how})", uri))
+    return {"panels": panels, "assigns": assigns,
+            "sightings": numeral_sightings(ocr),
+            "known_numerals": [n.number for n in reference_numerals(text)]}
+
+
+def _attach_figures(interactions, store: SpanStore, ctx) -> None:
+    """Set each interaction's `.figures` from the figures its cited spans point at
+    (RT-4). Display-only (D21): nothing here is verified; a spurious panel is a glance."""
+    from attest.figures_map import relevant_figures
+    for inter in interactions:
+        if inter.answer is None:
+            continue
+        spans = []
+        for s in inter.answer.sentences:
+            for atom in list(s.atoms) + [o for d in s.derived for o in d.operands]:
+                sp = store.span_containing(atom.doc_id, atom.char_start)
+                if sp is not None:
+                    spans.append(sp.text)
+        inter.figures = [f"FIG. {n}" for n in relevant_figures(
+            spans, ctx["assigns"], ctx["sightings"], ctx["known_numerals"])]
+
+
 def build_from_audit(audit_path: Path, out: Path, last: int = 0,
                      session: int | None = None, list_sessions: bool = False,
                      store_dir: Path | None = None) -> int:
-    store = SpanStore.from_store(DocumentStore(store_dir or ROOT / "corpus" / "store"))
+    store_dir = store_dir or ROOT / "corpus" / "store"
+    store = SpanStore.from_store(DocumentStore(store_dir))
+    fig_ctx = _patent_figure_context(store, Path(store_dir))
+    fig_panels = fig_ctx["panels"] if fig_ctx else None
     if not audit_path.exists():
         print(f"No audit log at {audit_path} — run a live session first "
               "(or scripts/run_layer_e.py).")
@@ -70,8 +134,10 @@ def build_from_audit(audit_path: Path, out: Path, last: int = 0,
             return 1
         g = groups[idx]
         title = f"ATTEST — session: {g['label']}" + (f" · {g['ts']}" if g["ts"] else "")
-        out.write_text(render_evidence_view(g["interactions"], store, title=title),
-                       encoding="utf-8")
+        if fig_ctx:
+            _attach_figures(g["interactions"], store, fig_ctx)
+        out.write_text(render_evidence_view(g["interactions"], store, title=title,
+                                            figures=fig_panels), encoding="utf-8")
         print(f"OK — wrote {out} (session {idx + 1}/{len(groups)} "
               f"'{g['label']}', {len(g['interactions'])} interaction(s))")
         return 0
@@ -83,9 +149,13 @@ def build_from_audit(audit_path: Path, out: Path, last: int = 0,
     total = len(interactions)
     if last > 0:                       # most recent N (the audit log is cumulative)
         interactions = interactions[-last:]
-    out.write_text(render_evidence_view(interactions, store), encoding="utf-8")
+    if fig_ctx:
+        _attach_figures(interactions, store, fig_ctx)
+    out.write_text(render_evidence_view(interactions, store, figures=fig_panels),
+                   encoding="utf-8")
     scope = f" (latest {len(interactions)} of {total})" if len(interactions) != total else ""
-    print(f"OK — wrote {out} ({len(interactions)} interaction(s){scope} from {audit_path})")
+    fig_note = f" · {len(fig_panels)} figure panels" if fig_panels else ""
+    print(f"OK — wrote {out} ({len(interactions)} interaction(s){scope}{fig_note})")
     return 0
 
 TOTAL_ASSETS = "Total assets $ 364,980 $ 352,583"

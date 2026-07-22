@@ -91,3 +91,34 @@ def test_element_numeral_issues_word_the_ocr_caveat():
     for i in issues:                                     # the honesty wording is load-bearing
         assert "indistinguishable" in i["message"] and "review" in i["message"]
         assert "112" not in i["message"] and "invalid" not in i["message"]
+
+
+def _rel(span: str, known=(10, 12, 89, 77)):
+    from attest.figures_map import numeral_sightings, relevant_figures
+    return relevant_figures([span], fig_to_sheets(MANIFEST, KNOWN),
+                            numeral_sightings(MANIFEST), list(known))
+
+
+def test_relevant_figures_by_numeral_and_ref():
+    """RT-4 payoff: a cited span → the figures to show. Numeral 10 → its sheet's
+    figure (1); an explicit FIG. 5 → figure 5; numeral 89 → the elimination-mapped
+    figure 4; the two signals union and sort."""
+    assert _rel("the separator 10, which splits flow") == ["1"]
+    assert _rel("a necked portion 89 is provided") == ["4"]          # elimination-mapped
+    assert _rel("as shown in FIG. 5 in cross-section") == ["5"]
+    assert _rel("separator 10 and FIG. 5") == ["1", "5"]             # union
+
+
+def test_relevant_figures_numeral_boundary():
+    """A numeral must be a STANDALONE integer — not part of a larger/grouped/decimal
+    number. Grouping comma ('10,500') excludes it; punctuation comma ('10, which')
+    does not."""
+    assert _rel("revenue of $10,500 thousand") == []                 # grouped
+    assert _rel("a ratio of 10.5 to one") == []                      # decimal
+    assert _rel("chamber 100 holds") == []                           # 100 ≠ 10
+    assert _rel("the separator 10, however,") == ["1"]               # punctuation comma
+
+
+def test_relevant_figures_unknown_signals_yield_nothing():
+    assert _rel("plain prose with no figure or numeral", known=[10]) == []
+    assert _rel("FIG. 9 does not exist here", known=[10]) == []      # 9 not assigned

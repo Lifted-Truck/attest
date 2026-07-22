@@ -112,6 +112,50 @@ def cross_check_numerals(
     )
 
 
+def relevant_figures(
+    cited_span_texts: list[str],
+    assignments: list[SheetAssignment],
+    sightings: list[NumeralSighting],
+    known_numerals: list[int],
+) -> list[str]:
+    """Which figures should ride beside these cited spans (RT-4's payoff rule).
+
+    Two deterministic signals, union'd:
+    - an explicit ``FIG. N`` reference in a cited span → that figure;
+    - a known reference numeral recited in a cited span → every sheet OCR sighted
+      it on → those sheets' assigned figures.
+
+    Display-only (D21): this selects which drawing panels to SHOW next to the
+    highlighted text — it asserts nothing and nothing here passes through
+    `verify`. The numeral match is a token-boundary heuristic over short
+    line-level spans; a spurious panel costs a glance, a missing one costs
+    nothing (the standalone figures view still has everything).
+    """
+    import re as _re
+
+    assigned = {a.fig for a in assignments}
+    page_to_fig = {a.page: a.fig for a in assignments}
+    num_to_pages: dict[int, set[int]] = {}
+    for s in sightings:
+        num_to_pages.setdefault(s.numeral, set()).add(s.page)
+
+    out: set[str] = set()
+    fig_ref = _re.compile(r"FIGS?\.?\s*(\d+[A-Z]?)", _re.IGNORECASE)
+    for text in cited_span_texts:
+        for m in fig_ref.finditer(text):
+            if m.group(1).upper() in assigned:
+                out.add(m.group(1).upper())
+        for n in known_numerals:
+            # standalone integer n: not inside a larger/grouped/decimal number.
+            # Trailing `,` is allowed as PUNCTUATION ("separator 10, which") but not
+            # as grouping ("10,500") — hence `(?!,\d)`, distinct from `(?![\d.])`.
+            if _re.search(rf"(?<![\d.,]){n}(?![\d.])(?!,\d)", text):
+                for page in num_to_pages.get(n, ()):
+                    if page in page_to_fig:
+                        out.add(page_to_fig[page])
+    return sorted(out, key=lambda f: (len(f), f))
+
+
 def element_numeral_issues(
     numerals, manifest: dict, *, min_confidence: float = 0.0,
 ) -> list[dict]:

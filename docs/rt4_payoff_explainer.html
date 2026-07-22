@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATTEST — figures in the document view: the payoff</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --bd:#30363d; --tx:#c9d1d9;
+    --mut:#8b949e; --acc:#58a6ff; --ok:#3fb950; --warn:#d29922; --bad:#f85149; --fig:#f0883e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+    font:15.5px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  .wrap{max-width:980px;margin:0 auto;padding:32px 24px 90px}
+  h1{font-size:27px;margin:0 0 6px;letter-spacing:-.5px}
+  h2{font-size:20px;margin:40px 0 10px;letter-spacing:-.3px;padding-bottom:7px;border-bottom:1px solid var(--bd)}
+  .lede{color:var(--mut);font-size:16.5px;margin:0 0 16px}
+  p{margin:9px 0}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:.86em;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .card{background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:15px 17px;margin:14px 0}
+  .card.key{border-left:3px solid var(--acc)}
+  .card.warn{border-left:3px solid var(--warn)}
+  .card.ok{border-left:3px solid var(--ok)}
+  .mut{color:var(--mut)}
+  .fig{margin:16px 0;background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:14px}
+  .fig svg{display:block;width:100%;height:auto}
+  .cap{color:var(--mut);font-size:12.5px;margin-top:9px;line-height:1.5}
+  .foot{margin-top:40px;padding-top:14px;border-top:1px solid var(--bd);color:var(--mut);font-size:12.5px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em}
+</style>
+</head>
+<body>
+<h2 class="sr-only">How a cited reference numeral surfaces its drawing in the main evidence view: the two-signal selection rule, and why no confidence floor is applied.</h2>
+<div class="wrap">
+
+<h1>Figures in the document view — the payoff</h1>
+<p class="lede">Click an answer about "the separator 10" and its drawing appears beside the highlighted
+text. This is where the whole figures arc — text model, fetch, OCR, mapping — cashes out.</p>
+
+<div class="card key">
+<b>The whole chain, now closed.</b> The spec text names a part by numeral ("necked portion&nbsp;89").
+The deterministic parser knows numeral 89 is recited. The frozen OCR manifest knows 89 sits on
+sheet&nbsp;p.8. The FIG→sheet map knows p.8 is FIG.&nbsp;5. So when an answer cites a span containing
+"89", the evidence view shows <b>FIG.&nbsp;5's drawing</b> in the document pane — automatically,
+deterministically, and marked as located by OCR.
+</div>
+
+<!-- the chain -->
+<h2>1 · The selection rule — two signals, union'd</h2>
+<div class="fig">
+<svg viewBox="0 0 900 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A cited span feeds two signals: explicit FIG references and recited numerals; numerals resolve through OCR sightings to sheets to figures; the union becomes the panels shown.">
+  <rect x="8" y="80" width="176" height="52" rx="9" fill="#12233a" stroke="#58a6ff"/>
+  <text x="96" y="102" fill="#58a6ff" font-size="12" text-anchor="middle" font-weight="700">a cited span</text>
+  <text x="96" y="120" fill="#c9d1d9" font-size="10.5" text-anchor="middle">"…necked portion 89…"</text>
+
+  <path d="M184 96 L224 70" stroke="#8b949e" stroke-width="1.4" marker-end="url(#a)"/>
+  <path d="M184 116 L224 142" stroke="#8b949e" stroke-width="1.4" marker-end="url(#a)"/>
+
+  <rect x="228" y="44" width="220" height="52" rx="9" fill="#2a1a0d" stroke="#f0883e"/>
+  <text x="338" y="66" fill="#f0883e" font-size="11.5" text-anchor="middle" font-weight="700">explicit "FIG. N"</text>
+  <text x="338" y="84" fill="#c9d1d9" font-size="10" text-anchor="middle">→ that figure, if it's known</text>
+
+  <rect x="228" y="116" width="220" height="60" rx="9" fill="#0f2417" stroke="#3fb950"/>
+  <text x="338" y="137" fill="#3fb950" font-size="11.5" text-anchor="middle" font-weight="700">a recited numeral (89)</text>
+  <text x="338" y="154" fill="#c9d1d9" font-size="10" text-anchor="middle">standalone integer — not 89.5,</text>
+  <text x="338" y="168" fill="#c9d1d9" font-size="10" text-anchor="middle">not 189, not 8,900</text>
+
+  <path d="M448 146 L488 146" stroke="#8b949e" stroke-width="1.4" marker-end="url(#a)"/>
+  <rect x="492" y="120" width="150" height="52" rx="9" fill="#1c2230" stroke="#30363d"/>
+  <text x="567" y="142" fill="#c9d1d9" font-size="11" text-anchor="middle">OCR sighting</text>
+  <text x="567" y="159" fill="#8b949e" font-size="10" text-anchor="middle">89 → sheet p.8</text>
+
+  <path d="M642 146 L682 146" stroke="#8b949e" stroke-width="1.4" marker-end="url(#a)"/>
+  <rect x="686" y="120" width="150" height="52" rx="9" fill="#1c2230" stroke="#30363d"/>
+  <text x="761" y="142" fill="#c9d1d9" font-size="11" text-anchor="middle">FIG→sheet map</text>
+  <text x="761" y="159" fill="#8b949e" font-size="10" text-anchor="middle">p.8 → FIG. 5</text>
+
+  <path d="M448 70 C 640 70, 700 100, 748 118" stroke="#8b949e" stroke-width="1.2" fill="none" marker-end="url(#a)"/>
+
+  <rect x="686" y="40" width="150" height="52" rx="9" fill="#1a1430" stroke="#a371f7" stroke-width="1.5"/>
+  <text x="761" y="62" fill="#a371f7" font-size="11.5" text-anchor="middle" font-weight="700">PANELS SHOWN</text>
+  <text x="761" y="80" fill="#c9d1d9" font-size="10" text-anchor="middle">the sorted union</text>
+  <path d="M761 118 L761 94" stroke="#8b949e" stroke-width="1.4" marker-end="url(#a)"/>
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#8b949e"/></marker></defs>
+</svg>
+<p class="cap">All of this is a <b>pure function</b> (<code>figures_map.relevant_figures</code>) over the
+cited text + the frozen manifest — same inputs, same panels (I6). It is display-only: nothing here
+passes through <code>verify</code>, and a spurious panel costs a glance, never a wrong citation (D21).</p>
+</div>
+
+<!-- the honest call -->
+<h2>2 · The judgment call: no confidence floor</h2>
+<div class="card warn">
+<b>The tempting mistake I didn't make.</b> OCR reads the flagship numeral 89 as <code class="mono">"89-"</code>
+at confidence <b>0.3</b> — the leader line (the little arrow from the number to the part) fuses with the
+digit and drags the score down. My first instinct was to floor low-confidence sightings as noise. But
+<b>that instinct is backwards here</b>: on a patent drawing, <i>almost every real reference numeral has a
+leader line</i>, so the low-confidence reads are the <b>real numerals</b>, not the noise. A 0.5 floor
+would have deleted 89→FIG.&nbsp;5 — the exact payoff — while removing almost nothing spurious.
+</div>
+<div class="card ok">
+<b>What I did instead.</b> No floor on recall; surface the OCR provenance on every panel instead
+(<span class="mono">"located by OCR, conf 0.5"</span> in the caption). A reviewer sees the drawing <i>and</i>
+how confidently it was placed, and the dedicated figures view (<code>patent_figures_view.py</code>) carries
+the full per-numeral confidence detail. <b>This is the same lesson as the ≥10-floor bug and the
+denial-cue census, a third time: a filter that looks like it removes noise can be quietly deleting the
+signal — so measure what it discards before trusting it.</b>
+</div>
+
+<!-- boundary -->
+<h2>3 · The boundary held throughout</h2>
+<table style="border-collapse:collapse;width:100%;font-size:13.5px;margin:12px 0">
+<tr><td style="border:1px solid var(--bd);padding:8px 10px;color:var(--mut)">the grounding</td>
+<td style="border:1px solid var(--bd);padding:8px 10px">still binds every claim to the <b>text</b> that recites the numeral — unchanged</td></tr>
+<tr><td style="border:1px solid var(--bd);padding:8px 10px;color:var(--mut)">the drawing</td>
+<td style="border:1px solid var(--bd);padding:8px 10px"><b>displayed evidence</b> (D21) — shown alongside, carries no span, never <code>verify</code>-checked</td></tr>
+<tr><td style="border:1px solid var(--bd);padding:8px 10px;color:var(--mut)">EDGAR</td>
+<td style="border:1px solid var(--bd);padding:8px 10px">unaffected — no manifests, so the figure path is inert; the 10-K view is byte-identical</td></tr>
+<tr><td style="border:1px solid var(--bd);padding:8px 10px;color:var(--mut)">CI</td>
+<td style="border:1px solid var(--bd);padding:8px 10px">the selection rule is hermetically tested over a synthetic manifest; no local images needed</td></tr>
+</table>
+
+<div class="card key">
+<b>RT-4 is complete.</b> "Diagrams visible in the document view" — the thing you flagged as imperative
+for real patent work — now happens automatically, per cited answer, with honest OCR provenance, and
+without touching the determinism guarantee or the EDGAR build. The arc that started with a text-only
+figure parser and hit a wall at "which sheet is FIG. 4 on?" is closed.
+</div>
+
+<p class="foot">Step explainer · companions:
+<a href="ocr_explainer.html" style="color:var(--acc)">the OCR mechanism</a> ·
+<a href="rt4_and_next_steps.html" style="color:var(--acc)">the RT-4 story</a> ·
+<a href="system_overview.html" style="color:var(--acc)">system overview</a> ·
+182 Layer-0 tests green · <b>last verified 2026-07-22</b>.</p>
+
+</div>
+</body>
+</html>
