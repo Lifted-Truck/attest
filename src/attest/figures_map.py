@@ -39,6 +39,8 @@ class NumeralSighting:
     page: int
     confidence: float
     source_text: str          # the raw OCR text the digits came from ("-82" → 82)
+    # (x, y, w, h) normalized, origin bottom-left — for the confirmation box overlay:
+    bbox: tuple[float, float, float, float] | None = None
 
 
 def load_manifest(store_dir: str | Path) -> dict:
@@ -75,12 +77,32 @@ def fig_to_sheets(manifest: dict, known_figs: list[str]) -> list[SheetAssignment
 def numeral_sightings(manifest: dict, *, min_confidence: float = 0.0) -> list[NumeralSighting]:
     """Every numeral candidate OCR located on any sheet (optionally floored by
     confidence). Located-by-OCR facts — display/review evidence only."""
-    out = [
-        NumeralSighting(n["numeral"], page["page"], n["confidence"], n["source_text"])
-        for page in manifest["pages"] for n in page["numerals"]
-        if n["confidence"] >= min_confidence
-    ]
+    out = []
+    for page in manifest["pages"]:
+        for n in page["numerals"]:
+            if n["confidence"] < min_confidence:
+                continue
+            bbox = ((n["x"], n["y"], n["w"], n["h"])
+                    if all(k in n for k in ("x", "y", "w", "h")) else None)
+            out.append(NumeralSighting(n["numeral"], page["page"], n["confidence"],
+                                       n["source_text"], bbox))
     return sorted(out, key=lambda s: (s.page, s.numeral))
+
+
+def numeral_figures(
+    assignments: list[SheetAssignment], sightings: list[NumeralSighting],
+) -> dict[int, list[str]]:
+    """For every numeral, ALL figures it is OCR-located in (a numeral shared across
+    figures — "the separator 10" appears in FIGS. 1, 2, 5 — surfaces all of them,
+    not just the first text mention). Figures are ordered as assigned; a sighting on
+    an unassigned sheet contributes nothing (no figure to name). Locate-only."""
+    page_to_fig = {a.page: a.fig for a in assignments}
+    out: dict[int, list[str]] = {}
+    for s in sightings:
+        fig = page_to_fig.get(s.page)
+        if fig and fig not in out.setdefault(s.numeral, []):
+            out[s.numeral].append(fig)
+    return {n: sorted(figs, key=lambda f: (len(f), f)) for n, figs in out.items()}
 
 
 @dataclass(frozen=True)

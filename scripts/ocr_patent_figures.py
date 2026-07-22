@@ -90,7 +90,10 @@ def derive(observations: list[dict]) -> dict:
         for run in _DIGIT_RUN.findall(o["text"]):
             numerals.append({
                 "numeral": int(run), "source_text": o["text"],
-                "confidence": o["confidence"], "x": o["x"], "y": o["y"],
+                "confidence": o["confidence"],
+                # full normalized bbox (origin bottom-left) — carried through so the
+                # figures view can draw a confirmation box around the located numeral.
+                "x": o["x"], "y": o["y"], "w": o["w"], "h": o["h"],
             })
     return {"fig_labels": figs, "sheet_id": sheet_id, "numerals": numerals}
 

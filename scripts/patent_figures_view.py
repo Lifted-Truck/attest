@@ -35,6 +35,7 @@ from attest.figures_map import (
     element_numeral_issues,
     fig_to_sheets,
     load_manifest,
+    numeral_figures,
     numeral_sightings,
 )
 from attest.ingest import DocumentStore
@@ -91,7 +92,18 @@ h2{{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut)
 margin:0 0 12px;font-weight:700}}
 .sheet{{margin:0 0 16px}}
 .sheet .cap{{font-size:11px;color:var(--mut);font-family:ui-monospace,monospace;margin-bottom:5px}}
+.imgwrap{{position:relative;line-height:0}}
 .sheet img{{width:100%;border:1px solid var(--bd);border-radius:8px;background:#fff;display:block}}
+.ov{{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}}
+.ov .bx{{fill:none;stroke:transparent;stroke-width:0.006}}
+.ov .bx.on{{stroke:#ff3b30;fill:rgba(255,59,48,0.16)}}
+.toggle{{font:inherit;font-size:11px;margin-left:8px;background:var(--panel2);color:var(--num);
+border:1px solid var(--bd);border-radius:6px;padding:2px 9px;cursor:pointer;vertical-align:middle}}
+.toggle:hover{{border-color:var(--num)}}
+.mut{{color:var(--mut)}}
+.only-all{{display:none}}
+body.mode-all .only-all{{display:inline}}
+body.mode-all .only-first{{display:none}}
 .fig{{background:var(--panel);border:1px solid var(--bd);border-left:3px solid var(--fig);
 border-radius:8px;padding:11px 13px;margin:0 0 9px;cursor:pointer;transition:.12s}}
 .fig:hover{{border-color:var(--fig)}}
@@ -121,7 +133,10 @@ border-radius:8px;padding:11px 13px;font-size:12.5px;min-height:20px;color:var(-
   <div class="pane left"><h2>Drawing sheets ({nsheets})</h2>{sheets}</div>
   <div class="pane right">
     <h2>Figures ({nfigs})</h2>{figs}
-    <h2 style="margin-top:20px">Reference numerals ({nnums})</h2>
+    <h2 style="margin-top:20px">Reference numerals ({nnums})
+      <button id="mode" class="toggle"
+        title="nearest text mention vs every figure it appears in">show: first discussed</button>
+    </h2>
     <div class="legend" id="legend">{nums}</div>
     <div id="ctx">Click a numeral to see where it is first named; click a figure to filter.</div>
     {issues}
@@ -130,28 +145,41 @@ border-radius:8px;padding:11px 13px;font-size:12.5px;min-height:20px;color:var(-
 </div>
 <script>
 const CTX = {ctx_json};
-const legend = document.getElementById('legend');
 const ctx = document.getElementById('ctx');
 let selFig = null;
+// a numeral matches a figure if it's the first-discussed OR (all-mode) among all its figures
+function matches(n, fig){{
+  return n.dataset.fig===fig || (n.dataset.figs||'').split(',').includes(fig);
+}}
 function filter(fig){{
   selFig = (selFig===fig)?null:fig;
   document.querySelectorAll('.fig').forEach(f=>f.classList.toggle('sel', f.dataset.fig===selFig));
-  document.querySelectorAll('.num').forEach(n=>{{
-    const show = !selFig || n.dataset.fig===selFig;
-    n.classList.toggle('dim', !show);
-  }});
-  ctx.innerHTML = selFig ? `Showing numerals first discussed with <b>FIG. ${{selFig}}</b>.`
-    : 'Click a numeral to see where it is first named; click a figure to filter.';
+  document.querySelectorAll('.num').forEach(n=>
+    n.classList.toggle('dim', selFig && !matches(n, selFig)));
+  ctx.innerHTML = selFig ? `Numerals appearing in <b>FIG. ${{selFig}}</b> (undimmed).`
+    : 'Click a numeral to box it on its sheet(s); click a figure to filter.';
+}}
+function clearBoxes(){{
+  document.querySelectorAll('.ov .bx.on').forEach(b=>b.classList.remove('on'));
 }}
 document.querySelectorAll('.fig').forEach(f=>f.addEventListener('click',()=>filter(f.dataset.fig)));
 document.querySelectorAll('.num').forEach(n=>n.addEventListener('click',()=>{{
   ctx.innerHTML = CTX[n.dataset.n] || '(no context)';
+  clearBoxes();
+  const rects = document.querySelectorAll('.ov .bx[data-n="'+n.dataset.n+'"]');
+  rects.forEach(r=>r.classList.add('on'));
+  if(rects.length) rects[0].closest('.sheet').scrollIntoView({{behavior:'smooth', block:'start'}});
 }}));
 document.querySelectorAll('.sh').forEach(t=>t.addEventListener('click',e=>{{
   e.stopPropagation();
   const el=document.getElementById('sheet-'+t.dataset.page);
   if(el) el.scrollIntoView({{behavior:'smooth', block:'start'}});
 }}));
+const modeBtn=document.getElementById('mode');
+modeBtn.addEventListener('click',()=>{{
+  const all=document.body.classList.toggle('mode-all');
+  modeBtn.textContent = all ? 'show: all figures' : 'show: first discussed';
+}});
 </script>
 </body></html>"""
 
@@ -179,19 +207,38 @@ def main() -> int:
     # D28: the OCR manifest (if present) supplies FIG→sheet + numeral→sheet ground
     # truth; without it the view falls back to text-proximity tags alone.
     assignments, sightings_by_num, pe2_issues = {}, {}, []
+    all_figs_by_num, boxes_by_page = {}, {}
     if (fig_dir / "ocr_manifest.json").exists():
         ocr = load_manifest(ns.store)
         known = sorted({f.number for f in figs} | {r.number for r in refs})
-        assignments = {a.fig: a for a in fig_to_sheets(ocr, known)}
-        for s in numeral_sightings(ocr):
+        assign_list = fig_to_sheets(ocr, known)
+        assignments = {a.fig: a for a in assign_list}
+        sights = numeral_sightings(ocr)
+        for s in sights:
             sightings_by_num.setdefault(s.numeral, []).append(s)
+            if s.bbox is not None:                          # for the confirmation overlay
+                boxes_by_page.setdefault(s.page, []).append((s.numeral, s.bbox, s.confidence))
+        all_figs_by_num = numeral_figures(assign_list, sights)  # every figure a numeral appears in
         pe2_issues = element_numeral_issues(nums, ocr)
 
+    def _overlay(page: int) -> str:
+        # SVG rects over the sheet (viewBox 0..1, preserveAspectRatio none so it
+        # stretches to the img). OCR bbox is origin BOTTOM-left → y_svg = 1 - y - h.
+        # A small pad makes the confirmation box sit clearly AROUND the number.
+        pad = 0.008
+        rects = "".join(
+            f'<rect class="bx" data-n="{num}" x="{x - pad:.4f}" y="{1 - y - h - pad:.4f}" '
+            f'width="{w + 2 * pad:.4f}" height="{h + 2 * pad:.4f}" rx="0.006">'
+            f'<title>{num} (OCR conf {c})</title></rect>'
+            for num, (x, y, w, h), c in boxes_by_page.get(page, [])
+        )
+        return (f'<svg class="ov" viewBox="0 0 1 1" preserveAspectRatio="none">{rects}</svg>'
+                if rects else "")
     sheets_html = "".join(
         f'<div class="sheet" id="sheet-{s["page"]}"><div class="cap">sheet · page {s["page"]} '
         f'· sha256 {s["sha256"][:12]}…</div>'
-        f'<img loading="lazy" alt="drawing sheet page {s["page"]}" '
-        f'src="{data_uri(fig_dir / s["file"])}"></div>'
+        f'<div class="imgwrap"><img loading="lazy" alt="drawing sheet page {s["page"]}" '
+        f'src="{data_uri(fig_dir / s["file"])}">{_overlay(s["page"])}</div></div>'
         for s in manifest["sheets"]
     )
     def _cap_body(f):                                   # caption text minus the "FIG. N is" lead
@@ -214,14 +261,19 @@ def main() -> int:
     )
     ctx_json, nums_html = {}, []
     for n in nums:
-        fig = numeral_figure(n.char_start, refs)
+        first = numeral_figure(n.char_start, refs)          # nearest text FIG (default)
+        allf = all_figs_by_num.get(n.number, [])            # every figure OCR located it in
         ctx_json[str(n.number)] = snippet(text, n.char_start, n.char_end)
-        fg = f'<span class="fg">FIG. {fig}</span>' if fig else ""
+        fg_first = (f'<span class="fg only-first">FIG. {first}'
+                    f'</span>') if first else ""
+        fg_all = (f'<span class="fg only-all">FIGS. {", ".join(allf)}</span>'
+                  if allf else '<span class="fg only-all mut">not located on a sheet</span>')
         pages = sorted({s.page for s in sightings_by_num.get(n.number, [])})
         located = "".join(f'<span class="sh" data-page="{p}">p.{p}</span>' for p in pages)
         nums_html.append(
-            f'<span class="num" data-n="{n.number}" data-fig="{fig or ""}">'
-            f'<b>{n.number}</b> {html.escape(n.element)}{fg}{located}</span>'
+            f'<span class="num" data-n="{n.number}" data-fig="{first or ""}" '
+            f'data-figs="{",".join(allf)}">'
+            f'<b>{n.number}</b> {html.escape(n.element)}{fg_first}{fg_all}{located}</span>'
         )
     issues_html = ""
     if pe2_issues:
@@ -231,9 +283,11 @@ def main() -> int:
     note = (
         "Drawings are <i>displayed evidence</i>, not text citations (truth-contract D21): "
         "grounding binds a claim to the text that recites a numeral; the sheet rides alongside. "
-        "The FIG. N tag on a numeral is where it is <i>first discussed</i> in the text; a "
-        "<b>p.N</b> tag is where OCR <i>located</i> it on a sheet (D28 — ingestion-time OCR, "
-        "frozen manifest, confidence-carrying, not 100% reliable; * = assigned by elimination). "
+        "The <b>show: first discussed / all figures</b> toggle switches a numeral's tag between "
+        "its nearest text mention and <i>every</i> figure OCR located it in (a shared component "
+        "appears in several). Click a numeral to draw a <b>confirmation box</b> around it on its "
+        "sheet(s); a <b>p.N</b> tag jumps to that sheet. All OCR-located (D28 — ingestion-time, "
+        "manifest, confidence-carrying, not 100% reliable; * = figure assigned by elimination). "
         "Locate-only aids (D10) — never claims about what a figure depicts. The structural-review "
         "list surfaces facts for a professional; it draws no §112 conclusions."
     )

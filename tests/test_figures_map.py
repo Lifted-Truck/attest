@@ -26,20 +26,24 @@ MANIFEST = {
          "fig_labels": [{"fig": "1", "confidence": 0.5, "x": 0.5, "y": 0.7}],
          "sheet_id": {"sheet": 1, "of": 3},
          "numerals": [
-             {"numeral": 10, "source_text": "10", "confidence": 1.0, "x": 0.4, "y": 0.3},
-             {"numeral": 12, "source_text": "-12", "confidence": 0.3, "x": 0.5, "y": 0.3},
+             {"numeral": 10, "source_text": "10", "confidence": 1.0,
+              "x": 0.4, "y": 0.3, "w": 0.02, "h": 0.02},
+             {"numeral": 12, "source_text": "-12", "confidence": 0.3,
+              "x": 0.5, "y": 0.3, "w": 0.03, "h": 0.02},
          ]},
         {"page": 3, "file": "drawings-page-3.png",
          "fig_labels": [{"fig": "A", "confidence": 0.5, "x": 0.5, "y": 0.03}],  # garbled "4"
          "sheet_id": {"sheet": 2, "of": 3},
          "numerals": [
-             {"numeral": 89, "source_text": "89", "confidence": 1.0, "x": 0.6, "y": 0.4},
+             {"numeral": 89, "source_text": "89", "confidence": 1.0,
+              "x": 0.6, "y": 0.4, "w": 0.02, "h": 0.02},
          ]},
         {"page": 4, "file": "drawings-page-4.png",
          "fig_labels": [{"fig": "5", "confidence": 1.0, "x": 0.5, "y": 0.03}],
          "sheet_id": {"sheet": 3, "of": 3},
          "numerals": [
-             {"numeral": 77, "source_text": "77", "confidence": 1.0, "x": 0.2, "y": 0.5},
+             {"numeral": 77, "source_text": "77", "confidence": 1.0,
+              "x": 0.2, "y": 0.5, "w": 0.02, "h": 0.02},
          ]},
     ],
 }
@@ -122,3 +126,32 @@ def test_relevant_figures_numeral_boundary():
 def test_relevant_figures_unknown_signals_yield_nothing():
     assert _rel("plain prose with no figure or numeral", known=[10]) == []
     assert _rel("FIG. 9 does not exist here", known=[10]) == []      # 9 not assigned
+
+
+def test_numeral_figures_all_appearances():
+    """The 'all references' resolver: a numeral OCR-located on several sheets lists
+    every figure it appears in (the user's shared-component case), sorted; an
+    unassigned-sheet sighting contributes no figure."""
+    from attest.figures_map import numeral_figures, numeral_sightings
+    assigns = fig_to_sheets(MANIFEST, KNOWN)         # 1→p2, 4→p3(elim), 5→p4
+    allf = numeral_figures(assigns, numeral_sightings(MANIFEST))
+    assert allf[10] == ["1"]                         # p2 → FIG 1
+    assert allf[89] == ["4"]                         # p3 → FIG 4 (elimination)
+    assert allf[77] == ["5"]                         # p4 → FIG 5
+
+
+def test_numeral_sighting_carries_bbox():
+    """Bounding boxes survive into the sighting for the confirmation overlay."""
+    from attest.figures_map import numeral_sightings
+    s = {(x.numeral, x.page): x for x in numeral_sightings(MANIFEST)}
+    assert s[(10, 2)].bbox == (0.4, 0.3, 0.02, 0.02)
+    assert s[(89, 3)].bbox == (0.6, 0.4, 0.02, 0.02)
+
+
+def test_numeral_sighting_bbox_absent_is_none():
+    """A legacy manifest without w/h yields bbox=None, not a crash."""
+    from attest.figures_map import numeral_sightings
+    legacy = {"pages": [{"page": 2, "file": "p.png", "fig_labels": [], "sheet_id": None,
+                         "numerals": [{"numeral": 5, "source_text": "5",
+                                       "confidence": 1.0, "x": 0.1, "y": 0.1}]}]}
+    assert numeral_sightings(legacy)[0].bbox is None
