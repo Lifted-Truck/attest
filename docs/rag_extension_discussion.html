@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATTEST → RAG — a design discussion</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --bd:#30363d; --tx:#c9d1d9;
+    --mut:#8b949e; --acc:#58a6ff; --ok:#3fb950; --warn:#d29922; --bad:#f85149; --ai:#a371f7; --new:#f0883e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+    font:15.5px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  .wrap{max-width:1000px;margin:0 auto;padding:32px 24px 90px}
+  h1{font-size:27px;margin:0 0 6px;letter-spacing:-.5px}
+  h2{font-size:20px;margin:42px 0 10px;letter-spacing:-.3px;padding-bottom:7px;border-bottom:1px solid var(--bd)}
+  h3{font-size:15.5px;margin:20px 0 6px}
+  .lede{color:var(--mut);font-size:16.5px;margin:0 0 16px}
+  p{margin:9px 0}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:.86em;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .card{background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:15px 17px;margin:14px 0}
+  .card.key{border-left:3px solid var(--acc)}
+  .card.warn{border-left:3px solid var(--warn)}
+  .card.ok{border-left:3px solid var(--ok)}
+  .card.new{border-left:3px solid var(--new)}
+  .mut{color:var(--mut)}
+  .fig{margin:16px 0;background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:14px}
+  .fig svg{display:block;width:100%;height:auto}
+  .cap{color:var(--mut);font-size:12.5px;margin-top:9px;line-height:1.5}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+  th,td{border:1px solid var(--bd);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  .pill{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:20px;border:1px solid currentColor}
+  .p-have{color:var(--ok)} .p-new{color:var(--new)} .p-dec{color:var(--warn)}
+  .q{background:var(--panel2);border:1px solid var(--bd);border-left:3px solid var(--acc);
+    border-radius:8px;padding:12px 15px;margin:12px 0}
+  .q b{color:var(--acc)}
+  .foot{margin-top:40px;padding-top:14px;border-top:1px solid var(--bd);color:var(--mut);font-size:12.5px}
+</style>
+</head>
+<body>
+<h2 class="sr-only">A design discussion on extending ATTEST toward retrieval-augmented generation: why the truth contract is unaffected, what is already built, what full RAG adds, the one real decision about runtime model calls, and the recommendation.</h2>
+<div class="wrap">
+
+<h1>Extending ATTEST toward RAG — a design discussion</h1>
+<p class="lede">For larger corpora and reference pools. This is a discussion, not a build — it lays out
+what's already in place, the one real decision, and a recommendation for you to rule on.</p>
+
+<div class="card key">
+<b>The load-bearing insight, up front.</b> ATTEST's guarantee does not live in retrieval — it lives in
+<code>verify</code>, coverage, and the atom resolver, which sit <b>downstream</b> of retrieval. Retrieval
+only decides <i>which candidate spans the agent looks at</i>; grounding decides <i>what may be presented</i>.
+So swapping BM25 for embeddings + chunking + contextual retrieval is a <b>retrieval-backend change that
+does not touch the truth contract</b>. That is the whole reason this is a tractable, low-risk extension
+rather than a rewrite.
+</div>
+
+<!-- 1 -->
+<h2>1 · Why the contract is unaffected — retrieval is a front-end, not the guarantee</h2>
+<div class="fig">
+<svg viewBox="0 0 900 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Retrieval is a swappable front-end feeding an unchanged grounding core: retrieve candidates, then verify/coverage/resolver gate what is presented.">
+  <rect x="8" y="70" width="250" height="90" rx="10" fill="#1c2230" stroke="#30363d" stroke-dasharray="5 4"/>
+  <text x="133" y="94" fill="#c9d1d9" font-size="12.5" text-anchor="middle" font-weight="700">RETRIEVAL (swappable)</text>
+  <text x="133" y="116" fill="#8b949e" font-size="11" text-anchor="middle">BM25 today · embeddings /</text>
+  <text x="133" y="132" fill="#8b949e" font-size="11" text-anchor="middle">hybrid / rerank tomorrow</text>
+  <text x="133" y="150" fill="#f0883e" font-size="10.5" text-anchor="middle" font-style="italic">"which spans to look at"</text>
+
+  <path d="M258 115 L306 115" stroke="#8b949e" stroke-width="1.6" marker-end="url(#a)"/>
+  <text x="282" y="106" fill="#8b949e" font-size="10" text-anchor="middle">candidates</text>
+
+  <rect x="310" y="40" width="580" height="150" rx="10" fill="#0f2417" stroke="#3fb950" stroke-width="1.5"/>
+  <text x="600" y="64" fill="#3fb950" font-size="12.5" text-anchor="middle" font-weight="700">THE GROUNDING CORE — UNCHANGED</text>
+  <text x="330" y="90" fill="#c9d1d9" font-size="11.5">· the agent reads freely (D11) and binds each atom to an exact span</text>
+  <text x="330" y="110" fill="#c9d1d9" font-size="11.5">· verify resolves every atom at its offset + hash (I1/I3)</text>
+  <text x="330" y="130" fill="#c9d1d9" font-size="11.5">· coverage checks the cited span carries the question's terms (v1.2)</text>
+  <text x="330" y="150" fill="#c9d1d9" font-size="11.5">· below floor / doesn't answer → abstain (I2)</text>
+  <text x="330" y="172" fill="#3fb950" font-size="11" font-weight="700">"what may be presented" — the guarantee lives HERE</text>
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#8b949e"/></marker></defs>
+</svg>
+<p class="cap">A better retriever surfaces better candidates — it can improve answer <i>rate</i> and reduce
+missed evidence. It cannot make ATTEST present an ungrounded claim, because the grounding core doesn't
+trust it. This is exactly why the brief could say "dead-simple retrieval" without weakening the pitch.</p>
+</div>
+
+<!-- 2 -->
+<h2>2 · What's already built for this (more than you might expect)</h2>
+<p>The v1 architecture was written with this extension in mind — the seams are in place:</p>
+<table>
+<tr><th>Lever</th><th>State today</th></tr>
+<tr><td><code>RetrievalBackend</code> Protocol (<code>retrieval.py</code>)</td><td>a one-method interface (<code>search(query, k) → [Hit]</code>); BM25 is one implementation. An embedding backend is a second implementation — <b>no core change</b>.</td></tr>
+<tr><td><code>Retriever.method</code> provenance tag</td><td>already returns a fusion tag (the docstring literally says "becomes <code>bm25+embed</code> under fusion") — the audit log + truth-contract stamp already record which retriever produced a result.</td></tr>
+<tr><td>D11 — read freely</td><td>grounding constrains <i>output</i>, not <i>input</i>; retrieval is explicitly "a navigational aid, not a cage." RAG just makes the aid better.</td></tr>
+<tr><td>Per-corpus support floor (D20)</td><td><code>calibrate_threshold</code> already fits the abstention floor per corpus from labelled data — the same knob re-fits for an embedding score distribution.</td></tr>
+<tr><td>Ingest-time freeze pattern (I3, and now the OCR manifest / D28)</td><td>the precedent for "run a model once at ingestion, freeze + hash the output, stay deterministic at runtime" is <b>already established twice</b>. Precomputed embeddings are the same move.</td></tr>
+</table>
+<div class="card ok">
+<b>Read plainly: the levers you asked to "make sure are robustly exposed" mostly already are.</b> The
+retrieval backend is a clean seam, its provenance is already plumbed, and the ingest-time-freeze pattern
+that keeps a model call deterministic is a proven precedent in the codebase. The gap is a documented
+plug-in <i>contract</i> and a reference embedding backend — not an architectural opening.
+</div>
+
+<!-- 3 -->
+<h2>3 · What "full RAG" adds — and exactly where each piece slots in</h2>
+<div class="fig">
+<svg viewBox="0 0 900 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="RAG pieces mapped to ingestion-time (chunk, contextualize, embed, freeze) versus runtime (embed query, fuse, candidates), with the grounding core unchanged.">
+  <rect x="8" y="30" width="430" height="86" rx="9" fill="#161b22" stroke="#3fb950"/>
+  <text x="24" y="52" fill="#3fb950" font-size="12" font-weight="700">INGESTION-TIME (frozen + hashed, like OCR/D28)</text>
+  <text x="24" y="74" fill="#c9d1d9" font-size="11">chunk → <tspan fill="#f0883e" font-weight="700">contextualize</tspan> → embed → freeze the index</text>
+  <text x="24" y="94" fill="#8b949e" font-size="10.5">deterministic INPUT; a model runs once, output is captured &amp; hashed</text>
+  <text x="24" y="110" fill="#8b949e" font-size="10.5">the cited span still points to ORIGINAL doc offsets — index-text ≠ cited-text</text>
+
+  <rect x="462" y="30" width="430" height="86" rx="9" fill="#161b22" stroke="#d29922"/>
+  <text x="478" y="52" fill="#d29922" font-size="12" font-weight="700">RUNTIME</text>
+  <text x="478" y="74" fill="#c9d1d9" font-size="11"><tspan fill="#f85149" font-weight="700">embed the query</tspan> → fuse (BM25 + vector) → top-k candidates</text>
+  <text x="478" y="94" fill="#8b949e" font-size="10.5">ONE new model call — deterministic (pinned model, temp 0, cached)</text>
+  <text x="478" y="110" fill="#8b949e" font-size="10.5">still just proposes candidates — decides nothing</text>
+
+  <path d="M223 116 L223 150" stroke="#8b949e" stroke-width="1.4" marker-end="url(#b)"/>
+  <path d="M677 116 L677 150" stroke="#8b949e" stroke-width="1.4" marker-end="url(#b)"/>
+  <rect x="150" y="152" width="600" height="76" rx="9" fill="#0f2417" stroke="#3fb950" stroke-width="1.5"/>
+  <text x="450" y="176" fill="#3fb950" font-size="12.5" text-anchor="middle" font-weight="700">THE GROUNDING CORE — untouched</text>
+  <text x="450" y="198" fill="#c9d1d9" font-size="11" text-anchor="middle">verify · coverage · atom resolver · abstain · audit log · truth contract</text>
+  <text x="450" y="217" fill="#8b949e" font-size="10.5" text-anchor="middle">every guarantee (I1-I6, coverage, locate-never-adjudicate) is downstream and unchanged</text>
+  <defs><marker id="b" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#8b949e"/></marker></defs>
+</svg>
+</div>
+<div class="card new">
+<b>The one subtlety worth naming: index-text ≠ cited-text.</b> <b>Contextual retrieval</b> (the Anthropic
+technique) prepends a short chunk-situating context to each chunk <i>before embedding</i>, which sharply
+improves recall on large corpora. But ATTEST must still cite the <b>original</b> span at its real offsets —
+so the added context is indexed, never cited. ATTEST already separates these cleanly (a span is an offset
+range into canonical text; the index is a separate featurization), so this fits without contortion — the
+contextualized text lives in the frozen index, the citation resolves against the untouched document.
+</div>
+
+<!-- 4 -->
+<h2>4 · The one real decision: I6's "no runtime model calls"</h2>
+<div class="card warn">
+<b>The honest tension.</b> I6 today reads, literally, "in v1 ATTEST makes <b>no model calls at all</b> at
+runtime." Embedding the <i>query</i> at runtime is a model call. So RAG cannot ship under I6 as currently
+worded — this needs your ruling, and it is the <b>only</b> part of this that touches the contract.
+</div>
+<p>I6 was doing <b>two jobs</b> at once, and they come apart here:</p>
+<table>
+<tr><th>What I6 protects</th><th>Under a runtime query-embedding?</th></tr>
+<tr><td><b>Determinism / reproducibility</b> — same corpus + query → same result</td><td><span class="pill p-have">KEPT</span> if the embedding model is pinned, temperature-0, and the query→vector is cached. Same query → same vector → same candidates. (A pinned model is a frozen artifact, like the OCR engine version.)</td></tr>
+<tr><td><b>"AI never decides"</b> — no model on the deciding path</td><td><span class="pill p-have">KEPT</span> — the query embedding <i>proposes candidates</i>; it decides nothing. <code>verify</code> still gates, deterministically, model-free.</td></tr>
+<tr><td><b>The literal pitch</b> — "zero model calls at runtime"</td><td><span class="pill p-dec">CHANGES</span> — this is the part that genuinely gives. "Zero runtime model calls" becomes "no model on the <i>deciding</i> path; retrieval may embed the query with a pinned, deterministic model."</td></tr>
+</table>
+<p>Per the monotonic rule, relaxing a literal guarantee is a <b>major contract version</b> + rationale +
+the oracle's blessing. My read: it is an honest, well-bounded relaxation of the <i>weakest</i> of I6's
+three jobs (a pitch line), while the two that carry real weight — determinism and AI-never-decides — are
+preserved by construction. But it is your call, and it is the crux of this whole discussion.</p>
+
+<!-- 5 -->
+<h2>5 · Levers: exposed vs. needs-exposing</h2>
+<table>
+<tr><th>Lever</th><th>Status</th><th>Work to expose robustly</th></tr>
+<tr><td>Retrieval backend seam</td><td><span class="pill p-have">EXPOSED</span></td><td>none — it's a Protocol; document the contract</td></tr>
+<tr><td>Retriever fusion point + provenance</td><td><span class="pill p-have">EXPOSED</span></td><td>none — <code>method</code> tag already plumbed to the audit log</td></tr>
+<tr><td>Per-corpus abstention floor</td><td><span class="pill p-have">EXPOSED</span></td><td>none — re-fits for an embedding score distribution</td></tr>
+<tr><td>Ingest-time freeze/hash pattern</td><td><span class="pill p-have">PROVEN</span></td><td>none — reuse the OCR-manifest pattern for an embedding index</td></tr>
+<tr><td>Chunking policy (size, overlap, boundaries)</td><td><span class="pill p-new">TO ADD</span></td><td>a chunker in the ingestion adapter; must preserve span→offset mapping</td></tr>
+<tr><td>Embedding backend (the reference impl)</td><td><span class="pill p-new">TO ADD</span></td><td>one <code>RetrievalBackend</code> impl + a pinned model + a frozen index</td></tr>
+<tr><td>Contextual-retrieval transform</td><td><span class="pill p-new">TO ADD</span></td><td>an ingest-time "situate this chunk" step; index-text ≠ cited-text kept separate</td></tr>
+<tr><td>Fusion / rerank strategy</td><td><span class="pill p-new">TO ADD</span></td><td>score normalization + combine in <code>Retriever</code>; measured at Layer-E</td></tr>
+</table>
+
+<!-- 6 -->
+<h2>6 · Recommendation</h2>
+<div class="card key">
+<b>Two moves, in order — and the discipline is to not skip to the second.</b><br><br>
+<b>(A) Now, cheap:</b> write down the <b>plug-in contract</b> — the exact interface an embedding/chunking
+backend must satisfy (search signature, determinism requirement, index-freeze + hash, span-offset
+preservation, provenance tag) — and a one-page decision record. This "robustly exposes the levers" you
+asked about <i>without</i> building infra or touching the contract, and it makes the eventual build a
+drop-in. Low risk, high clarity.<br><br>
+<b>(B) When the eval demands it, not before:</b> build the embedding backend + contextual retrieval —
+triggered by a <b>real corpus where BM25 measurably misses</b> (a multi-document reference pool where
+lexical matching fails on paraphrase). The brief's rule stands: "No Pinecone/Weaviate until the eval says
+you need it." For the current single-document corpora (one 10-K, one patent), BM25 is not the bottleneck,
+so building embeddings now would be answering a question the eval hasn't asked.
+</div>
+<p class="mut">This mirrors exactly what the provability swarm taught us three weeks ago: build the
+<i>measurement</i> that tells you whether the expensive thing is worth it, before building the expensive
+thing. Here the measurement is a multi-doc golden set where you can watch BM25's recall fall.</p>
+
+<!-- 7 -->
+<h2>7 · The decisions I need from you</h2>
+<div class="q"><b>Decision 1 — the I6 amendment.</b> Are you comfortable relaxing I6's literal "zero runtime
+model calls" to "no model on the deciding path; retrieval may embed the query with a pinned, deterministic
+model"? This is the gate for any embedding work. (My lean: yes, as a major contract bump with the
+determinism + AI-never-decides jobs explicitly preserved — but it's your ruling.)</div>
+<div class="q"><b>Decision 2 — scope now.</b> Do you want me to do move (A) — write the plug-in contract +
+decision record so the levers are robustly exposed and documented — and stop there? Or is there a
+specific larger corpus already in view that should trigger move (B) now?</div>
+<div class="q"><b>Decision 3 — the trigger.</b> If we defer the build, what's the concrete trigger to
+revisit? My proposal: the first multi-document engagement, measured against a golden set where BM25's
+recall is shown to fall below a threshold you set.</div>
+
+<div class="card ok">
+<b>Nothing here has been built.</b> This document is analysis for your decision, filed with the same
+status as the landscape and provability research docs — a design input that authorizes no work. When you
+rule on Decision 1 and 2, I'll act on exactly what you choose.
+</div>
+
+<p class="foot">Design discussion · grounded in <code>retrieval.py</code> (the <code>RetrievalBackend</code>
+seam + <code>Retriever.method</code>), <code>support.py</code> (D20 floor), the brief §"Stack" (BM25 +
+embedding, hybrid; no vector DB until the eval says so), and D11 · <b>authorizes no work</b> ·
+last verified 2026-07-22.</p>
+
+</div>
+</body>
+</html>
