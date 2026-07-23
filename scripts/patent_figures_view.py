@@ -120,6 +120,7 @@ padding:4px 9px;font-size:12.5px;cursor:pointer;transition:.12s;white-space:nowr
 .sh{{color:var(--num);font-family:ui-monospace,monospace;font-size:10.5px;margin-left:5px;
 cursor:pointer;border:1px solid var(--bd);border-radius:4px;padding:0 4px}}
 .sh:hover{{border-color:var(--num)}}
+.sh.tg{{color:var(--fig);border-style:dashed}}   /* recovered by the text-guided pass */
 .pe2{{color:var(--mut);font-size:12px;line-height:1.55;padding-left:18px;margin:0}}
 .pe2 li{{margin:0 0 6px}}
 #ctx{{position:sticky;bottom:0;background:#0b0f16f2;border:1px solid var(--bd);
@@ -159,21 +160,31 @@ function filter(fig){{
   ctx.innerHTML = selFig ? `Numerals appearing in <b>FIG. ${{selFig}}</b> (undimmed).`
     : 'Click a numeral to box it on its sheet(s); click a figure to filter.';
 }}
+let boxedNum = null;                 // the numeral whose boxes are currently shown
 function clearBoxes(){{
   document.querySelectorAll('.ov .bx.on').forEach(b=>b.classList.remove('on'));
+  boxedNum = null;
 }}
 document.querySelectorAll('.fig').forEach(f=>f.addEventListener('click',()=>filter(f.dataset.fig)));
 document.querySelectorAll('.num').forEach(n=>n.addEventListener('click',()=>{{
+  // click a numeral to box it on every sheet; click it AGAIN to turn the boxes off
+  if(boxedNum === n.dataset.n){{ clearBoxes(); ctx.innerHTML = '(boxes off)'; return; }}
   ctx.innerHTML = CTX[n.dataset.n] || '(no context)';
   clearBoxes();
   const rects = document.querySelectorAll('.ov .bx[data-n="'+n.dataset.n+'"]');
   rects.forEach(r=>r.classList.add('on'));
+  boxedNum = n.dataset.n;
   if(rects.length) rects[0].closest('.sheet').scrollIntoView({{behavior:'smooth', block:'start'}});
 }}));
 document.querySelectorAll('.sh').forEach(t=>t.addEventListener('click',e=>{{
-  e.stopPropagation();
-  const el=document.getElementById('sheet-'+t.dataset.page);
-  if(el) el.scrollIntoView({{behavior:'smooth', block:'start'}});
+  e.stopPropagation();                                 // don't also trigger the numeral toggle
+  clearBoxes();
+  const sheet = document.getElementById('sheet-'+t.dataset.page);
+  // jump to THIS numeral's box on THIS sheet (not just scroll to the page)
+  const rect = sheet && sheet.querySelector('.ov .bx[data-n="'+t.dataset.n+'"]');
+  if(rect) rect.classList.add('on');
+  boxedNum = t.dataset.n;
+  if(sheet) sheet.scrollIntoView({{behavior:'smooth', block:'start'}});
 }}));
 const modeBtn=document.getElementById('mode');
 modeBtn.addEventListener('click',()=>{{
@@ -268,8 +279,16 @@ def main() -> int:
                     f'</span>') if first else ""
         fg_all = (f'<span class="fg only-all">FIGS. {", ".join(allf)}</span>'
                   if allf else '<span class="fg only-all mut">not located on a sheet</span>')
-        pages = sorted({s.page for s in sightings_by_num.get(n.number, [])})
-        located = "".join(f'<span class="sh" data-page="{p}">p.{p}</span>' for p in pages)
+        page_method: dict[int, str] = {}
+        for s in sightings_by_num.get(n.number, []):
+            if page_method.get(s.page) != "first-pass":     # first-pass wins the label
+                page_method[s.page] = s.method
+        def _sh(p: int, n: int = n.number, pm: dict = page_method) -> str:
+            tg = pm[p] == "text-guided"
+            title = "recovered by the text-guided pass" if tg else "first-pass OCR"
+            return (f'<span class="sh{" tg" if tg else ""}" data-page="{p}" data-n="{n}" '
+                    f'title="{title}">{"↻ " if tg else ""}p.{p}</span>')
+        located = "".join(_sh(p) for p in sorted(page_method))
         nums_html.append(
             f'<span class="num" data-n="{n.number}" data-fig="{first or ""}" '
             f'data-figs="{",".join(allf)}">'
@@ -281,9 +300,19 @@ def main() -> int:
             return ", ".join(str(n) for n in nums_list) or "none"
         flags = len(cov.recited_not_drawn) + len(cov.drawn_not_recited) + len(cov.figure_mismatches)
         mism = "".join(f'<li>{html.escape(m["message"])}</li>' for m in cov.figure_mismatches)
+        n_recovered = sum(1 for ss in sightings_by_num.values()
+                          for s in ss if s.method == "text-guided")
+        recovered_line = (
+            f'<li><b style="color:var(--fig)">↻ Text-guided recovery ({n_recovered}):</b> '
+            f'where the spec predicted a numeral on a figure\'s sheet but the first OCR pass '
+            f'missed it, a tiled re-OCR searched that sheet for exactly that numeral and '
+            f'recovered {n_recovered} (marked <span class="sh tg">↻ p.N</span> above). '
+            f'The prediction pushes the truth from both angles — text and image.</li>'
+            if n_recovered else "")
         issues_html = (
             f'<h2 style="margin-top:20px">Numeral coverage &amp; consistency ({flags} flags)</h2>'
             f'<ul class="pe2">'
+            f'{recovered_line}'
             f'<li><b>Recited in the spec but not found on any drawing '
             f'({len(cov.recited_not_drawn)}):</b> {_nlist(cov.recited_not_drawn)} '
             f'<span class="mut">— OCR miss, or the number is not drawn; review.</span></li>'

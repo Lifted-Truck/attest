@@ -190,3 +190,20 @@ def test_numeral_text_figures_sees_all_mentions():
             "the disassembled separator 10 is shown.")
     refs = figure_references(text)
     assert numeral_text_figures(text, 10, refs) == ["1", "4"]     # both, not just the first
+
+
+def test_numeral_sighting_method_round_trips():
+    """D28 confirmation pass: a numeral record's `method` (first-pass | text-guided)
+    survives into the sighting so the view can mark recovered numerals; a legacy
+    record without the field defaults to first-pass."""
+    from attest.figures_map import numeral_sightings
+    man = {"pages": [{"page": 7, "file": "p.png", "fig_labels": [], "sheet_id": None,
+                      "numerals": [
+                          {"numeral": 10, "source_text": "10", "confidence": 0.3,
+                           "x": 0.2, "y": 0.56, "w": 0.08, "h": 0.02, "method": "text-guided"},
+                          {"numeral": 80, "source_text": "80", "confidence": 1.0,
+                           "x": 0.7, "y": 0.6, "w": 0.02, "h": 0.02},  # no method → first-pass
+                      ]}]}
+    by = {s.numeral: s for s in numeral_sightings(man)}
+    assert by[10].method == "text-guided"
+    assert by[80].method == "first-pass"

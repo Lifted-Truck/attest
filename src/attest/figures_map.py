@@ -42,6 +42,7 @@ class NumeralSighting:
     source_text: str          # the raw OCR text the digits came from ("-82" → 82)
     # (x, y, w, h) normalized, origin bottom-left — for the confirmation box overlay:
     bbox: tuple[float, float, float, float] | None = None
+    method: str = "first-pass"  # "first-pass" | "text-guided" (D28 confirmation pass)
 
 
 def load_manifest(store_dir: str | Path) -> dict:
@@ -86,7 +87,7 @@ def numeral_sightings(manifest: dict, *, min_confidence: float = 0.0) -> list[Nu
             bbox = ((n["x"], n["y"], n["w"], n["h"])
                     if all(k in n for k in ("x", "y", "w", "h")) else None)
             out.append(NumeralSighting(n["numeral"], page["page"], n["confidence"],
-                                       n["source_text"], bbox))
+                                       n["source_text"], bbox, n.get("method", "first-pass")))
     return sorted(out, key=lambda s: (s.page, s.numeral))
 
 
