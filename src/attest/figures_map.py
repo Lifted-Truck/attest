@@ -18,6 +18,7 @@ Honesty rules (D21/D28), enforced in the data model:
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -176,6 +177,91 @@ def relevant_figures(
                     if page in page_to_fig:
                         out.add(page_to_fig[page])
     return sorted(out, key=lambda f: (len(f), f))
+
+
+def numeral_text_figures(text: str, numeral: int, fig_refs, *, window: int = 500) -> list[str]:
+    """Every figure a numeral is discussed near across ALL its spec mentions — the
+    nearest `FIG. N` reference at/before each standalone occurrence, within `window`
+    chars. (`reference_numerals` gives only the FIRST mention; this sees them all, so
+    "separator 10" discussed under both FIG. 1 and FIG. 4 surfaces both.)"""
+    figs: set[str] = set()
+    pat = re.compile(rf"(?<![\d.,]){numeral}(?![\d.])(?!,\d)")
+    for m in pat.finditer(text):
+        best = None
+        for r in fig_refs:
+            if r.char_start <= m.start() and m.start() - r.char_start <= window:
+                if best is None or r.char_start > best.char_start:
+                    best = r
+        if best is not None:
+            figs.add(best.number)
+    return sorted(figs, key=lambda f: (len(f), f))
+
+
+@dataclass(frozen=True)
+class NumeralCoverage:
+    figure_tied: list[int]          # the clean set: numerals the spec recites near a figure
+    recited_not_drawn: list[int]    # figure-tied, but OCR found on NO sheet → OCR-miss flag
+    drawn_not_recited: list[int]    # OCR-located, never recited in the spec → artefact/unlabeled
+    figure_mismatches: list[dict]   # tied to FIG. N in text, not OCR-located on FIG. N's sheet
+    seq_gaps: list[int]             # missing ints in figure_tied's range — WEAK (patents skip)
+
+
+def numeral_coverage(
+    numerals, text, fig_refs, assignments: list[SheetAssignment],
+    sightings: list[NumeralSighting], *, min_confidence: float = 0.0,
+) -> NumeralCoverage:
+    """Reconcile the spec text vs. the drawings (OCR) and flag every numeral the two
+    disagree on. Locate-only (D10): each flag is an OCR miss OR skipped numbering
+    (patents routinely skip) OR a document limit — the check states the fact, never
+    which.
+
+    Design honesty (see the module's L0006-class lesson): the naive "are all
+    CONSECUTIVE numbers present?" check is **not reliable** for patents — they skip
+    reference numerals by design, and both quantities and OCR misreads corrupt the
+    range — so `seq_gaps` is returned but flagged WEAK. The reliable checks are the
+    reconciliation ones, which don't depend on enumerating a contiguous sequence:
+
+    - `recited_not_drawn`: a **figure-tied** numeral (the spec recites it near a
+      `FIG. N`, so it is a real reference numeral, not a quantity) that OCR located on
+      no sheet at all — the strongest OCR-miss / missing-from-drawings signal.
+    - `drawn_not_recited`: OCR read a number the spec never recites — an OCR artefact
+      or a genuinely unlabelled element.
+    - `figure_mismatches`: tied to FIG. N in text but not OCR-located on FIG. N's sheet
+      (the separator-10 / FIG-4 case) — a per-figure OCR-miss.
+    """
+    text_nums = {n.number for n in numerals}
+    sightings = [s for s in sightings if s.confidence >= min_confidence]
+    ocr_nums = {s.numeral for s in sightings if s.numeral >= 1}   # 0 = OCR noise
+    ocr_figs = numeral_figures(assignments, sightings)
+    assigned_figs = {a.fig for a in assignments}
+
+    text_figs_of = {n: [f for f in numeral_text_figures(text, n, fig_refs) if f in assigned_figs]
+                    for n in text_nums}
+    # TEXT-AUTHORITATIVE, figure-tied: numerals the spec recites in the context of a
+    # figure. Excludes quantity noise ("220° F" — recited, not figure-tied) and OCR
+    # misreads ("280" — on a sheet, never recited). The spec defines the numerals.
+    figure_tied = sorted({n for n, fs in text_figs_of.items() if fs and n >= 1})
+    seq_gaps = ([i for i in range(figure_tied[0], figure_tied[-1] + 1) if i not in set(figure_tied)]
+                if figure_tied else [])
+
+    mismatches = []
+    for n in figure_tied:
+        missing = [f for f in text_figs_of[n] if f not in ocr_figs.get(n, [])]
+        if missing:
+            mismatches.append({
+                "numeral": n, "text_figures": text_figs_of[n],
+                "ocr_figures": ocr_figs.get(n, []), "not_located_on": missing,
+                "message": (f"numeral {n} is discussed in the text in the context of "
+                            f"FIG(S). {', '.join(missing)}, but OCR did not locate it there "
+                            f"— an OCR miss or the number is not labeled on that sheet; review"),
+            })
+    return NumeralCoverage(
+        figure_tied=figure_tied,
+        recited_not_drawn=[n for n in figure_tied if n not in ocr_nums],
+        drawn_not_recited=sorted(ocr_nums - text_nums),
+        figure_mismatches=mismatches,
+        seq_gaps=seq_gaps,
+    )
 
 
 def element_numeral_issues(

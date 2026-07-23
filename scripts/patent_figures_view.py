@@ -32,9 +32,9 @@ from pathlib import Path
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
 from attest.figures_map import (
-    element_numeral_issues,
     fig_to_sheets,
     load_manifest,
+    numeral_coverage,
     numeral_figures,
     numeral_sightings,
 )
@@ -206,8 +206,8 @@ def main() -> int:
 
     # D28: the OCR manifest (if present) supplies FIG→sheet + numeral→sheet ground
     # truth; without it the view falls back to text-proximity tags alone.
-    assignments, sightings_by_num, pe2_issues = {}, {}, []
-    all_figs_by_num, boxes_by_page = {}, {}
+    assignments, sightings_by_num = {}, {}
+    all_figs_by_num, boxes_by_page, cov = {}, {}, None
     if (fig_dir / "ocr_manifest.json").exists():
         ocr = load_manifest(ns.store)
         known = sorted({f.number for f in figs} | {r.number for r in refs})
@@ -219,7 +219,7 @@ def main() -> int:
             if s.bbox is not None:                          # for the confirmation overlay
                 boxes_by_page.setdefault(s.page, []).append((s.numeral, s.bbox, s.confidence))
         all_figs_by_num = numeral_figures(assign_list, sights)  # every figure a numeral appears in
-        pe2_issues = element_numeral_issues(nums, ocr)
+        cov = numeral_coverage(nums, text, refs, assign_list, sights)  # text↔drawing reconciliation
 
     def _overlay(page: int) -> str:
         # SVG rects over the sheet (viewBox 0..1, preserveAspectRatio none so it
@@ -276,10 +276,29 @@ def main() -> int:
             f'<b>{n.number}</b> {html.escape(n.element)}{fg_first}{fg_all}{located}</span>'
         )
     issues_html = ""
-    if pe2_issues:
-        rows = "".join(f'<li>{html.escape(i["message"])}</li>' for i in pe2_issues)
-        issues_html = (f'<h2 style="margin-top:20px">Structural review — element/numeral '
-                       f'({len(pe2_issues)})</h2><ul class="pe2">{rows}</ul>')
+    if cov is not None:
+        def _nlist(nums_list):
+            return ", ".join(str(n) for n in nums_list) or "none"
+        flags = len(cov.recited_not_drawn) + len(cov.drawn_not_recited) + len(cov.figure_mismatches)
+        mism = "".join(f'<li>{html.escape(m["message"])}</li>' for m in cov.figure_mismatches)
+        issues_html = (
+            f'<h2 style="margin-top:20px">Numeral coverage &amp; consistency ({flags} flags)</h2>'
+            f'<ul class="pe2">'
+            f'<li><b>Recited in the spec but not found on any drawing '
+            f'({len(cov.recited_not_drawn)}):</b> {_nlist(cov.recited_not_drawn)} '
+            f'<span class="mut">— OCR miss, or the number is not drawn; review.</span></li>'
+            f'<li><b>Found on a drawing but not recited in the spec '
+            f'({len(cov.drawn_not_recited)}):</b> {_nlist(cov.drawn_not_recited)} '
+            f'<span class="mut">— an OCR artefact, or an unlabelled element; review.</span></li>'
+            f'<li><b>Discussed with a figure but not located on that sheet '
+            f'({len(cov.figure_mismatches)}):</b><ul class="pe2">{mism}</ul></li>'
+            f'<li class="mut">Consecutive-number check: the figure-tied reference numerals run '
+            f'{cov.figure_tied[0] if cov.figure_tied else "?"}–'
+            f'{cov.figure_tied[-1] if cov.figure_tied else "?"} and are '
+            f'<b>non-contiguous by design</b> (patents skip reference numerals), so a raw list '
+            f'of missing integers is a weak signal, not shown as a flag — the three checks above '
+            f'are the reliable OCR-miss / document-gap detectors.</li>'
+            f'</ul>')
     note = (
         "Drawings are <i>displayed evidence</i>, not text citations (truth-contract D21): "
         "grounding binds a claim to the text that recites a numeral; the sheet rides alongside. "

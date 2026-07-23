@@ -155,3 +155,38 @@ def test_numeral_sighting_bbox_absent_is_none():
                          "numerals": [{"numeral": 5, "source_text": "5",
                                        "confidence": 1.0, "x": 0.1, "y": 0.1}]}]}
     assert numeral_sightings(legacy)[0].bbox is None
+
+
+def test_numeral_coverage_reconciliation():
+    """The consistency check (Julian's ask): reconcile spec text vs OCR'd drawings.
+    Reliable flags — recited-not-drawn, drawn-not-recited, per-figure mismatch —
+    NOT the consecutive-integer check (unreliable for patents; returned as WEAK)."""
+    from attest.figures_map import numeral_coverage
+    from attest.patents import Numeral, figure_references
+    # FIG1→p2 (OCR: 10,12), FIG4→p3 (OCR: 89), FIG5→p4 (OCR: 77) — from MANIFEST.
+    text = ("As shown in FIG. 1, the separator 10 operates. "
+            "In FIG. 5, the frame 12 and a gauge 34 are shown. "
+            "In FIG. 4, the widget 89 is disassembled.")
+    numerals = [Numeral(n, "x", 0, 1) for n in (10, 12, 34, 89)]   # 77 recited by nobody
+    refs = figure_references(text)
+    assigns = fig_to_sheets(MANIFEST, KNOWN)
+    cov = numeral_coverage(numerals, text, refs, assigns, numeral_sightings(MANIFEST))
+
+    assert cov.figure_tied == [10, 12, 34, 89]
+    assert cov.recited_not_drawn == [34]        # tied to FIG 5 in text, OCR found it nowhere
+    assert cov.drawn_not_recited == [77]        # OCR has 77 (p4), text never recites it
+    mism = {m["numeral"]: m["not_located_on"] for m in cov.figure_mismatches}
+    assert mism.get(12) == ["5"]                # text ties 12 to FIG 5, OCR has it on FIG 1
+    assert 10 not in mism                        # 10 tied to FIG 1 AND OCR'd on FIG 1 → clean
+    assert cov.seq_gaps                          # computed, but weak (not a shipped flag)
+
+
+def test_numeral_text_figures_sees_all_mentions():
+    """Unlike reference_numerals (first mention only), this finds every figure a
+    numeral is discussed near — the basis of the separator-10 finding."""
+    from attest.figures_map import numeral_text_figures
+    from attest.patents import figure_references
+    text = ("In FIG. 1 the separator 10 enters. Later, referring to FIG. 4, "
+            "the disassembled separator 10 is shown.")
+    refs = figure_references(text)
+    assert numeral_text_figures(text, 10, refs) == ["1", "4"]     # both, not just the first
