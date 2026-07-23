@@ -26,23 +26,23 @@ MANIFEST = {
          "fig_labels": [{"fig": "1", "confidence": 0.5, "x": 0.5, "y": 0.7}],
          "sheet_id": {"sheet": 1, "of": 3},
          "numerals": [
-             {"numeral": 10, "source_text": "10", "confidence": 1.0,
+             {"numeral": "10", "source_text": "10", "confidence": 1.0,
               "x": 0.4, "y": 0.3, "w": 0.02, "h": 0.02},
-             {"numeral": 12, "source_text": "-12", "confidence": 0.3,
+             {"numeral": "12", "source_text": "-12", "confidence": 0.3,
               "x": 0.5, "y": 0.3, "w": 0.03, "h": 0.02},
          ]},
         {"page": 3, "file": "drawings-page-3.png",
          "fig_labels": [{"fig": "A", "confidence": 0.5, "x": 0.5, "y": 0.03}],  # garbled "4"
          "sheet_id": {"sheet": 2, "of": 3},
          "numerals": [
-             {"numeral": 89, "source_text": "89", "confidence": 1.0,
+             {"numeral": "89", "source_text": "89", "confidence": 1.0,
               "x": 0.6, "y": 0.4, "w": 0.02, "h": 0.02},
          ]},
         {"page": 4, "file": "drawings-page-4.png",
          "fig_labels": [{"fig": "5", "confidence": 1.0, "x": 0.5, "y": 0.03}],
          "sheet_id": {"sheet": 3, "of": 3},
          "numerals": [
-             {"numeral": 77, "source_text": "77", "confidence": 1.0,
+             {"numeral": "77", "source_text": "77", "confidence": 1.0,
               "x": 0.2, "y": 0.5, "w": 0.02, "h": 0.02},
          ]},
     ],
@@ -71,33 +71,33 @@ def test_elimination_needs_a_unique_gap():
 
 def test_numeral_sightings_confidence_floor():
     all_s = numeral_sightings(MANIFEST)
-    assert [(s.numeral, s.page) for s in all_s] == [(10, 2), (12, 2), (89, 3), (77, 4)]
+    assert [(s.numeral, s.page) for s in all_s] == [("10", 2), ("12", 2), ("89", 3), ("77", 4)]
     high = numeral_sightings(MANIFEST, min_confidence=0.5)
-    assert [(s.numeral, s.page) for s in high] == [(10, 2), (89, 3), (77, 4)]  # -12 dropped
+    assert [(s.numeral, s.page) for s in high] == [("10", 2), ("89", 3), ("77", 4)]  # -12 dropped
 
 
 def test_cross_check_three_classes():
-    cc = cross_check_numerals([10, 89, 42], MANIFEST)
-    assert sorted(cc.matched) == [10, 89]
-    assert cc.text_only == [42]                          # recited, never located
-    assert [(s.numeral, s.page) for s in cc.sheet_only] == [(12, 2), (77, 4)]
+    cc = cross_check_numerals(["10", "89", "42"], MANIFEST)
+    assert sorted(cc.matched) == ["10", "89"]
+    assert cc.text_only == ["42"]                          # recited, never located
+    assert [(s.numeral, s.page) for s in cc.sheet_only] == [("12", 2), ("77", 4)]
 
 
 def test_element_numeral_issues_word_the_ocr_caveat():
     """PE-2's check surfaces facts with the indistinguishability caveat — never a
     §112 conclusion (D10)."""
-    nums = [Numeral(10, "separator", 0, 2), Numeral(42, "ash outlet", 10, 12)]
+    nums = [Numeral("10", "separator", 0, 2), Numeral("42", "ash outlet", 10, 12)]
     issues = element_numeral_issues(nums, MANIFEST, min_confidence=0.5)
     kinds = {(i["kind"], i["numeral"]) for i in issues}
-    assert ("recited-not-located", 42) in kinds
-    assert ("located-not-recited", 77) in kinds
-    assert ("located-not-recited", 89) in kinds          # 89 not in the recited list here
+    assert ("recited-not-located", "42") in kinds
+    assert ("located-not-recited", "77") in kinds
+    assert ("located-not-recited", "89") in kinds          # 89 not in the recited list here
     for i in issues:                                     # the honesty wording is load-bearing
         assert "indistinguishable" in i["message"] and "review" in i["message"]
         assert "112" not in i["message"] and "invalid" not in i["message"]
 
 
-def _rel(span: str, known=(10, 12, 89, 77)):
+def _rel(span: str, known=("10", "12", "89", "77")):
     from attest.figures_map import numeral_sightings, relevant_figures
     return relevant_figures([span], fig_to_sheets(MANIFEST, KNOWN),
                             numeral_sightings(MANIFEST), list(known))
@@ -124,8 +124,8 @@ def test_relevant_figures_numeral_boundary():
 
 
 def test_relevant_figures_unknown_signals_yield_nothing():
-    assert _rel("plain prose with no figure or numeral", known=[10]) == []
-    assert _rel("FIG. 9 does not exist here", known=[10]) == []      # 9 not assigned
+    assert _rel("plain prose with no figure or numeral", known=["10"]) == []
+    assert _rel("FIG. 9 does not exist here", known=["10"]) == []      # 9 not assigned
 
 
 def test_numeral_figures_all_appearances():
@@ -135,24 +135,24 @@ def test_numeral_figures_all_appearances():
     from attest.figures_map import numeral_figures, numeral_sightings
     assigns = fig_to_sheets(MANIFEST, KNOWN)         # 1→p2, 4→p3(elim), 5→p4
     allf = numeral_figures(assigns, numeral_sightings(MANIFEST))
-    assert allf[10] == ["1"]                         # p2 → FIG 1
-    assert allf[89] == ["4"]                         # p3 → FIG 4 (elimination)
-    assert allf[77] == ["5"]                         # p4 → FIG 5
+    assert allf["10"] == ["1"]                         # p2 → FIG 1
+    assert allf["89"] == ["4"]                         # p3 → FIG 4 (elimination)
+    assert allf["77"] == ["5"]                         # p4 → FIG 5
 
 
 def test_numeral_sighting_carries_bbox():
     """Bounding boxes survive into the sighting for the confirmation overlay."""
     from attest.figures_map import numeral_sightings
     s = {(x.numeral, x.page): x for x in numeral_sightings(MANIFEST)}
-    assert s[(10, 2)].bbox == (0.4, 0.3, 0.02, 0.02)
-    assert s[(89, 3)].bbox == (0.6, 0.4, 0.02, 0.02)
+    assert s[("10", 2)].bbox == (0.4, 0.3, 0.02, 0.02)
+    assert s[("89", 3)].bbox == (0.6, 0.4, 0.02, 0.02)
 
 
 def test_numeral_sighting_bbox_absent_is_none():
     """A legacy manifest without w/h yields bbox=None, not a crash."""
     from attest.figures_map import numeral_sightings
     legacy = {"pages": [{"page": 2, "file": "p.png", "fig_labels": [], "sheet_id": None,
-                         "numerals": [{"numeral": 5, "source_text": "5",
+                         "numerals": [{"numeral": "5", "source_text": "5",
                                        "confidence": 1.0, "x": 0.1, "y": 0.1}]}]}
     assert numeral_sightings(legacy)[0].bbox is None
 
@@ -167,17 +167,17 @@ def test_numeral_coverage_reconciliation():
     text = ("As shown in FIG. 1, the separator 10 operates. "
             "In FIG. 5, the frame 12 and a gauge 34 are shown. "
             "In FIG. 4, the widget 89 is disassembled.")
-    numerals = [Numeral(n, "x", 0, 1) for n in (10, 12, 34, 89)]   # 77 recited by nobody
+    numerals = [Numeral(n, "x", 0, 1) for n in ("10", "12", "34", "89")]  # 77: nobody
     refs = figure_references(text)
     assigns = fig_to_sheets(MANIFEST, KNOWN)
     cov = numeral_coverage(numerals, text, refs, assigns, numeral_sightings(MANIFEST))
 
-    assert cov.figure_tied == [10, 12, 34, 89]
-    assert cov.recited_not_drawn == [34]        # tied to FIG 5 in text, OCR found it nowhere
-    assert cov.drawn_not_recited == [77]        # OCR has 77 (p4), text never recites it
+    assert cov.figure_tied == ["10", "12", "34", "89"]
+    assert cov.recited_not_drawn == ["34"]        # tied to FIG 5 in text, OCR found it nowhere
+    assert cov.drawn_not_recited == ["77"]        # OCR has 77 (p4), text never recites it
     mism = {m["numeral"]: m["not_located_on"] for m in cov.figure_mismatches}
-    assert mism.get(12) == ["5"]                # text ties 12 to FIG 5, OCR has it on FIG 1
-    assert 10 not in mism                        # 10 tied to FIG 1 AND OCR'd on FIG 1 → clean
+    assert mism.get("12") == ["5"]                # text ties 12 to FIG 5, OCR has it on FIG 1
+    assert "10" not in mism                        # 10 tied to FIG 1 AND OCR'd on FIG 1 → clean
     assert cov.seq_gaps                          # computed, but weak (not a shipped flag)
 
 
@@ -189,7 +189,7 @@ def test_numeral_text_figures_sees_all_mentions():
     text = ("In FIG. 1 the separator 10 enters. Later, referring to FIG. 4, "
             "the disassembled separator 10 is shown.")
     refs = figure_references(text)
-    assert numeral_text_figures(text, 10, refs) == ["1", "4"]     # both, not just the first
+    assert numeral_text_figures(text, "10", refs) == ["1", "4"]     # both, not just the first
 
 
 def test_numeral_sighting_method_round_trips():
@@ -199,11 +199,42 @@ def test_numeral_sighting_method_round_trips():
     from attest.figures_map import numeral_sightings
     man = {"pages": [{"page": 7, "file": "p.png", "fig_labels": [], "sheet_id": None,
                       "numerals": [
-                          {"numeral": 10, "source_text": "10", "confidence": 0.3,
+                          {"numeral": "10", "source_text": "10", "confidence": 0.3,
                            "x": 0.2, "y": 0.56, "w": 0.08, "h": 0.02, "method": "text-guided"},
-                          {"numeral": 80, "source_text": "80", "confidence": 1.0,
+                          {"numeral": "80", "source_text": "80", "confidence": 1.0,
                            "x": 0.7, "y": 0.6, "w": 0.02, "h": 0.02},  # no method → first-pass
                       ]}]}
     by = {s.numeral: s for s in numeral_sightings(man)}
-    assert by[10].method == "text-guided"
-    assert by[80].method == "first-pass"
+    assert by["10"].method == "text-guided"
+    assert by["80"].method == "first-pass"
+
+
+def test_plain_label_does_not_match_inside_a_suffixed_one():
+    """Boundary: searching for "12" must NOT fire on "12a" (a different part)."""
+    assert _rel("the bracket 12a is welded", known=["12"]) == []
+    assert _rel("the housing 12 is welded", known=["12"]) == ["1"]
+
+
+MULTI = {
+    "pages": [{"page": 2, "file": "p.png",
+               "fig_labels": [{"fig": "1", "confidence": 1.0, "x": 0.5, "y": 0.7}],
+               "sheet_id": None,
+               "numerals": [        # the SAME label twice on one sheet (FIG 3A does this)
+                   {"numeral": "12a", "source_text": "12a", "confidence": 1.0,
+                    "x": 0.20, "y": 0.70, "w": 0.03, "h": 0.02, "method": "text-guided"},
+                   {"numeral": "12a", "source_text": "12a", "confidence": 0.9,
+                    "x": 0.60, "y": 0.30, "w": 0.03, "h": 0.02, "method": "text-guided"},
+               ]}],
+}
+
+
+def test_same_label_twice_on_a_sheet_keeps_both_instances():
+    """A label legitimately repeats on one drawing — both instances survive so the
+    reviewer gets a confirmation box on each (Julian: 12a appears twice on FIG 3A)."""
+    from attest.figures_map import numeral_figures, numeral_sightings
+    sights = [s for s in numeral_sightings(MULTI) if s.numeral == "12a"]
+    assert len(sights) == 2
+    assert {s.bbox[0] for s in sights} == {0.20, 0.60}      # two distinct positions
+    # but it is still ONE figure association, not a duplicate
+    assigns = fig_to_sheets(MULTI, ["1"])
+    assert numeral_figures(assigns, sights)["12a"] == ["1"]

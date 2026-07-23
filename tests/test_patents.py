@@ -215,9 +215,9 @@ def test_figure_references_carry_offsets():
 def test_reference_numerals_map_number_to_element():
     from attest.patents import reference_numerals
     nums = {n.number: n.element for n in reference_numerals(_text())}
-    assert set(nums) == {100, 12, 14, 10}                # the four ≥10 numerals
-    assert "device" in nums[100] and "housing" in nums[10]
-    assert "sprocket" in nums[12] and "controller" in nums[14]
+    assert set(nums) == {"100", "12", "14", "10"}                # the four ≥10 numerals
+    assert "device" in nums["100"] and "housing" in nums["10"]
+    assert "sprocket" in nums["12"] and "controller" in nums["14"]
 
 
 def test_reference_numerals_ignore_claim_noise_without_a_magnitude_floor():
@@ -246,8 +246,8 @@ def test_single_digit_reference_numerals_are_kept():
         _pytest.skip("engagement corpus not present (local-only)")
     from attest.patents import reference_numerals
     nums = {n.number: n.element for n in reference_numerals(real.read_text(encoding="utf-8"))}
-    assert "bathtub" in nums[1] and "toilet" in nums[2]
-    assert "dishwasher" in nums[4] and "clothes washer" in nums[5]
+    assert "bathtub" in nums["1"] and "toilet" in nums["2"]
+    assert "dishwasher" in nums["4"] and "clothes washer" in nums["5"]
 
 
 def test_reference_numerals_reject_decimals_and_quantities():
@@ -257,9 +257,9 @@ def test_reference_numerals_reject_decimals_and_quantities():
     sample = ("The chlorine residual has been measured as 0.24 mg/l in the tank 42. "
               "The magnetron 44 draws 400 W and the chamber holds 60 degrees.")
     nums = {n.number: n.element for n in reference_numerals(sample)}
-    assert 0 not in nums                                # the decimal
-    assert 400 not in nums and 60 not in nums           # quantities carrying units
-    assert "tank" in nums[42] and "magnetron" in nums[44]
+    assert "0" not in nums                                # the decimal
+    assert "400" not in nums and "60" not in nums           # quantities carrying units
+    assert "tank" in nums["42"] and "magnetron" in nums["44"]
 
 
 def test_figure_and_numeral_spans_resolve_through_the_span_store(tmp_path):
@@ -288,9 +288,9 @@ def test_figures_validate_on_the_real_patent():
     labels = [f.label for f in parse_figures(t)]
     assert labels == ["FIG. 1", "FIG. 2", "FIG. 4", "FIG. 5", "FIG. 6"]  # clean block
     nums = {n.number: n.element for n in reference_numerals(t)}
-    assert "microwave reactor chamber" in nums[12]
-    assert "ceramic filter material" in nums[38]
-    assert "necked portion" in nums[89]
+    assert "microwave reactor chamber" in nums["12"]
+    assert "ceramic filter material" in nums["38"]
+    assert "necked portion" in nums["89"]
 
 
 def test_figure_reference_letter_range_expands():
@@ -301,3 +301,21 @@ def test_figure_reference_letter_range_expands():
     refs = figure_references("as shown in FIGS. 3 A-C are respective views; see FIG. 4.")
     assert [r.number for r in refs] == ["3A", "3B", "3C", "4"]
     assert "3" not in {r.number for r in refs}
+
+
+def test_letter_suffixed_reference_numerals_are_distinct():
+    """Julian's case: "12a" is a DIFFERENT part from "12". Collapsing the suffix
+    reports 12 present and 12a missing — both wrong."""
+    from attest.patents import reference_numerals
+    sample = ("the housing 12 supports a bracket 12a and a clamp 12b; "
+              "the arm 14 carries a pin 14a.")
+    nums = {n.number: n.element for n in reference_numerals(sample)}
+    assert set(nums) == {"12", "12a", "12b", "14", "14a"}
+    assert "bracket" in nums["12a"] and "housing" in nums["12"]
+
+
+def test_numeral_key_orders_naturally():
+    """9 < 10 < 12 < 12a < 12b, and a non-numeric label sorts after the numbered."""
+    from attest.patents import numeral_key
+    labels = ["12b", "10", "STM", "9", "12", "12a"]
+    assert sorted(labels, key=numeral_key) == ["9", "10", "12", "12a", "12b", "STM"]

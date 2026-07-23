@@ -398,7 +398,11 @@ _FIG_REF = re.compile(
 #     artefact of scanning the claims, so we simply don't scan them.
 #   · DECIMALS — "measured as 0.24 mg/l" must not yield numeral 0.
 #   · UNITS — "400 W", "60 degrees" are quantities, not pointers.
-_NUMERAL = re.compile(r"\b((?:the |a |an |said )?(?:[a-z]+ ){0,2}[a-z]+)\s+(\d{1,3})\b(?!\.\d)")
+#   · SUFFIXES — "12a"/"14a" are DISTINCT labels from "12"/"14" (a variant part), so
+#     the suffix is captured; without it 12a collapses into 12 and both are wrong.
+_NUMERAL = re.compile(
+    r"\b((?:the |a |an |said )?(?:[a-z]+ ){0,2}[a-z]+)\s+(\d{1,3}[a-z]?)(?![\da-z])(?!\.\d)"
+)
 _UNIT_AFTER = re.compile(
     r"^\s*(?:W|watts?|mm|cm|m|in|inch(?:es)?|ft|kg|lbs?|°|degrees?|%|percent|hours?|"
     r"minutes?|seconds?|volts?|V|Hz|psi|gal|gallons?|l(?:iters?)?|N\.T\.U\.|mg)\b",
@@ -430,10 +434,21 @@ class FigureRef:
 
 @dataclass(frozen=True)
 class Numeral:
-    number: int
+    # A reference LABEL, not an integer: patents use letter-suffixed numerals
+    # ("12a", "14a" — often a variant of part 12) alongside plain ones. Keeping it a
+    # string is what stops "12a" collapsing into "12" (which then reports 12 as
+    # present when only 12a is drawn, and 12a as missing entirely).
+    number: str
     element: str              # the noun phrase the numeral labels ("separator")
     char_start: int          # first-mention offset (element+number), resolvable
     char_end: int
+
+
+def numeral_key(label: str) -> tuple:
+    """Natural ordering for reference labels: 9 < 10 < 12 < 12a < 12b, and any
+    non-numeric label (an acronym like "STM") sorts after the numbered ones."""
+    m = re.fullmatch(r"(\d+)([a-z]?)", label)
+    return (0, int(m.group(1)), m.group(2)) if m else (1, 0, label)
 
 
 def parse_figures(text: str) -> list[Figure]:
@@ -502,16 +517,16 @@ def reference_numerals(text: str) -> list[Numeral]:
     """
     cm = _CLAIMS_MARKER.search(text)
     region = text[:cm.start()] if cm else text          # specification only
-    seen: dict[int, Numeral] = {}
+    seen: dict[str, Numeral] = {}
     for m in _NUMERAL.finditer(region):
         phrase = re.sub(r"^(the|a|an|said)\s+", "", m.group(1).strip())
         if not phrase or phrase.split()[-1] in _NOT_ELEMENT:
             continue
         if _UNIT_AFTER.match(region[m.end():m.end() + 14]):    # a quantity, not a pointer
             continue
-        num = int(m.group(2))
+        num = m.group(2).lower()                       # "12a" stays distinct from "12"
         if num in seen:                                # first mention only
             continue
         s = m.start() + (m.group(0).find(phrase))
         seen[num] = Numeral(num, phrase, s, m.end())
-    return [seen[n] for n in sorted(seen)]
+    return [seen[n] for n in sorted(seen, key=numeral_key)]

@@ -41,9 +41,10 @@ import Vision
 
 _FIG_LABEL = re.compile(r"FIGS?\.?\s*(\d+[A-Z]?)", re.IGNORECASE)
 _SHEET_ID = re.compile(r"Sheet\s+(\d+)\s+of\s+(\d+)", re.IGNORECASE)
-# A digit run NOT letter-prefixed: "D1"/"D6" are FIG. 6's DIMENSION labels, not
-# reference numerals — without the lookbehind they polluted the numeral set as 1..6.
-_DIGIT_RUN = re.compile(r"(?<![A-Za-z0-9])\d{1,3}(?!\d)")
+# A reference LABEL: digits + an optional single letter suffix ("12a" is a distinct
+# part from "12" — dropping the suffix reports 12 present and 12a missing, both wrong).
+# Still letter-PREFIX rejected: "D1"/"D6" are FIG. 6's DIMENSION labels, not numerals.
+_DIGIT_RUN = re.compile(r"(?<![A-Za-z0-9])(\d{1,3}[a-z]?)(?![\da-z])")
 # Header furniture that must not yield numeral candidates (patent number, dates).
 _HEADER_BAND = 0.88          # normalized y above this = the running header band
 # Page/patent furniture whose digits are NOT reference numerals — the first pass
@@ -91,18 +92,26 @@ def ocr_image(path: Path) -> list[dict]:
     return out
 
 
-def tiled_search(path: Path, targets: set[int], *, rows: int = 4, cols: int = 2,
+_SAME_SPOT = 0.02        # normalized distance under which two reads are one instance
+
+
+def tiled_search(path: Path, targets: set[str], *, rows: int = 4, cols: int = 2,
                  overlap: float = 0.12) -> list[dict]:
     """Text-GUIDED confirmation: re-OCR a sheet in overlapping full-resolution tiles
     (which recovers small numerals the single-pass whole-image OCR drops on sparse
     line drawings) and return ONLY sightings of the requested `targets`. Restricting
-    to text-predicted numerals is what keeps the higher-recall pass from adding tiling
+    to text-predicted labels is what keeps the higher-recall pass from adding tiling
     noise (page/patent-number fragments). Bboxes are mapped back to full-image
     normalized coords (origin bottom-left) so the confirmation box still lands right.
+
+    **Every instance is kept, not just the best one:** the same label legitimately
+    appears more than once on a sheet (FIG. 3A carries "12a" twice), and a reviewer
+    needs a box on each. Reads from OVERLAPPING tiles that land on the same spot are
+    the same instance and collapse to the highest-confidence one.
     """
     cg = _load_cg(path)
     W, H = Quartz.CGImageGetWidth(cg), Quartz.CGImageGetHeight(cg)
-    best: dict[int, dict] = {}
+    found: list[dict] = []
     for r in range(rows):
         for c in range(cols):
             x = max(0, int(c * W / cols - overlap * W))
@@ -117,7 +126,7 @@ def tiled_search(path: Path, targets: set[int], *, rows: int = 4, cols: int = 2,
                     if _FURNITURE.search(text):          # "Sheet N of M", patent number
                         continue
                     for tok in _DIGIT_RUN.findall(text):
-                        num = int(tok)
+                        num = tok.lower()
                         if num not in targets:
                             continue
                         bb = obs.boundingBox()       # normalized within the TILE
@@ -129,18 +138,23 @@ def tiled_search(path: Path, targets: set[int], *, rows: int = 4, cols: int = 2,
                         y_full = round(1 - (y + h * (1 - by)) / H, 4)
                         if y_full >= _HEADER_BAND:       # the running header strip
                             continue
+                        x_full = round((x + float(bb.origin.x) * w) / W, 4)
                         conf = round(float(cand.confidence()), 3)
-                        if num in best and best[num]["confidence"] >= conf:
-                            continue
-                        best[num] = {
+                        hit = {
                             "numeral": num, "source_text": text, "confidence": conf,
-                            "method": "text-guided",
-                            "x": round((x + float(bb.origin.x) * w) / W, 4),
-                            "y": y_full,
+                            "method": "text-guided", "x": x_full, "y": y_full,
                             "w": round(float(bb.size.width) * w / W, 4),
                             "h": round(float(bb.size.height) * h / H, 4),
                         }
-    return [best[n] for n in sorted(best)]
+                        dup = next(
+                            (o for o in found if o["numeral"] == num
+                             and abs(o["x"] - x_full) < _SAME_SPOT
+                             and abs(o["y"] - y_full) < _SAME_SPOT), None)
+                        if dup is None:                  # a genuinely separate instance
+                            found.append(hit)
+                        elif conf > dup["confidence"]:   # same spot, better read
+                            found[found.index(dup)] = hit
+    return sorted(found, key=lambda d: (d["numeral"], -d["y"]))
 
 
 def derive(observations: list[dict]) -> dict:
@@ -160,7 +174,7 @@ def derive(observations: list[dict]) -> dict:
             continue
         for run in _DIGIT_RUN.findall(o["text"]):
             numerals.append({
-                "numeral": int(run), "source_text": o["text"],
+                "numeral": run.lower(), "source_text": o["text"],
                 "confidence": o["confidence"], "method": "first-pass",
                 # full normalized bbox (origin bottom-left) — carried through so the
                 # figures view can draw a confirmation box around the located numeral.
@@ -186,7 +200,7 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
         numeral_text_figures,
     )
     from attest.ingest import DocumentStore
-    from attest.patents import figure_references, parse_figures, reference_numerals
+    from attest.patents import figure_references, numeral_key, parse_figures, reference_numerals
     from attest.spans import SpanStore
 
     text = SpanStore.from_store(DocumentStore(store)).get_document(doc)
@@ -200,7 +214,7 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
 
     # predicted: numeral → figures the spec discusses it near; keep those the first
     # pass did NOT already place on that figure's sheet.
-    want_per_page: dict[int, set[int]] = {}
+    want_per_page: dict[int, set[str]] = {}
     for n in reference_numerals(text):
         for fig in numeral_text_figures(text, n.number, refs):
             page = fig_to_page.get(fig)
@@ -215,7 +229,7 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
             got = ", ".join(str(h["numeral"]) for h in hits)
             recovered += len(hits)
             print(f"  ↻ p.{page}: text-guided recovery → {got}  "
-                  f"(of predicted {', '.join(map(str, sorted(targets)))})")
+                  f"(of predicted {', '.join(sorted(targets, key=numeral_key))})")
     return recovered
 
 

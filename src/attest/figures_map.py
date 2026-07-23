@@ -22,8 +22,20 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from .patents import numeral_key
+
 OCR = "ocr"
 ELIMINATION = "elimination"
+
+# How far a figure's "current context" carries in the spec text. Patent prose says
+# "Referring now to FIG. 2, …" and then discusses that figure's parts for several
+# paragraphs, so a numeral's governing figure is the nearest PRECEDING FIG reference,
+# not one within a tight radius. Measured on US5447630A: at 500 chars the check failed
+# to tie 14a/54/62/64/66 to FIG. 2 (numerals the spec plainly discusses under it, and
+# which a reviewer spotted on the sheet); at 2000 all five tie correctly. Wider than
+# that ties more numerals without recovering any more of them — so 2000 is where the
+# evidence stops improving.
+FIGURE_CONTEXT_WINDOW = 2000
 
 
 @dataclass(frozen=True)
@@ -36,7 +48,7 @@ class SheetAssignment:
 
 @dataclass(frozen=True)
 class NumeralSighting:
-    numeral: int
+    numeral: str      # a reference LABEL: "12", "12a", or an acronym
     page: int
     confidence: float
     source_text: str          # the raw OCR text the digits came from ("-82" → 82)
@@ -88,18 +100,18 @@ def numeral_sightings(manifest: dict, *, min_confidence: float = 0.0) -> list[Nu
                     if all(k in n for k in ("x", "y", "w", "h")) else None)
             out.append(NumeralSighting(n["numeral"], page["page"], n["confidence"],
                                        n["source_text"], bbox, n.get("method", "first-pass")))
-    return sorted(out, key=lambda s: (s.page, s.numeral))
+    return sorted(out, key=lambda s: (s.page, numeral_key(s.numeral)))
 
 
 def numeral_figures(
     assignments: list[SheetAssignment], sightings: list[NumeralSighting],
-) -> dict[int, list[str]]:
+) -> dict[str, list[str]]:
     """For every numeral, ALL figures it is OCR-located in (a numeral shared across
     figures — "the separator 10" appears in FIGS. 1, 2, 5 — surfaces all of them,
     not just the first text mention). Figures are ordered as assigned; a sighting on
     an unassigned sheet contributes nothing (no figure to name). Locate-only."""
     page_to_fig = {a.page: a.fig for a in assignments}
-    out: dict[int, list[str]] = {}
+    out: dict[str, list[str]] = {}
     for s in sightings:
         fig = page_to_fig.get(s.page)
         if fig and fig not in out.setdefault(s.numeral, []):
@@ -109,13 +121,13 @@ def numeral_figures(
 
 @dataclass(frozen=True)
 class NumeralCrossCheck:
-    matched: dict[int, list[NumeralSighting]]   # recited in spec AND located on sheets
-    text_only: list[int]                        # recited, never located (OCR miss OR omission)
+    matched: dict[str, list[NumeralSighting]]   # recited in spec AND located on sheets
+    text_only: list[str]                        # recited, never located (OCR miss OR omission)
     sheet_only: list[NumeralSighting]           # located, never recited (OCR artifact OR gap)
 
 
 def cross_check_numerals(
-    text_numerals: list[int], manifest: dict, *, min_confidence: float = 0.0,
+    text_numerals: list[str], manifest: dict, *, min_confidence: float = 0.0,
 ) -> NumeralCrossCheck:
     """The PE-2 element-numeral bridge: reconcile the spec's numeral list (from
     `patents.reference_numerals`, deterministic over text) with the sheets' (OCR).
@@ -125,13 +137,13 @@ def cross_check_numerals(
     indistinguishable from here, and the check never claims otherwise (D10).
     """
     sightings = numeral_sightings(manifest, min_confidence=min_confidence)
-    by_num: dict[int, list[NumeralSighting]] = {}
+    by_num: dict[str, list[NumeralSighting]] = {}
     for s in sightings:
         by_num.setdefault(s.numeral, []).append(s)
     text_set = set(text_numerals)
     return NumeralCrossCheck(
-        matched={n: by_num[n] for n in sorted(text_set & set(by_num))},
-        text_only=sorted(text_set - set(by_num)),
+        matched={n: by_num[n] for n in sorted(text_set & set(by_num), key=numeral_key)},
+        text_only=sorted(text_set - set(by_num), key=numeral_key),
         sheet_only=[s for s in sightings if s.numeral not in text_set],
     )
 
@@ -140,7 +152,7 @@ def relevant_figures(
     cited_span_texts: list[str],
     assignments: list[SheetAssignment],
     sightings: list[NumeralSighting],
-    known_numerals: list[int],
+    known_numerals: list[str],
 ) -> list[str]:
     """Which figures should ride beside these cited spans (RT-4's payoff rule).
 
@@ -159,7 +171,7 @@ def relevant_figures(
 
     assigned = {a.fig for a in assignments}
     page_to_fig = {a.page: a.fig for a in assignments}
-    num_to_pages: dict[int, set[int]] = {}
+    num_to_pages: dict[str, set[int]] = {}
     for s in sightings:
         num_to_pages.setdefault(s.numeral, set()).add(s.page)
 
@@ -170,23 +182,25 @@ def relevant_figures(
             if m.group(1).upper() in assigned:
                 out.add(m.group(1).upper())
         for n in known_numerals:
-            # standalone integer n: not inside a larger/grouped/decimal number.
-            # Trailing `,` is allowed as PUNCTUATION ("separator 10, which") but not
-            # as grouping ("10,500") — hence `(?!,\d)`, distinct from `(?![\d.])`.
-            if _re.search(rf"(?<![\d.,]){n}(?![\d.])(?!,\d)", text):
+            # standalone label n: not inside a larger/grouped/decimal number, and not
+            # a prefix of a suffixed label ("12" must NOT match inside "12a") — hence
+            # the trailing [\da-z] guard. A trailing `,` is punctuation ("10, which")
+            # but `,\d` is grouping ("10,500").
+            if _re.search(rf"(?<![\d.,]){_re.escape(n)}(?![\da-z])(?!\.\d)(?!,\d)", text):
                 for page in num_to_pages.get(n, ()):
                     if page in page_to_fig:
                         out.add(page_to_fig[page])
     return sorted(out, key=lambda f: (len(f), f))
 
 
-def numeral_text_figures(text: str, numeral: int, fig_refs, *, window: int = 500) -> list[str]:
+def numeral_text_figures(text: str, numeral: str, fig_refs, *,
+                         window: int = FIGURE_CONTEXT_WINDOW) -> list[str]:
     """Every figure a numeral is discussed near across ALL its spec mentions — the
     nearest `FIG. N` reference at/before each standalone occurrence, within `window`
     chars. (`reference_numerals` gives only the FIRST mention; this sees them all, so
     "separator 10" discussed under both FIG. 1 and FIG. 4 surfaces both.)"""
     figs: set[str] = set()
-    pat = re.compile(rf"(?<![\d.,]){numeral}(?![\d.])(?!,\d)")
+    pat = re.compile(rf"(?<![\d.,]){re.escape(numeral)}(?![\da-z])(?!\.\d)(?!,\d)")
     for m in pat.finditer(text):
         best = None
         for r in fig_refs:
@@ -200,9 +214,9 @@ def numeral_text_figures(text: str, numeral: int, fig_refs, *, window: int = 500
 
 @dataclass(frozen=True)
 class NumeralCoverage:
-    figure_tied: list[int]          # the clean set: numerals the spec recites near a figure
-    recited_not_drawn: list[int]    # figure-tied, but OCR found on NO sheet → OCR-miss flag
-    drawn_not_recited: list[int]    # OCR-located, never recited in the spec → artefact/unlabeled
+    figure_tied: list[str]         # the clean set: numerals the spec recites near a figure
+    recited_not_drawn: list[str]    # figure-tied, but OCR found on NO sheet → OCR-miss flag
+    drawn_not_recited: list[str]    # OCR-located, never recited in the spec → artefact/unlabeled
     figure_mismatches: list[dict]   # tied to FIG. N in text, not OCR-located on FIG. N's sheet
     seq_gaps: list[int]             # missing ints in figure_tied's range — WEAK (patents skip)
 
@@ -232,7 +246,7 @@ def numeral_coverage(
     """
     text_nums = {n.number for n in numerals}
     sightings = [s for s in sightings if s.confidence >= min_confidence]
-    ocr_nums = {s.numeral for s in sightings if s.numeral >= 1}   # 0 = OCR noise
+    ocr_nums = {s.numeral for s in sightings if s.numeral != "0"}   # "0" = OCR noise
     ocr_figs = numeral_figures(assignments, sightings)
     assigned_figs = {a.fig for a in assignments}
 
@@ -241,9 +255,10 @@ def numeral_coverage(
     # TEXT-AUTHORITATIVE, figure-tied: numerals the spec recites in the context of a
     # figure. Excludes quantity noise ("220° F" — recited, not figure-tied) and OCR
     # misreads ("280" — on a sheet, never recited). The spec defines the numerals.
-    figure_tied = sorted({n for n, fs in text_figs_of.items() if fs and n >= 1})
-    seq_gaps = ([i for i in range(figure_tied[0], figure_tied[-1] + 1) if i not in set(figure_tied)]
-                if figure_tied else [])
+    figure_tied = sorted({n for n, fs in text_figs_of.items() if fs and n != "0"},
+                         key=numeral_key)
+    ints = sorted(int(n) for n in figure_tied if n.isdigit())   # suffixed labels excluded
+    seq_gaps = ([i for i in range(ints[0], ints[-1] + 1) if i not in set(ints)] if ints else [])
 
     mismatches = []
     for n in figure_tied:
@@ -259,7 +274,7 @@ def numeral_coverage(
     return NumeralCoverage(
         figure_tied=figure_tied,
         recited_not_drawn=[n for n in figure_tied if n not in ocr_nums],
-        drawn_not_recited=sorted(ocr_nums - text_nums),
+        drawn_not_recited=sorted(ocr_nums - text_nums, key=numeral_key),
         figure_mismatches=mismatches,
         seq_gaps=seq_gaps,
     )
