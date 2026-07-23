@@ -46,6 +46,12 @@ _SHEET_ID = re.compile(r"Sheet\s+(\d+)\s+of\s+(\d+)", re.IGNORECASE)
 _DIGIT_RUN = re.compile(r"(?<![A-Za-z0-9])\d{1,3}(?!\d)")
 # Header furniture that must not yield numeral candidates (patent number, dates).
 _HEADER_BAND = 0.88          # normalized y above this = the running header band
+# Page/patent furniture whose digits are NOT reference numerals — the first pass
+# drops these via the header BAND, but the tiled confirmation pass reads tiles with
+# no absolute-y context, so it also string-matches these ("Sheet 1 of 8" boxed the
+# header when searching for reference 1/8; "N of 8" is the page count).
+_FURNITURE = re.compile(r"sheet\s+\d+\s+of\s+\d+|\b\d+\s+of\s+\d+\b|5[,\s]*447[,\s]*630",
+                        re.IGNORECASE)
 
 
 def _load_cg(path: Path):
@@ -107,12 +113,12 @@ def tiled_search(path: Path, targets: set[int], *, rows: int = 4, cols: int = 2,
             results, ncand = _recognize(tile, n_candidates=3)
             for obs in results:
                 for cand in obs.topCandidates_(ncand):
-                    for tok in _DIGIT_RUN.findall(cand.string()):
+                    text = cand.string()
+                    if _FURNITURE.search(text):          # "Sheet N of M", patent number
+                        continue
+                    for tok in _DIGIT_RUN.findall(text):
                         num = int(tok)
                         if num not in targets:
-                            continue
-                        conf = round(float(cand.confidence()), 3)
-                        if num in best and best[num]["confidence"] >= conf:
                             continue
                         bb = obs.boundingBox()       # normalized within the TILE
                         # The tile rect (x, y) is TOP-left origin (Quartz sub-image),
@@ -120,11 +126,17 @@ def tiled_search(path: Path, targets: set[int], *, rows: int = 4, cols: int = 2,
                         # composes directly while y must be flipped back to the full
                         # image's bottom-left frame (else the box lands mirrored).
                         by = float(bb.origin.y)
+                        y_full = round(1 - (y + h * (1 - by)) / H, 4)
+                        if y_full >= _HEADER_BAND:       # the running header strip
+                            continue
+                        conf = round(float(cand.confidence()), 3)
+                        if num in best and best[num]["confidence"] >= conf:
+                            continue
                         best[num] = {
-                            "numeral": num, "source_text": cand.string(), "confidence": conf,
+                            "numeral": num, "source_text": text, "confidence": conf,
                             "method": "text-guided",
                             "x": round((x + float(bb.origin.x) * w) / W, 4),
-                            "y": round(1 - (y + h * (1 - by)) / H, 4),
+                            "y": y_full,
                             "w": round(float(bb.size.width) * w / W, 4),
                             "h": round(float(bb.size.height) * h / H, 4),
                         }
