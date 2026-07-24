@@ -319,3 +319,30 @@ def test_numeral_key_orders_naturally():
     from attest.patents import numeral_key
     labels = ["12b", "10", "STM", "9", "12", "12a"]
     assert sorted(labels, key=numeral_key) == ["9", "10", "12", "12a", "12b", "STM"]
+
+
+def test_acronym_labels_are_candidates_from_the_spec():
+    """Some drawings label a part with letters ("STM"), so the reference model can't
+    be digits-only. Candidates come from the spec and need >=2 mentions; figure
+    syntax and unit abbreviations are excluded. The DRAWINGS then adjudicate — a
+    candidate that is really prose simply isn't found as a label."""
+    from attest.patents import acronym_labels
+    spec = ("The solid treatment module STM feeds the liquid treatment module LTM. "
+            "The STM houses a central processing unit CPU; the CPU drives it. "
+            "The LTM is PVC. See FIG. 1 and FIGS. 2-3. Airflow is 300 CFM.")
+    got = acronym_labels(spec)
+    assert "STM" in got and "LTM" in got and "CPU" in got   # >=2 mentions each
+    assert "FIG" not in got and "FIGS" not in got           # figure syntax
+    assert "CFM" not in got                                 # unit abbreviation
+    assert "PVC" not in got                                 # single mention here
+
+
+def test_label_pattern_numeric_vs_acronym():
+    import re
+
+    from attest.figures_map import label_pattern
+    assert re.search(label_pattern("STM"), "the STM feeds")          # word-boundary
+    assert not re.search(label_pattern("STM"), "the STMX feeds")     # not a prefix
+    assert re.search(label_pattern("12"), "housing 12.")             # sentence-final ok
+    assert not re.search(label_pattern("12"), "bracket 12a")         # not inside 12a
+    assert not re.search(label_pattern("12"), "ratio 12.5")          # not a decimal

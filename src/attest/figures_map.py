@@ -38,6 +38,16 @@ ELIMINATION = "elimination"
 FIGURE_CONTEXT_WINDOW = 2000
 
 
+def label_pattern(label: str) -> str:
+    """Regex for a reference LABEL as a standalone token. A numeric label needs
+    number-aware guards (no trailing digit/letter so "12" never fires inside "12a";
+    no decimal "10.5"; a trailing comma is punctuation unless it is grouping
+    "10,500"). An acronym label ("STM") just needs word boundaries."""
+    if label[0].isdigit():
+        return rf"(?<![\d.,]){re.escape(label)}(?![\da-z])(?!\.\d)(?!,\d)"
+    return rf"\b{re.escape(label)}\b" 
+
+
 @dataclass(frozen=True)
 class SheetAssignment:
     fig: str                  # "1", "3A"
@@ -186,7 +196,7 @@ def relevant_figures(
             # a prefix of a suffixed label ("12" must NOT match inside "12a") — hence
             # the trailing [\da-z] guard. A trailing `,` is punctuation ("10, which")
             # but `,\d` is grouping ("10,500").
-            if _re.search(rf"(?<![\d.,]){_re.escape(n)}(?![\da-z])(?!\.\d)(?!,\d)", text):
+            if _re.search(label_pattern(n), text):
                 for page in num_to_pages.get(n, ()):
                     if page in page_to_fig:
                         out.add(page_to_fig[page])
@@ -200,7 +210,7 @@ def numeral_text_figures(text: str, numeral: str, fig_refs, *,
     chars. (`reference_numerals` gives only the FIRST mention; this sees them all, so
     "separator 10" discussed under both FIG. 1 and FIG. 4 surfaces both.)"""
     figs: set[str] = set()
-    pat = re.compile(rf"(?<![\d.,]){re.escape(numeral)}(?![\da-z])(?!\.\d)(?!,\d)")
+    pat = re.compile(label_pattern(numeral))
     for m in pat.finditer(text):
         best = None
         for r in fig_refs:

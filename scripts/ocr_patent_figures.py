@@ -125,8 +125,13 @@ def tiled_search(path: Path, targets: set[str], *, rows: int = 4, cols: int = 2,
                     text = cand.string()
                     if _FURNITURE.search(text):          # "Sheet N of M", patent number
                         continue
-                    for tok in _DIGIT_RUN.findall(text):
-                        num = tok.lower()
+                    # numeric labels come from the digit-run pattern; acronym labels
+                    # ("STM") are matched whole-word — a drawing can label a part with
+                    # letters, so the reference model is not digits-only.
+                    toks = [t.lower() for t in _DIGIT_RUN.findall(text)]
+                    toks += [a for a in targets
+                             if not a[0].isdigit() and re.search(rf"\b{re.escape(a)}\b", text)]
+                    for num in toks:
                         if num not in targets:
                             continue
                         bb = obs.boundingBox()       # normalized within the TILE
@@ -200,7 +205,13 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
         numeral_text_figures,
     )
     from attest.ingest import DocumentStore
-    from attest.patents import figure_references, numeral_key, parse_figures, reference_numerals
+    from attest.patents import (
+        acronym_labels,
+        figure_references,
+        numeral_key,
+        parse_figures,
+        reference_numerals,
+    )
     from attest.spans import SpanStore
 
     text = SpanStore.from_store(DocumentStore(store)).get_document(doc)
@@ -215,11 +226,12 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
     # predicted: numeral → figures the spec discusses it near; keep those the first
     # pass did NOT already place on that figure's sheet.
     want_per_page: dict[int, set[str]] = {}
-    for n in reference_numerals(text):
-        for fig in numeral_text_figures(text, n.number, refs):
+    labels = [n.number for n in reference_numerals(text)] + acronym_labels(text)
+    for lbl in labels:
+        for fig in numeral_text_figures(text, lbl, refs):
             page = fig_to_page.get(fig)
-            if page is not None and fig not in ocr_figs.get(n.number, []):
-                want_per_page.setdefault(page, set()).add(n.number)
+            if page is not None and fig not in ocr_figs.get(lbl, []):
+                want_per_page.setdefault(page, set()).add(lbl)
 
     recovered = 0
     for page, targets in sorted(want_per_page.items()):

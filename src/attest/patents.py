@@ -444,6 +444,33 @@ class Numeral:
     char_end: int
 
 
+# Acronym reference labels ("STM", "LTM", "CPU") — some drawings label a component
+# with letters instead of a number, so the reference model cannot be digits-only.
+# Candidates come from the SPEC (not the drawing) and are then text-GUIDED searched
+# on the sheets: a candidate that is really prose (a material "PVC", a unit "CFM")
+# simply is not found as a drawing label and costs nothing, so this needs no clever
+# classifier — the drawings adjudicate. FIG/FIGS are figure syntax, not labels.
+_ACRONYM = re.compile(r"\b([A-Z]{2,5})\b")
+_NOT_A_LABEL = frozenset("FIG FIGS US NO PCT CIP CFM RPM PSI GPM".split())
+_MIN_ACRONYM_MENTIONS = 2     # a one-off is usually an OCR/typo fragment, not a label
+
+
+def acronym_labels(text: str) -> list[str]:
+    """Candidate acronym reference labels the spec uses for components.
+
+    Requires >= _MIN_ACRONYM_MENTIONS mentions (a single occurrence is noise) and
+    excludes figure syntax and unit abbreviations. Locate-only (D10): these are
+    candidates to LOOK FOR on the drawings, never an assertion that they are labels.
+    """
+    cm = _CLAIMS_MARKER.search(text)
+    region = text[:cm.start()] if cm else text          # specification only
+    counts: dict[str, int] = {}
+    for m in _ACRONYM.finditer(region):
+        counts[m.group(1)] = counts.get(m.group(1), 0) + 1
+    return sorted(a for a, n in counts.items()
+                  if n >= _MIN_ACRONYM_MENTIONS and a not in _NOT_A_LABEL)
+
+
 def numeral_key(label: str) -> tuple:
     """Natural ordering for reference labels: 9 < 10 < 12 < 12a < 12b, and any
     non-numeric label (an acronym like "STM") sorts after the numbered ones."""

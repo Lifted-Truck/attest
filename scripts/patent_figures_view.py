@@ -27,6 +27,7 @@ import argparse
 import base64
 import html
 import json
+import re
 from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
@@ -40,6 +41,8 @@ from attest.figures_map import (
 )
 from attest.ingest import DocumentStore
 from attest.patents import (
+    Numeral,
+    acronym_labels,
     figure_references,
     parse_figures,
     reference_numerals,
@@ -270,6 +273,15 @@ def main() -> int:
         f'<div class="fd">{_cap_body(f)}</div></div>'
         for f in figs
     )
+    # Acronym reference labels ("STM") get legend chips too — their sightings and
+    # confirmation boxes already exist in the manifest; without a chip they would be
+    # unreachable in the UI. Only acronyms actually SIGHTED on a sheet get a chip
+    # (a prose-only candidate like "PVC" would be noise).
+    for a in acronym_labels(text):
+        m = re.search(rf"\b{re.escape(a)}\b", text)
+        if m and a in sightings_by_num:
+            nums = list(nums) + [Numeral(a, "(text label on drawing)", m.start(), m.end())]
+
     ctx_json, nums_html = {}, []
     for n in nums:
         first = numeral_figure(n.char_start, refs)          # nearest text FIG (default)
