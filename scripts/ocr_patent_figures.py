@@ -33,11 +33,28 @@ import hashlib
 import json
 import platform
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path for the --confirm pass)
-import Quartz
-import Vision
+
+# Engine imports are OPTIONAL — ATTEST ingests on non-Mac systems too (D29):
+# Vision is darwin-only; RapidOCR is a pip extra; Tesseract is a system binary.
+try:
+    import Quartz
+    import Vision
+    VISION_OK = True
+except Exception:                                       # non-darwin / no pyobjc
+    Quartz = Vision = None
+    VISION_OK = False
+try:
+    from rapidocr_onnxruntime import RapidOCR
+    RAPID_OK = True
+except Exception:
+    RapidOCR = None
+    RAPID_OK = False
+TESSERACT_OK = shutil.which("tesseract") is not None
 
 _FIG_LABEL = re.compile(r"FIGS?\.?\s*(\d+[A-Z]?)", re.IGNORECASE)
 _SHEET_ID = re.compile(r"Sheet\s+(\d+)\s+of\s+(\d+)", re.IGNORECASE)
@@ -53,6 +70,10 @@ _HEADER_BAND = 0.88          # normalized y above this = the running header band
 # header when searching for reference 1/8; "N of 8" is the page count).
 _FURNITURE = re.compile(r"sheet\s+\d+\s+of\s+\d+|\b\d+\s+of\s+\d+\b|5[,\s]*447[,\s]*630",
                         re.IGNORECASE)
+# A digit inside PROSE ("FINAL PURIFIED EFFLUENT. 1") is annotation text, not a
+# reference numeral — real numeral reads are short ("14 140", "-82"), never carry
+# multi-letter words.
+_PROSE = re.compile(r"[A-Za-z]{4,}")
 
 
 def _load_cg(path: Path):
@@ -89,6 +110,52 @@ def ocr_image(path: Path) -> list[dict]:
             "x": round(float(bb.origin.x), 4), "y": round(float(bb.origin.y), 4),
             "w": round(float(bb.size.width), 4), "h": round(float(bb.size.height), 4),
         })
+    return out
+
+
+def obs_tesseract(path: Path) -> list[dict]:
+    """Tesseract sparse-text pass (`--psm 11`) → common observations. A system
+    binary, cross-platform — and empirically complementary to Vision (it reads the
+    isolated view-marker glyphs and 14a/64 that Vision drops on this corpus)."""
+    from PIL import Image
+
+    from attest.figures_map import tesseract_tsv_to_observations
+    w, h = Image.open(path).size
+    r = subprocess.run(["tesseract", str(path), "stdout", "--psm", "11", "tsv"],
+                       capture_output=True)
+    return tesseract_tsv_to_observations(r.stdout.decode("utf-8", "replace"), w, h)
+
+
+def obs_rapidocr(path: Path) -> list[dict]:
+    """RapidOCR (PaddleOCR models on ONNX runtime — pip-only, cross-platform, no
+    torch). Best whole-image recall of the three on patent sheets (24/30 labels on
+    FIG 2 vs Vision's ~18). 1-bit scans must be widened to RGB first."""
+    import numpy as np
+    from PIL import Image
+
+    from attest.figures_map import rapidocr_result_to_observations
+    img = Image.open(path).convert("RGB")
+    result, _ = _RAPID_SINGLETON[0](np.array(img))
+    return rapidocr_result_to_observations(result, img.size[0], img.size[1])
+
+
+_RAPID_SINGLETON: list = []          # model load is slow; init once in main()
+
+ENGINE_READERS = {
+    "vision": (lambda path: ocr_image(path)),
+    "tesseract": obs_tesseract,
+    "rapidocr": obs_rapidocr,
+}
+
+
+def available_engines() -> list[str]:
+    out = []
+    if VISION_OK:
+        out.append("vision")
+    if TESSERACT_OK:
+        out.append("tesseract")
+    if RAPID_OK:
+        out.append("rapidocr")
     return out
 
 
@@ -140,7 +207,8 @@ def tiled_search(path: Path, targets: set[str], *, rows: int = 4, cols: int = 2,
                     # (_letters_from_first_pass), where the detector has layout
                     # context. Empirically: every real letter (B) was in the first
                     # pass; every tile-only letter was fake.
-                    toks = [t.lower() for t in _DIGIT_RUN.findall(text)]
+                    toks = ([] if _PROSE.search(text)
+                            else [t.lower() for t in _DIGIT_RUN.findall(text)])
                     toks += [a for a in targets if len(a) > 1
                              and not a[0].isdigit() and re.search(rf"\b{re.escape(a)}\b", text)]
                     confusion = {t[:-1] + "0": t for t in targets
@@ -194,17 +262,67 @@ def derive(observations: list[dict]) -> dict:
             continue
         if _FIG_LABEL.search(o["text"]):         # a FIG label's digits are not numerals
             continue
+        if _PROSE.search(o["text"]):             # prose annotation, not a numeral read
+            continue
         for run in _DIGIT_RUN.findall(o["text"]):
             numerals.append({
                 "numeral": run.lower(), "source_text": o["text"],
                 "confidence": o["confidence"], "method": "first-pass",
+                "engine": o.get("engine", "vision"),
                 # full normalized bbox (origin bottom-left) — carried through so the
                 # figures view can draw a confirmation box around the located numeral.
                 "x": o["x"], "y": o["y"], "w": o["w"], "h": o["h"],
             })
-    return {"fig_labels": figs, "sheet_id": sheet_id, "numerals": numerals}
+    from attest.figures_map import merge_same_spot_numerals
+    best_fig: dict[str, dict] = {}
+    for fg in figs:                              # engines re-read the same FIG label
+        if fg["fig"] not in best_fig or fg["confidence"] > best_fig[fg["fig"]]["confidence"]:
+            best_fig[fg["fig"]] = fg
+    return {"fig_labels": sorted(best_fig.values(), key=lambda f: f["fig"]),
+            "sheet_id": sheet_id,
+            "numerals": merge_same_spot_numerals(numerals)}
 
 
+
+
+def marker_band_rescue(path: Path, letters: set[str]) -> list[dict]:
+    """View-marker rescue via Tesseract sparse mode on the sheet's EDGE BANDS —
+    markers sit at the edges by convention (they mark viewing directions from
+    outside the object). Empirical basis: the FIG-2 "A" that Vision cannot detect
+    by any API reads cleanly in a tesseract --psm 11 pass over the right band.
+    Exact-token acceptance only (a lone letter is too noisy as a substring)."""
+    from PIL import Image
+
+    from attest.figures_map import tesseract_tsv_to_observations
+    img = Image.open(path)
+    W, H = img.size
+    bands = {"left": (0, 0, int(0.20 * W), H), "right": (int(0.80 * W), 0, W, H),
+             "top": (0, 0, W, int(0.18 * H)), "bottom": (0, int(0.82 * H), W, H)}
+    hits = []
+    for name, (x0, y0, x1, y1) in bands.items():
+        tmp = path.parent / f".band_{name}.png"
+        img.crop((x0, y0, x1, y1)).save(tmp)
+        r = subprocess.run(["tesseract", str(tmp), "stdout", "--psm", "11", "tsv"],
+                           capture_output=True)
+        obs = tesseract_tsv_to_observations(
+            r.stdout.decode("utf-8", "replace"), x1 - x0, y1 - y0)
+        tmp.unlink(missing_ok=True)
+        for o in obs:
+            core = re.sub(r"[^A-Za-z0-9]", "", o["text"])
+            if core not in letters:
+                continue
+            # band-local normalized bbox → full-image (both bottom-left origin)
+            fx = (x0 + o["x"] * (x1 - x0)) / W
+            f_top = (y0 + (1 - o["y"] - o["h"]) * (y1 - y0)) / H
+            fw, fh = o["w"] * (x1 - x0) / W, o["h"] * (y1 - y0) / H
+            fy = 1 - f_top - fh
+            if fy >= _HEADER_BAND:
+                continue
+            hits.append({"numeral": core, "source_text": o["text"],
+                         "confidence": o["confidence"], "method": "text-guided",
+                         "engine": "tesseract", "x": round(fx, 4), "y": round(fy, 4),
+                         "w": round(fw, 4), "h": round(fh, 4)})
+    return hits
 
 
 def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
@@ -279,15 +397,27 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
         page_markers = [mk for mk, pg in marker_page.items() if pg == page] \
             if markers else []
         hits = letters_from_first_pass(page_of[page], page_markers)
-        hits += tiled_search(fig_dir / page_of[page]["file"], targets, reserved=reserved)
-        # finer-tile fallback for what the standard pass STILL missed: small faint
-        # numerals ("64 —" on FIG 2) only resolve at 8x4 full-res tiles.
-        still = targets - {h["numeral"] for h in hits}
-        if still:
-            hits += tiled_search(fig_dir / page_of[page]["file"], still,
-                                 rows=8, cols=4, overlap=0.08, reserved=reserved)
+        if VISION_OK:                                 # Vision-guided tiling (darwin)
+            hits += tiled_search(fig_dir / page_of[page]["file"], targets,
+                                 reserved=reserved)
+            # finer-tile fallback for what the standard pass STILL missed: small
+            # faint numerals ("64 —" on FIG 2) only resolve at 8x4 full-res tiles.
+            still = targets - {h["numeral"] for h in hits}
+            if still:
+                hits += tiled_search(fig_dir / page_of[page]["file"], still,
+                                     rows=8, cols=4, overlap=0.08, reserved=reserved)
         hits = drop_fragment_hits(hits)               # hits vs each other ("4" inside "84")
         hits = [h for h in hits if not is_fragment(h, page_of[page])]
+        # view markers still missing → tesseract edge-band rescue (exact token; the
+        # engines are COMPLEMENTARY: Vision reads B but is blind to A, tesseract the
+        # reverse — D29's whole point)
+        got_now = {h["numeral"] for h in hits} | {n["numeral"]
+                                                  for n in page_of[page]["numerals"]}
+        still_mk = {mk for mk in page_markers if mk not in got_now}
+        if still_mk and TESSERACT_OK:
+            hits += [h for h in marker_band_rescue(fig_dir / page_of[page]["file"],
+                                                   still_mk)
+                     if h["numeral"] in still_mk]
         if hits:
             page_of[page]["numerals"].extend(hits)
             got = ", ".join(str(h["numeral"]) for h in hits)
@@ -303,7 +433,25 @@ def main() -> int:
     ap.add_argument("--doc", help="document id — enables the text-guided confirmation pass")
     ap.add_argument("--confirm", action="store_true",
                     help="text-guided recovery pass for spec-predicted misses (needs --doc)")
+    ap.add_argument("--engines", default="auto",
+                    help="comma list of vision,tesseract,rapidocr — or 'auto' (all available)")
     ns = ap.parse_args()
+
+    engines = available_engines() if ns.engines == "auto" else [
+        e.strip() for e in ns.engines.split(",") if e.strip()]
+    bad = [e for e in engines if e not in ENGINE_READERS]
+    missing = [e for e in engines if e not in available_engines()]
+    if bad or missing:
+        print(f"unavailable engine(s): {', '.join(bad + missing)} "
+              f"(available here: {', '.join(available_engines()) or 'none'})")
+        return 1
+    if not engines:
+        print("no OCR engine available — install tesseract, `pip install "
+              "rapidocr-onnxruntime`, or run on macOS (Vision)")
+        return 1
+    if "rapidocr" in engines and not _RAPID_SINGLETON:
+        _RAPID_SINGLETON.append(RapidOCR())
+    print(f"engines: {', '.join(engines)}  (complementary recall — D29)")
 
     fig_dir = Path(ns.store).parent / "figures"
     sheets = sorted(fig_dir.glob("drawings-page-*.png"),
@@ -314,7 +462,11 @@ def main() -> int:
 
     pages = []
     for p in sheets:
-        obs = ocr_image(p)
+        obs = []
+        for eng in engines:
+            for o in ENGINE_READERS[eng](p):
+                o["engine"] = eng
+                obs.append(o)
         d = derive(obs)
         pages.append({
             "file": p.name,
@@ -337,8 +489,16 @@ def main() -> int:
         print(f"  → recovered {recovered} spec-predicted numeral(s) the first pass missed")
 
     manifest = {
-        "engine": "apple-vision",
-        "engine_provenance": {"macos": platform.mac_ver()[0], "machine": platform.machine()},
+        "engines": engines,
+        "engine_provenance": {
+            "platform": platform.platform(),
+            "macos": platform.mac_ver()[0] or None,
+            "tesseract": (subprocess.run(["tesseract", "--version"], capture_output=True)
+                          .stdout.decode("utf-8", "replace").split("\n")[0]
+                          if "tesseract" in engines else None),
+            "rapidocr": (getattr(__import__("rapidocr_onnxruntime"), "__version__", "?")
+                         if "rapidocr" in engines else None),
+        },
         "warning": ("OCR-derived: strong but not 100% reliable (leader lines fuse with "
                     "digits; rotated text garbles). Confidence + method (first-pass / "
                     "text-guided) per numeral; frozen at ingestion — downstream is "

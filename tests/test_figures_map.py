@@ -351,3 +351,43 @@ def test_manual_annotation_sidecar_merges_with_human_provenance(tmp_path):
     assert [(x.numeral, x.page, x.method) for x in s] == [("A", 3, "human")]
     assert s[0].bbox == (0.84, 0.19, 0.03, 0.02)
     assert s[0].confidence == 1.0
+
+
+def test_tesseract_tsv_converts_to_common_observations():
+    """Engine converters normalize everything to ONE observation format: pixel
+    top-left boxes → normalized bottom-left; conf 0-100 → 0-1; -1 rows skipped."""
+    from attest.figures_map import tesseract_tsv_to_observations
+    tsv = ("level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\t"
+           "left\ttop\twidth\theight\tconf\ttext\n"
+           "5\t1\t1\t1\t1\t1\t100\t50\t40\t20\t96.5\t64\n"
+           "5\t1\t1\t1\t1\t2\t0\t0\t10\t10\t-1\t\n")
+    obs = tesseract_tsv_to_observations(tsv, 1000, 1000)
+    assert len(obs) == 1
+    o = obs[0]
+    assert o["text"] == "64" and o["confidence"] == 0.965
+    assert o["x"] == 0.1 and o["w"] == 0.04 and o["h"] == 0.02
+    assert o["y"] == 0.93                                 # bottom-left flip (rounded)
+
+
+def test_rapidocr_result_converts_to_common_observations():
+    from attest.figures_map import rapidocr_result_to_observations
+    result = [([[100, 50], [140, 50], [140, 70], [100, 70]], "12a", 0.88)]
+    o = rapidocr_result_to_observations(result, 1000, 1000)[0]
+    assert o["text"] == "12a" and o["confidence"] == 0.88
+    assert o["x"] == 0.1 and o["w"] == 0.04 and o["y"] == 0.93
+
+
+def test_merge_same_spot_numerals_corroborates_across_engines():
+    """The same label at the same spot from two engines is ONE mark with union'd
+    engine provenance (corroboration); different spots stay separate instances."""
+    from attest.figures_map import merge_same_spot_numerals
+    merged = merge_same_spot_numerals([
+        {"numeral": "12", "x": 0.50, "y": 0.30, "confidence": 0.9, "engine": "vision"},
+        {"numeral": "12", "x": 0.505, "y": 0.302, "confidence": 0.7, "engine": "tesseract"},
+        {"numeral": "12", "x": 0.80, "y": 0.30, "confidence": 1.0, "engine": "rapidocr"},
+    ])
+    by_x = {m["x"]: m for m in merged}
+    assert len(merged) == 2                               # two real instances
+    assert by_x[0.50]["engines"] == ["tesseract", "vision"]   # corroborated
+    assert by_x[0.50]["confidence"] == 0.9                    # best read kept
+    assert by_x[0.80]["engines"] == ["rapidocr"]

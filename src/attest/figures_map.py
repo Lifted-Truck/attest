@@ -41,6 +41,78 @@ FIGURE_CONTEXT_WINDOW = 2000
 HEADER_BAND = 0.88   # normalized y above this = the sheets' running header
 
 
+# --- multi-engine OCR support (D29) ------------------------------------------------
+# ATTEST runs on non-Mac systems too, and engines have COMPLEMENTARY blind spots
+# (measured on US5447630A/FIG 2: Vision reads the view-marker B but is totally blind
+# to A; Tesseract reads A in sparse/single-glyph mode but misses B; RapidOCR has the
+# best whole-image recall — 24/30 labels vs Vision's ~18 — but reads neither letter).
+# These pure converters normalize each engine's output into the ONE observation
+# format (text, confidence 0..1, x/y/w/h normalized, origin bottom-left) so the
+# frozen manifest and everything downstream stay engine-agnostic.
+
+def tesseract_tsv_to_observations(tsv: str, width: int, height: int) -> list[dict]:
+    """Tesseract `tsv` output → common observations. Pixel boxes are TOP-left origin
+    (flip y); conf is 0-100 with -1 on non-word rows (skipped)."""
+    out = []
+    lines = tsv.strip().split("\n")
+    if not lines:
+        return out
+    head = lines[0].split("\t")
+    idx = {k: i for i, k in enumerate(head)}
+    for line in lines[1:]:
+        f = line.split("\t")
+        if len(f) != len(head):
+            continue
+        text = f[idx["text"]].strip()
+        conf = float(f[idx["conf"]])
+        if not text or conf < 0:
+            continue
+        left, top = int(f[idx["left"]]), int(f[idx["top"]])
+        w_px, h_px = int(f[idx["width"]]), int(f[idx["height"]])
+        out.append({
+            "text": text, "confidence": round(conf / 100.0, 3),
+            "x": round(left / width, 4), "y": round(1 - (top + h_px) / height, 4),
+            "w": round(w_px / width, 4), "h": round(h_px / height, 4),
+        })
+    return out
+
+
+def rapidocr_result_to_observations(result, width: int, height: int) -> list[dict]:
+    """RapidOCR `(box_4pts_px_topleft, text, score)` entries → common observations."""
+    out = []
+    for box, text, conf in (result or []):
+        xs = [p[0] for p in box]
+        ys = [p[1] for p in box]
+        x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+        out.append({
+            "text": str(text), "confidence": round(float(conf), 3),
+            "x": round(x0 / width, 4), "y": round(1 - y1 / height, 4),
+            "w": round((x1 - x0) / width, 4), "h": round((y1 - y0) / height, 4),
+        })
+    return out
+
+
+def merge_same_spot_numerals(numerals: list[dict], *, radius: float = 0.02) -> list[dict]:
+    """Cross-engine dedupe for the manifest: the same label read at the same spot by
+    several engines is ONE mark. Keeps the highest-confidence record and unions the
+    contributing engines into `engines` — corroboration is provenance, not noise
+    (two independent engines agreeing on a mark is stronger evidence than one)."""
+    kept: list[dict] = []
+    for n in sorted(numerals, key=lambda d: -d["confidence"]):
+        dup = next((k for k in kept if k["numeral"] == n["numeral"]
+                    and abs(k["x"] - n["x"]) < radius and abs(k["y"] - n["y"]) < radius), None)
+        if dup is None:
+            n = dict(n)
+            n["engines"] = sorted(set(n.get("engines") or [n.get("engine", "unknown")]))
+            n.pop("engine", None)
+            kept.append(n)
+        else:
+            dup["engines"] = sorted(set(dup["engines"])
+                                    | set(n.get("engines") or [n.get("engine", "unknown")]))
+    return kept
+
+
+
 def is_fragment(hit: dict, page: dict, *, radius: float = 0.025) -> bool:
     """A recovered token that sits ON TOP of a longer token containing it is a
     FRAGMENT, not a label: tiles cut "12b" and read "1"; "13" re-reads as "1J";
@@ -76,6 +148,7 @@ def letters_from_first_pass(page: dict, markers: list[str]) -> list[dict]:
         if core in markers and core not in have and o["y"] < HEADER_BAND:
             out.append({"numeral": core, "source_text": o["text"],
                         "confidence": o["confidence"], "method": "text-guided",
+                        "engine": o.get("engine", "unknown"),
                         "x": o["x"], "y": o["y"], "w": o["w"], "h": o["h"]})
     return out
 
