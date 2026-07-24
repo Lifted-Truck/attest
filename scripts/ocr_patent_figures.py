@@ -248,7 +248,7 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
     # predicted: numeral → figures the spec discusses it near; keep those the first
     # pass did NOT already place on that figure's sheet.
     want_per_page: dict[int, set[str]] = {}
-    from attest.figures_map import view_marker_letters
+    from attest.figures_map import sub_figure_parent, view_marker_letters
     labels = [n.number for n in reference_numerals(text)] + acronym_labels(text)
     reserved = set(labels)                                # gates the a↔0 confusion match
     markers = view_marker_letters(known)
@@ -257,16 +257,28 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
             page = fig_to_page.get(fig)
             if page is not None and fig not in ocr_figs.get(lbl, []):
                 want_per_page.setdefault(page, set()).add(lbl)
-    if markers:                                           # view markers can sit on any sheet
+    marker_page: dict[str, int] = {}
+    if markers:
+        # A view marker sits ON THE PARENT figure (the one the views are taken of —
+        # "views …of FIG. 2"), derived from the family's caption. Searching only the
+        # parent's sheet is what structurally prevents tile hallucinations elsewhere
+        # (a curly leader on FIG 6 once read as "C!"). No parent derivable → the
+        # marker has no predicted location and is searched nowhere, not everywhere.
         already = {(s.numeral, s.page) for s in numeral_sightings(manifest)}
-        for page in fig_to_page.values():
-            for mk in markers:
+        for mk in markers:
+            fam = next((f for f in known if f.endswith(mk) and len(f) > 1), None)
+            parent = sub_figure_parent(text, fam[:-1], refs) if fam else None
+            page = fig_to_page.get(parent) if parent else None
+            if page is not None:
+                marker_page[mk] = page
                 if (mk, page) not in already:
                     want_per_page.setdefault(page, set()).add(mk)
 
     recovered = 0
     for page, targets in sorted(want_per_page.items()):
-        hits = letters_from_first_pass(page_of[page], markers)
+        page_markers = [mk for mk, pg in marker_page.items() if pg == page] \
+            if markers else []
+        hits = letters_from_first_pass(page_of[page], page_markers)
         hits += tiled_search(fig_dir / page_of[page]["file"], targets, reserved=reserved)
         # finer-tile fallback for what the standard pass STILL missed: small faint
         # numerals ("64 —" on FIG 2) only resolve at 8x4 full-res tiles.

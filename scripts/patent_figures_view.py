@@ -38,6 +38,7 @@ from attest.figures_map import (
     numeral_coverage,
     numeral_figures,
     numeral_sightings,
+    sub_figure_parent,
     view_marker_letters,
 )
 from attest.ingest import DocumentStore
@@ -297,11 +298,15 @@ def main() -> int:
     markers = view_marker_letters(known)
     unlocated_markers = []
     for mk in markers:
-        fam = next((f for f in known if f.endswith(mk)), "?")
+        fam = next((f for f in known if f.endswith(mk) and len(f) > 1), "?")
+        parent = sub_figure_parent(text, fam[:-1], refs) if fam != "?" else None
+        on = f"on FIG. {parent}" if parent else "(no predicted location)"
         if mk in sightings_by_num:
-            nums = list(nums) + [Numeral(mk, f"(view marker → FIG. {fam})", 0, 0)]
+            nums = list(nums) + [Numeral(
+                mk, f"(view marker {on} — the FIG. {fam} view direction)", 0, 0)]
         else:
-            unlocated_markers.append(f"{mk} (for FIG. {fam})")
+            unlocated_markers.append(
+                f"{mk} — expected {on}, marks the FIG. {fam} view direction")
 
     ctx_json, nums_html = {}, []
     for n in nums:

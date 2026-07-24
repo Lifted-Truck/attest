@@ -312,3 +312,18 @@ def test_drop_fragment_hits_cross_filters_recovered_hits():
     ]
     kept = {(h["numeral"], h["x"]) for h in drop_fragment_hits(hits)}
     assert kept == {("84", 0.416), ("4", 0.100)}
+
+
+def test_sub_figure_parent_from_the_caption():
+    """View markers sit ON the parent figure — "FIGS. 3 A-C are …views of the module
+    of FIG. 2" names it inside the caption sentence (Julian: 'A was on FIG 2')."""
+    from attest.figures_map import sub_figure_parent
+    from attest.patents import figure_references
+    text = ("FIGS. 3 A-C are respective right, left and rear views of the module "
+            "of FIG. 2; FIG. 4 is a perspective view of a separator.")
+    refs = figure_references(text)
+    assert sub_figure_parent(text, "3", refs) == "2"      # the caption's parent
+    # a caption naming NO parent → None (searched nowhere, not everywhere)
+    text2 = "FIGS. 7 A-B are schematic views of the assembly. FIG. 8 is a chart."
+    refs2 = figure_references(text2)
+    assert sub_figure_parent(text2, "7", refs2) is None

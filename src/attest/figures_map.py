@@ -95,6 +95,27 @@ def drop_fragment_hits(hits: list[dict]) -> list[dict]:
     return kept
 
 
+def sub_figure_parent(text: str, base: str, fig_refs) -> str | None:
+    """The figure a sub-figure family's views are TAKEN OF — where its view markers
+    physically sit. Derived from the family's own caption: "FIGS. 3 A-C are …views
+    of the solid treatment module of FIG. 2" names the parent within the caption
+    sentence. Returns None when the caption names no parent (then markers can't be
+    localized and are searched nowhere — predicted-but-unplaceable, not guessed)."""
+    fam = [r for r in fig_refs
+           if r.number.startswith(base) and r.number[len(base):].isalpha()]
+    if not fam:
+        return None
+    first = min(fam, key=lambda r: r.char_start)
+    # sentence terminator, scanned AFTER the family reference; "FIG. "/"FIGS. " carry
+    # a ". " of their own, so the abbreviation's period must not end the sentence.
+    m = re.search(r";|(?<!FIG)(?<!FIGS)\.\s", text[first.char_end:first.char_end + 400])
+    end = first.char_end + (m.start() if m else 400)
+    for r in sorted(fig_refs, key=lambda r: r.char_start):
+        if first.char_start < r.char_start <= end and not r.number.startswith(base):
+            return r.number
+    return None
+
+
 def view_marker_letters(known_figs: list[str]) -> list[str]:
     """Single-letter view/section markers derived from sub-figure suffixes: if the
     patent has FIGS. 3A/3B/3C ("respective right, left and rear views of FIG. 2"),
