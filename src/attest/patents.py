@@ -552,8 +552,19 @@ def reference_numerals(text: str) -> list[Numeral]:
         if _UNIT_AFTER.match(region[m.end():m.end() + 14]):    # a quantity, not a pointer
             continue
         num = m.group(2).lower()                       # "12a" stays distinct from "12"
-        if num in seen:                                # first mention only
-            continue
         s = m.start() + (m.group(0).find(phrase))
-        seen[num] = Numeral(num, phrase, s, m.end())
+        if num not in seen:                            # first mention only
+            seen[num] = Numeral(num, phrase, s, m.end())
+        # list siblings: "pipes 56, 58" recites 58 with no noun phrase of its own —
+        # it inherits the list head's element. ("58" only ever appears in lists on
+        # US5447630A and was invisible without this.)
+        tail = m.end()
+        while True:
+            sib = re.match(r",\s*(\d{1,3}[a-z]?)(?![\da-z])(?!\.\d)", region[tail:])
+            if not sib:
+                break
+            sn = sib.group(1).lower()
+            if sn not in seen:
+                seen[sn] = Numeral(sn, phrase, tail + sib.start(1), tail + sib.end(1))
+            tail += sib.end()
     return [seen[n] for n in sorted(seen, key=numeral_key)]

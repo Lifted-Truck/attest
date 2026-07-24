@@ -346,3 +346,14 @@ def test_label_pattern_numeric_vs_acronym():
     assert re.search(label_pattern("12"), "housing 12.")             # sentence-final ok
     assert not re.search(label_pattern("12"), "bracket 12a")         # not inside 12a
     assert not re.search(label_pattern("12"), "ratio 12.5")          # not a decimal
+
+
+def test_list_sibling_numerals_inherit_the_head_element():
+    """"pipes 56, 58" recites BOTH: 58 has no noun phrase of its own (it was
+    invisible to the extractor — US5447630A's 58 appears only in lists)."""
+    from attest.patents import reference_numerals
+    nums = {n.number: n.element for n in reference_numerals(
+        "The liquid pipes 56, 58 then feed the drain manifolds 96, 98 below.")}
+    assert "56" in nums and "58" in nums
+    assert nums["58"] == nums["56"]                      # sibling inherits the element
+    assert "96" in nums and "98" in nums

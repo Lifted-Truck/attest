@@ -38,6 +38,72 @@ ELIMINATION = "elimination"
 FIGURE_CONTEXT_WINDOW = 2000
 
 
+HEADER_BAND = 0.88   # normalized y above this = the sheets' running header
+
+
+def is_fragment(hit: dict, page: dict, *, radius: float = 0.025) -> bool:
+    """A recovered token that sits ON TOP of a longer token containing it is a
+    FRAGMENT, not a label: tiles cut "12b" and read "1"; "13" re-reads as "1J";
+    "CL" (a centerline mark) yields "C". Checked against both the page's numeral
+    records and its raw first-pass observations."""
+    tok = str(hit["numeral"]).lower()
+
+    def overlaps(rec: dict) -> bool:
+        # box overlap on x (a long observation's CENTER can be far from a fragment
+        # at its end — "FINAL PURIFIED EFFLUENT. 1"), radius band on y.
+        x0, x1 = rec["x"] - radius, rec["x"] + rec.get("w", 0.0) + radius
+        return x0 <= hit["x"] <= x1 and abs(rec["y"] - hit["y"]) < radius
+
+    for n in page.get("numerals", []):
+        lbl = str(n["numeral"]).lower()
+        if lbl != tok and tok in lbl and overlaps(n):
+            return True
+    for o in page.get("observations", []):
+        core = re.sub(r"[^A-Za-z0-9]", "", o["text"]).lower()
+        if core != tok and tok in core and overlaps(o):
+            return True
+    return False
+
+
+def letters_from_first_pass(page: dict, markers: list[str]) -> list[dict]:
+    """A view-marker letter the WHOLE-IMAGE pass already read (tiles often can't —
+    "B" reads at full view but vanishes in every tile) is reclassified from a raw
+    observation into a sighting; nothing is re-OCR'd."""
+    out = []
+    have = {str(n["numeral"]) for n in page.get("numerals", [])}
+    for o in page.get("observations", []):
+        core = re.sub(r"[^A-Za-z0-9]", "", o["text"])
+        if core in markers and core not in have and o["y"] < HEADER_BAND:
+            out.append({"numeral": core, "source_text": o["text"],
+                        "confidence": o["confidence"], "method": "text-guided",
+                        "x": o["x"], "y": o["y"], "w": o["w"], "h": o["h"]})
+    return out
+
+
+def drop_fragment_hits(hits: list[dict]) -> list[dict]:
+    """Cross-filter freshly recovered hits against EACH OTHER: a hit whose token is
+    contained in a LONGER co-located hit is a fragment of it (tiles re-read "84" and
+    a weaker candidate yields a bare "4" at the same spot). Longer labels win."""
+    kept: list[dict] = []
+    for h in sorted(hits, key=lambda d: -len(str(d["numeral"]))):
+        tok = str(h["numeral"]).lower()
+        clash = any(tok != str(k["numeral"]).lower() and tok in str(k["numeral"]).lower()
+                    and abs(k["x"] - h["x"]) < 0.03 and abs(k["y"] - h["y"]) < 0.03
+                    for k in kept)
+        if not clash:
+            kept.append(h)
+    return kept
+
+
+def view_marker_letters(known_figs: list[str]) -> list[str]:
+    """Single-letter view/section markers derived from sub-figure suffixes: if the
+    patent has FIGS. 3A/3B/3C ("respective right, left and rear views of FIG. 2"),
+    the letters A/B/C appear ON the parent drawing marking where each view is taken
+    from. Derived from the figure list (text side), searched on the sheets with an
+    exact-token rule — a lone letter is far too noisy to match as a substring."""
+    return sorted({f[-1].upper() for f in known_figs if len(f) > 1 and f[-1].isalpha()})
+
+
 def label_pattern(label: str) -> str:
     """Regex for a reference LABEL as a standalone token. A numeric label needs
     number-aware guards (no trailing digit/letter so "12" never fires inside "12a";
@@ -229,6 +295,7 @@ class NumeralCoverage:
     drawn_not_recited: list[str]    # OCR-located, never recited in the spec → artefact/unlabeled
     figure_mismatches: list[dict]   # tied to FIG. N in text, not OCR-located on FIG. N's sheet
     seq_gaps: list[int]             # missing ints in figure_tied's range — WEAK (patents skip)
+    likely_misreads: list[dict]     # sheet-only "140" that is positionally the recited "14a"
 
 
 def numeral_coverage(
@@ -281,12 +348,39 @@ def numeral_coverage(
                             f"FIG(S). {', '.join(missing)}, but OCR did not locate it there "
                             f"— an OCR miss or the number is not labeled on that sheet; review"),
             })
+    # a↔0 OCR confusion: a sheet-only "140" whose suffixed twin "14a" is recited AND
+    # sighted within 0.03 on the same page is (very probably) the same ink — surfaced
+    # as a likely misread, not an anomaly. The raw record is never deleted (D28).
+    drawn_only = ocr_nums - text_nums
+    misreads = []
+    for lbl in sorted(drawn_only, key=numeral_key):
+        if not (lbl.isdigit() and lbl.endswith("0")):
+            continue
+        twin = lbl[:-1] + "a"
+        if twin not in text_nums:
+            continue
+        # box overlap, not center distance: the raw read is often WIDE ("14 140")
+        # and the twin sits at its end — same principle as is_fragment.
+        spots = [(s0, s1) for s0 in sightings if s0.numeral == lbl and s0.bbox
+                 for s1 in sightings if s1.numeral == twin and s1.page == s0.page and s1.bbox
+                 if s0.bbox[0] - 0.02 <= s1.bbox[0] <= s0.bbox[0] + s0.bbox[2] + 0.02
+                 and abs(s0.bbox[1] - s1.bbox[1]) < 0.02]
+        if spots:
+            misreads.append({"read_as": lbl, "actually": twin, "page": spots[0][0].page,
+                             "message": (f'sheet label read as "{lbl}" is positionally the '
+                                         f'recited "{twin}" — the a↔0 OCR confusion; treated '
+                                         f"as {twin}, raw read preserved")})
+            drawn_only = drawn_only - {lbl}
+    # single-letter view markers are a different class (derived from sub-figure
+    # suffixes, not recited as numerals) — not anomalies.
+    drawn_only = {n for n in drawn_only if not (len(n) == 1 and n.isalpha())}
     return NumeralCoverage(
         figure_tied=figure_tied,
         recited_not_drawn=[n for n in figure_tied if n not in ocr_nums],
-        drawn_not_recited=sorted(ocr_nums - text_nums, key=numeral_key),
+        drawn_not_recited=sorted(drawn_only, key=numeral_key),
         figure_mismatches=mismatches,
         seq_gaps=seq_gaps,
+        likely_misreads=misreads,
     )
 
 

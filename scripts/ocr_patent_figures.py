@@ -96,7 +96,7 @@ _SAME_SPOT = 0.02        # normalized distance under which two reads are one ins
 
 
 def tiled_search(path: Path, targets: set[str], *, rows: int = 4, cols: int = 2,
-                 overlap: float = 0.12) -> list[dict]:
+                 overlap: float = 0.12, reserved: set[str] | None = None) -> list[dict]:
     """Text-GUIDED confirmation: re-OCR a sheet in overlapping full-resolution tiles
     (which recovers small numerals the single-pass whole-image OCR drops on sparse
     line drawings) and return ONLY sightings of the requested `targets`. Restricting
@@ -125,13 +125,30 @@ def tiled_search(path: Path, targets: set[str], *, rows: int = 4, cols: int = 2,
                     text = cand.string()
                     if _FURNITURE.search(text):          # "Sheet N of M", patent number
                         continue
+                    if _FIG_LABEL.search(text):          # "FIG.4"'s own digits ≠ numeral 4
+                        continue
                     # numeric labels come from the digit-run pattern; acronym labels
-                    # ("STM") are matched whole-word — a drawing can label a part with
-                    # letters, so the reference model is not digits-only.
+                    # ("STM") are matched whole-word; a SINGLE-letter view marker ("A")
+                    # only as an exact token (a lone letter is too noisy as a substring);
+                    # and a target like "14a" also matches its a↔0 OCR confusion "140"
+                    # — Vision reads the suffix 'a' as '0' — but ONLY when "140" is not
+                    # itself a known label (the `reserved` gate).
+                    # NOTE: single-letter view markers are deliberately NOT matched
+                    # here. Tiles amplify hallucination on line art (a curly leader
+                    # read as "C!"), and a lone letter has no redundancy to check —
+                    # letters come only from whole-image observations
+                    # (_letters_from_first_pass), where the detector has layout
+                    # context. Empirically: every real letter (B) was in the first
+                    # pass; every tile-only letter was fake.
                     toks = [t.lower() for t in _DIGIT_RUN.findall(text)]
-                    toks += [a for a in targets
-                             if not a[0].isdigit() and re.search(rf"\b{re.escape(a)}\b", text)]
+                    toks += [a for a in targets if len(a) > 1
+                             and not a[0].isdigit() and re.search(rf"\b{re.escape(a)}\b", text)]
+                    confusion = {t[:-1] + "0": t for t in targets
+                                 if t.endswith("a") and t[:-1].isdigit()
+                                 and t[:-1] + "0" not in (reserved or set())}
+                    toks += [confusion[t] for t in toks if t in confusion]
                     for num in toks:
+                        num = confusion.get(num, num)    # record under the TRUE label
                         if num not in targets:
                             continue
                         bb = obs.boundingBox()       # normalized within the TILE
@@ -188,6 +205,8 @@ def derive(observations: list[dict]) -> dict:
     return {"fig_labels": figs, "sheet_id": sheet_id, "numerals": numerals}
 
 
+
+
 def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
     """Text-guided confirmation (the "push truth from all angles" pass): where the
     SPEC predicts a numeral on a figure's sheet but the first OCR pass missed it,
@@ -199,7 +218,10 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
     stays flagged, a stronger signal that it needs a human eye.
     """
     from attest.figures_map import (
+        drop_fragment_hits,
         fig_to_sheets,
+        is_fragment,
+        letters_from_first_pass,
         numeral_figures,
         numeral_sightings,
         numeral_text_figures,
@@ -226,16 +248,34 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
     # predicted: numeral → figures the spec discusses it near; keep those the first
     # pass did NOT already place on that figure's sheet.
     want_per_page: dict[int, set[str]] = {}
+    from attest.figures_map import view_marker_letters
     labels = [n.number for n in reference_numerals(text)] + acronym_labels(text)
+    reserved = set(labels)                                # gates the a↔0 confusion match
+    markers = view_marker_letters(known)
     for lbl in labels:
         for fig in numeral_text_figures(text, lbl, refs):
             page = fig_to_page.get(fig)
             if page is not None and fig not in ocr_figs.get(lbl, []):
                 want_per_page.setdefault(page, set()).add(lbl)
+    if markers:                                           # view markers can sit on any sheet
+        already = {(s.numeral, s.page) for s in numeral_sightings(manifest)}
+        for page in fig_to_page.values():
+            for mk in markers:
+                if (mk, page) not in already:
+                    want_per_page.setdefault(page, set()).add(mk)
 
     recovered = 0
     for page, targets in sorted(want_per_page.items()):
-        hits = tiled_search(fig_dir / page_of[page]["file"], targets)
+        hits = letters_from_first_pass(page_of[page], markers)
+        hits += tiled_search(fig_dir / page_of[page]["file"], targets, reserved=reserved)
+        # finer-tile fallback for what the standard pass STILL missed: small faint
+        # numerals ("64 —" on FIG 2) only resolve at 8x4 full-res tiles.
+        still = targets - {h["numeral"] for h in hits}
+        if still:
+            hits += tiled_search(fig_dir / page_of[page]["file"], still,
+                                 rows=8, cols=4, overlap=0.08, reserved=reserved)
+        hits = drop_fragment_hits(hits)               # hits vs each other ("4" inside "84")
+        hits = [h for h in hits if not is_fragment(h, page_of[page])]
         if hits:
             page_of[page]["numerals"].extend(hits)
             got = ", ".join(str(h["numeral"]) for h in hits)

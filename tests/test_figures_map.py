@@ -238,3 +238,77 @@ def test_same_label_twice_on_a_sheet_keeps_both_instances():
     # but it is still ONE figure association, not a duplicate
     assigns = fig_to_sheets(MULTI, ["1"])
     assert numeral_figures(assigns, sights)["12a"] == ["1"]
+
+
+def test_view_marker_letters_derived_from_sub_figures():
+    from attest.figures_map import view_marker_letters
+    assert view_marker_letters(["1", "2", "3A", "3B", "3C", "4"]) == ["A", "B", "C"]
+    assert view_marker_letters(["1", "2"]) == []          # no sub-figures → no markers
+
+
+def test_is_fragment_box_overlap():
+    """A token sitting ON a longer token containing it is a fragment: tiles cut
+    '12b' → '1'; prose 'FINAL PURIFIED EFFLUENT. 1' ends in a fragment '1' far from
+    the observation's CENTER — hence box overlap, not center distance."""
+    from attest.figures_map import is_fragment
+    page = {"numerals": [{"numeral": "12b", "x": 0.399, "y": 0.084, "w": 0.02, "h": 0.02}],
+            "observations": [{"text": "FINAL PURIFIED EFFLUENT. 1",
+                              "x": 0.60, "y": 0.526, "w": 0.13, "h": 0.02}]}
+    assert is_fragment({"numeral": "1", "x": 0.400, "y": 0.087}, page)      # atop 12b
+    assert is_fragment({"numeral": "1", "x": 0.726, "y": 0.526}, page)      # prose tail
+    assert not is_fragment({"numeral": "1", "x": 0.200, "y": 0.300}, page)  # standalone
+
+
+def test_letters_from_first_pass_reclassifies_only_clean_reads():
+    """Single-letter view markers come ONLY from whole-image observations (tiles
+    hallucinate letters on line art). Exact-core match; header band excluded."""
+    from attest.figures_map import letters_from_first_pass
+    page = {"numerals": [],
+            "observations": [
+                {"text": "B", "x": 0.134, "y": 0.218, "w": 0.01, "h": 0.015,
+                 "confidence": 0.3},
+                {"text": "FIG.A", "x": 0.47, "y": 0.03, "w": 0.05, "h": 0.02,
+                 "confidence": 0.5},                      # garble — core is FIGA, not A
+                {"text": "C", "x": 0.5, "y": 0.95, "w": 0.01, "h": 0.01,
+                 "confidence": 1.0},                      # header band — excluded
+            ]}
+    got = letters_from_first_pass(page, ["A", "B", "C"])
+    assert [(h["numeral"], h["method"]) for h in got] == [("B", "text-guided")]
+
+
+def test_likely_misreads_resolves_a_zero_confusion():
+    """A sheet-only '140' positionally coinciding with the recited '14a' is surfaced
+    as a likely a↔0 misread and leaves the drawn-not-recited anomaly list."""
+    from attest.figures_map import numeral_coverage
+    from attest.patents import Numeral, figure_references
+    man = {"pages": [{"page": 3, "file": "p.png",
+                      "fig_labels": [{"fig": "2", "confidence": 1.0, "x": 0.5, "y": 0.03}],
+                      "sheet_id": None,
+                      "numerals": [
+                          {"numeral": "140", "source_text": "14 140", "confidence": 0.5,
+                           "x": 0.565, "y": 0.183, "w": 0.04, "h": 0.02},
+                          {"numeral": "14a", "source_text": "140", "confidence": 0.5,
+                           "x": 0.599, "y": 0.186, "w": 0.03, "h": 0.02,
+                           "method": "text-guided"},
+                      ]}]}
+    text = "Referring to FIG. 2, the impeller 14a rotates."
+    nums = [Numeral("14a", "impeller", 0, 1)]
+    refs = figure_references(text)
+    assigns = fig_to_sheets(man, ["2"])
+    cov = numeral_coverage(nums, text, refs, assigns, numeral_sightings(man))
+    assert cov.drawn_not_recited == []                    # 140 resolved, not an anomaly
+    assert cov.likely_misreads and cov.likely_misreads[0]["read_as"] == "140"
+    assert cov.likely_misreads[0]["actually"] == "14a"
+
+
+def test_drop_fragment_hits_cross_filters_recovered_hits():
+    """Fresh hits check against EACH OTHER: tiles re-reading "84" also emit a bare
+    "4" at the same spot; the longer label wins. A distant "4" survives."""
+    from attest.figures_map import drop_fragment_hits
+    hits = [
+        {"numeral": "4", "x": 0.428, "y": 0.501, "confidence": 1.0},   # inside 84's box
+        {"numeral": "84", "x": 0.416, "y": 0.499, "confidence": 1.0},
+        {"numeral": "4", "x": 0.100, "y": 0.100, "confidence": 1.0},   # elsewhere — real
+    ]
+    kept = {(h["numeral"], h["x"]) for h in drop_fragment_hits(hits)}
+    assert kept == {("84", 0.416), ("4", 0.100)}

@@ -38,6 +38,7 @@ from attest.figures_map import (
     numeral_coverage,
     numeral_figures,
     numeral_sightings,
+    view_marker_letters,
 )
 from attest.ingest import DocumentStore
 from attest.patents import (
@@ -233,7 +234,14 @@ def main() -> int:
             if s.bbox is not None:                          # for the confirmation overlay
                 boxes_by_page.setdefault(s.page, []).append((s.numeral, s.bbox, s.confidence))
         all_figs_by_num = numeral_figures(assign_list, sights)  # every figure a numeral appears in
-        cov = numeral_coverage(nums, text, refs, assign_list, sights)  # text↔drawing reconciliation
+        # Reconcile text↔drawings. Sighted ACRONYM labels (STM) count as recited —
+        # they are recited, just not by reference_numerals (which is numeral-shaped);
+        # without this they false-flag as "drawn but never recited".
+        recited_for_cov = list(nums) + [
+            Numeral(a, "(text label)", 0, 0)
+            for a in acronym_labels(text) if a in sightings_by_num
+        ]
+        cov = numeral_coverage(recited_for_cov, text, refs, assign_list, sights)
 
     def _overlay(page: int) -> str:
         # SVG rects over the sheet (viewBox 0..1, preserveAspectRatio none so it
@@ -282,11 +290,26 @@ def main() -> int:
         if m and a in sightings_by_num:
             nums = list(nums) + [Numeral(a, "(text label on drawing)", m.start(), m.end())]
 
+    # View-marker letters (A/B/C from FIGS. 3A-3C): a sighted letter gets a chip
+    # tagged to its sub-figure; an UNLOCATED one is surfaced in the review list —
+    # a reviewer saw "A" on FIG 2, so an OCR blind spot must stay visible, never
+    # silently absent.
+    markers = view_marker_letters(known)
+    unlocated_markers = []
+    for mk in markers:
+        fam = next((f for f in known if f.endswith(mk)), "?")
+        if mk in sightings_by_num:
+            nums = list(nums) + [Numeral(mk, f"(view marker → FIG. {fam})", 0, 0)]
+        else:
+            unlocated_markers.append(f"{mk} (for FIG. {fam})")
+
     ctx_json, nums_html = {}, []
     for n in nums:
         first = numeral_figure(n.char_start, refs)          # nearest text FIG (default)
         allf = all_figs_by_num.get(n.number, [])            # every figure OCR located it in
-        ctx_json[str(n.number)] = snippet(text, n.char_start, n.char_end)
+        ctx_json[str(n.number)] = (
+            html.escape(f"{n.number}: {n.element}") if n.char_start == n.char_end == 0
+            else snippet(text, n.char_start, n.char_end))
         fg_first = (f'<span class="fg only-first">FIG. {first}'
                     f'</span>') if first else ""
         fg_all = (f'<span class="fg only-all">FIGS. {", ".join(allf)}</span>'
@@ -310,7 +333,8 @@ def main() -> int:
     if cov is not None:
         def _nlist(nums_list):
             return ", ".join(str(n) for n in nums_list) or "none"
-        flags = len(cov.recited_not_drawn) + len(cov.drawn_not_recited) + len(cov.figure_mismatches)
+        flags = (len(cov.recited_not_drawn) + len(cov.drawn_not_recited)
+                 + len(cov.figure_mismatches) + len(unlocated_markers))
         mism = "".join(f'<li>{html.escape(m["message"])}</li>' for m in cov.figure_mismatches)
         n_recovered = sum(1 for ss in sightings_by_num.values()
                           for s in ss if s.method == "text-guided")
@@ -325,7 +349,15 @@ def main() -> int:
             f'<h2 style="margin-top:20px">Numeral coverage &amp; consistency ({flags} flags)</h2>'
             f'<ul class="pe2">'
             f'{recovered_line}'
-            f'<li><b>Recited in the spec but not found on any drawing '
+            + ("".join(f'<li><b>View marker not located:</b> {html.escape(u)} '
+                       f'<span class="mut">— OCR could not read it on any sheet; if it is '
+                       f'visibly drawn, this is a known OCR blind spot; review.</span></li>'
+                       for u in unlocated_markers))
+            + ((f'<li><b style="color:var(--fig)">Likely misreads resolved '
+                f'({len(cov.likely_misreads)}):</b> '
+                + "; ".join(html.escape(mm["message"]) for mm in cov.likely_misreads)
+                + "</li>") if cov.likely_misreads else "")
+            + f'<li><b>Recited in the spec but not found on any drawing '
             f'({len(cov.recited_not_drawn)}):</b> {_nlist(cov.recited_not_drawn)} '
             f'<span class="mut">— OCR miss, or the number is not drawn; review.</span></li>'
             f'<li><b>Found on a drawing but not recited in the spec '
