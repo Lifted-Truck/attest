@@ -327,3 +327,27 @@ def test_sub_figure_parent_from_the_caption():
     text2 = "FIGS. 7 A-B are schematic views of the assembly. FIG. 8 is a chart."
     refs2 = figure_references(text2)
     assert sub_figure_parent(text2, "7", refs2) is None
+
+
+def test_manual_annotation_sidecar_merges_with_human_provenance(tmp_path):
+    """The human/visual confirmation channel: a reviewer-confirmed mark the OCR
+    engine is blind to (the FIG-2 view-marker "A" — Vision detects nothing at any
+    scale/API) enters via figures/manual_annotations.json with method:"human",
+    distinct provenance, and full downstream behavior (sighting, box, coverage)."""
+    import json as _json
+
+    from attest.figures_map import load_manifest, numeral_sightings
+    fig_dir = tmp_path / "figures"
+    fig_dir.mkdir()
+    (fig_dir / "ocr_manifest.json").write_text(_json.dumps(
+        {"pages": [{"page": 3, "file": "p.png", "fig_labels": [], "sheet_id": None,
+                    "numerals": []}]}))
+    (fig_dir / "manual_annotations.json").write_text(_json.dumps(
+        [{"numeral": "A", "page": 3, "x": 0.84, "y": 0.19, "w": 0.03, "h": 0.02,
+          "note": "view marker", "by": "reviewer", "date": "2026-07-22"}]))
+    store_dir = tmp_path / "store"
+    m = load_manifest(store_dir)
+    s = numeral_sightings(m)
+    assert [(x.numeral, x.page, x.method) for x in s] == [("A", 3, "human")]
+    assert s[0].bbox == (0.84, 0.19, 0.03, 0.02)
+    assert s[0].confidence == 1.0

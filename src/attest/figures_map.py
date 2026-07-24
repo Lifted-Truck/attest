@@ -155,8 +155,27 @@ class NumeralSighting:
 
 
 def load_manifest(store_dir: str | Path) -> dict:
-    path = Path(store_dir).parent / "figures" / "ocr_manifest.json"
-    return json.loads(path.read_text(encoding="utf-8"))
+    """The frozen OCR manifest, plus any MANUAL annotations from the sidecar
+    `figures/manual_annotations.json` — reviewer/visually-confirmed marks the OCR
+    engine is blind to (a lone view-marker glyph reads as line art to Vision, every
+    API, at every scale). Each carries `method: "human"` and a `by`/`note`
+    provenance string: a human confirmation is an EVIDENCE SOURCE with its own
+    provenance, never conflated with an OCR read (D28's honesty model extended —
+    this is the adjudication-record shape RT-5 anticipates)."""
+    fig_dir = Path(store_dir).parent / "figures"
+    manifest = json.loads((fig_dir / "ocr_manifest.json").read_text(encoding="utf-8"))
+    sidecar = fig_dir / "manual_annotations.json"
+    if sidecar.exists():
+        by_page = {p["page"]: p for p in manifest["pages"]}
+        for a in json.loads(sidecar.read_text(encoding="utf-8")):
+            page = by_page.get(a["page"])
+            if page is not None:
+                page["numerals"].append({
+                    "numeral": a["numeral"], "source_text": a.get("note", "manual"),
+                    "confidence": 1.0, "method": "human",
+                    "x": a["x"], "y": a["y"], "w": a.get("w", 0.02), "h": a.get("h", 0.02),
+                })
+    return manifest
 
 
 def fig_to_sheets(manifest: dict, known_figs: list[str]) -> list[SheetAssignment]:

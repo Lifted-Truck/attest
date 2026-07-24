@@ -126,6 +126,7 @@ padding:4px 9px;font-size:12.5px;cursor:pointer;transition:.12s;white-space:nowr
 cursor:pointer;border:1px solid var(--bd);border-radius:4px;padding:0 4px}}
 .sh:hover{{border-color:var(--num)}}
 .sh.tg{{color:var(--fig);border-style:dashed}}   /* recovered by the text-guided pass */
+.sh.hu{{color:#d2a8ff;border-style:dotted}}      /* human/visually confirmed (OCR-blind) */
 .pe2{{color:var(--mut);font-size:12px;line-height:1.55;padding-left:18px;margin:0}}
 .pe2 li{{margin:0 0 6px}}
 #ctx{{position:sticky;bottom:0;background:#0b0f16f2;border:1px solid var(--bd);
@@ -321,13 +322,19 @@ def main() -> int:
                   if allf else '<span class="fg only-all mut">not located on a sheet</span>')
         page_method: dict[int, str] = {}
         for s in sightings_by_num.get(n.number, []):
-            if page_method.get(s.page) != "first-pass":     # first-pass wins the label
-                page_method[s.page] = s.method
+            prev = page_method.get(s.page)
+            if prev is None or (prev == "text-guided" and s.method != "text-guided"):
+                page_method[s.page] = s.method            # first-pass/human win the label
         def _sh(p: int, n: int = n.number, pm: dict = page_method) -> str:
-            tg = pm[p] == "text-guided"
-            title = "recovered by the text-guided pass" if tg else "first-pass OCR"
-            return (f'<span class="sh{" tg" if tg else ""}" data-page="{p}" data-n="{n}" '
-                    f'title="{title}">{"↻ " if tg else ""}p.{p}</span>')
+            kind = pm[p]
+            cls, mark, title = "", "", "first-pass OCR"
+            if kind == "text-guided":
+                cls, mark, title = " tg", "↻ ", "recovered by the text-guided pass"
+            elif kind == "human":
+                cls, mark = " hu", "👁 "
+                title = "human/visually confirmed — OCR cannot read this mark"
+            return (f'<span class="sh{cls}" data-page="{p}" data-n="{n}" '
+                    f'title="{title}">{mark}p.{p}</span>')
         located = "".join(_sh(p) for p in sorted(page_method))
         nums_html.append(
             f'<span class="num" data-n="{n.number}" data-fig="{first or ""}" '
