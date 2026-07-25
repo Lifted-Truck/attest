@@ -451,3 +451,31 @@ def test_same_spot_conflict_stays_unresolved_without_text_evidence():
     unres = [m for m in cov.likely_misreads if m.get("unresolved")]
     assert unres and {unres[0]["read_as"], unres[0]["actually"]} == {"34", "54"}
     assert "NOT resolved" in unres[0]["message"]
+
+
+def test_sub_ten_numerals_are_not_locatable_by_policy():
+    """D30: sub-10 numerals are recited (element + figure) but never LOCATED — a
+    one-stroke glyph beside a leader line is indistinguishable from line art, and
+    the sightings were garbage (the box for "2" landed on the word GRAYWATER).
+    Non-numeric labels stay locatable: they are multi-stroke and read reliably."""
+    from attest.figures_map import is_locatable
+    assert not any(is_locatable(str(n)) for n in range(1, 10))
+    assert is_locatable("10") and is_locatable("12a") and is_locatable("89")
+    assert is_locatable("STM") and is_locatable("CL") and is_locatable("D1")
+    assert is_locatable("A")                      # view markers are located fine
+
+
+def test_sub_ten_absence_is_not_reported_as_an_ocr_miss():
+    """A label we never look for must not appear as recited-not-drawn — that would
+    be a false anomaly (we abstained on position by policy, not by failure)."""
+    from attest.figures_map import numeral_coverage
+    from attest.patents import Numeral, figure_references
+    man = {"pages": [{"page": 2, "file": "p.png",
+                      "fig_labels": [{"fig": "1", "confidence": 1.0, "x": 0.5, "y": 0.9}],
+                      "sheet_id": None, "numerals": []}]}
+    text = "As shown in FIG. 1, the toilet 2 and the separator 10 are connected."
+    cov = numeral_coverage([Numeral("2", "toilet", 0, 1), Numeral("10", "separator", 2, 3)],
+                           text, figure_references(text), fig_to_sheets(man, ["1"]),
+                           numeral_sightings(man))
+    assert "2" not in cov.recited_not_drawn        # policy, not a miss
+    assert "10" in cov.recited_not_drawn           # genuinely not located

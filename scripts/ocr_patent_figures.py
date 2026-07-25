@@ -39,6 +39,8 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path for the --confirm pass)
 
+from attest.figures_map import is_locatable
+
 # Engine imports are OPTIONAL — ATTEST ingests on non-Mac systems too (D29):
 # Vision is darwin-only; RapidOCR is a pip extra; Tesseract is a system binary.
 try:
@@ -290,8 +292,8 @@ def derive(observations: list[dict]) -> dict:
                 "x": o["x"], "y": o["y"], "w": o["w"], "h": o["h"],
             })
         for run in _DIGIT_RUN.findall(o["text"]):
-            if run in _NOT_A_NUMERAL:
-                continue
+            if run in _NOT_A_NUMERAL or not is_locatable(run):
+                continue                     # sub-10: not located on sheets (D30)
             numerals.append({
                 "numeral": run.lower(), "source_text": o["text"],
                 "confidence": o["confidence"], "method": "first-pass",
@@ -366,6 +368,7 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
         drop_fragment_hits,
         fig_to_sheets,
         is_fragment,
+        is_locatable,
         letters_from_first_pass,
         numeral_figures,
         numeral_sightings,
@@ -395,8 +398,9 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
     # pass did NOT already place on that figure's sheet.
     want_per_page: dict[int, set[str]] = {}
     from attest.figures_map import sub_figure_parent, view_marker_letters
-    labels = ([n.number for n in reference_numerals(text)]
-              + acronym_labels(text) + dimension_labels(text))
+    labels = [lbl for lbl in ([n.number for n in reference_numerals(text)]
+                              + acronym_labels(text) + dimension_labels(text))
+              if is_locatable(lbl)]           # sub-10 are text-only by policy (D30)
     reserved = set(labels)                                # gates the a↔0 confusion match
     markers = view_marker_letters(known)
     for lbl in labels:

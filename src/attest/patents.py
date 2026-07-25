@@ -495,7 +495,7 @@ def acronym_labels(text: str) -> list[str]:
 def numeral_key(label: str) -> tuple:
     """Natural ordering for reference labels: 9 < 10 < 12 < 12a < 12b, and any
     non-numeric label (an acronym like "STM") sorts after the numbered ones."""
-    m = re.fullmatch(r"(\d+)([a-z]?)", label)
+    m = re.fullmatch(r"(\d+)([a-z]?)", label.lower())
     return (0, int(m.group(1)), m.group(2)) if m else (1, 0, label)
 
 
@@ -541,7 +541,7 @@ def parse_figures(text: str) -> list[Figure]:
         desc = parent_cap.description if parent_cap else ""
         out.append(Figure(f"FIG. {r.number}", r.number, desc, r.char_start, r.char_end))
         seen.add(r.number.upper())
-    return out
+    return sorted(out, key=lambda f: numeral_key(f.number))
 
 
 def figure_references(text: str) -> list[FigureRef]:

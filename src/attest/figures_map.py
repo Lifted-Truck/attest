@@ -40,6 +40,22 @@ FIGURE_CONTEXT_WINDOW = 2000
 
 HEADER_BAND = 0.88   # normalized y above this = the sheets' running header
 
+# Sub-10 reference numerals are NOT located on the sheets (D30). This is a SIGHTING
+# policy, not an extraction policy — the text side still recites them with their
+# element and figure ("2 · toilet · FIG. 1"), because that part is reliable. What is
+# unreliable is the IMAGE side: a one- or two-stroke glyph beside a leader line is
+# indistinguishable from line art to every engine, and the "sightings" they produced
+# were garbage (the box for "2" landed on the word GRAYWATER). Locating nothing is
+# honest; boxing the wrong ink is not — so we assert the label and abstain on its
+# position, which is the same discipline as the rest of the system.
+MIN_LOCATABLE_NUMERAL = 10
+
+
+def is_locatable(label: str) -> bool:
+    """Whether we attempt to LOCATE this label on a drawing sheet (D30). Non-numeric
+    labels (STM, CL, D1, A) are locatable — they are multi-stroke and read reliably."""
+    return not (label.isdigit() and int(label) < MIN_LOCATABLE_NUMERAL)
+
 
 # --- multi-engine OCR support (D29) ------------------------------------------------
 # ATTEST runs on non-Mac systems too, and engines have COMPLEMENTARY blind spots
@@ -537,7 +553,9 @@ def numeral_coverage(
     drawn_only = {n for n in drawn_only if not (len(n) == 1 and n.isalpha())}
     return NumeralCoverage(
         figure_tied=figure_tied,
-        recited_not_drawn=[n for n in figure_tied if n not in ocr_nums],
+        # sub-10 labels are excluded by policy (D30) — not attempted, so not a miss
+        recited_not_drawn=[n for n in figure_tied
+                           if n not in ocr_nums and is_locatable(n)],
         drawn_not_recited=sorted(drawn_only, key=numeral_key),
         figure_mismatches=mismatches,
         seq_gaps=seq_gaps,

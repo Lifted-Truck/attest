@@ -34,6 +34,7 @@ import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
 from attest.figures_map import (
     fig_to_sheets,
+    is_locatable,
     load_manifest,
     numeral_coverage,
     numeral_figures,
@@ -128,6 +129,7 @@ cursor:pointer;border:1px solid var(--bd);border-radius:4px;padding:0 4px}}
 .sh:hover{{border-color:var(--num)}}
 .sh.tg{{color:var(--fig);border-style:dashed}}   /* recovered by the text-guided pass */
 .sh.hu{{color:#d2a8ff;border-style:dotted}}      /* human/visually confirmed (OCR-blind) */
+.sh.to{{color:var(--mut);border-style:dotted;cursor:default}} /* text-only (D30) */
 .pe2{{color:var(--mut);font-size:12px;line-height:1.55;padding-left:18px;margin:0}}
 .pe2 li{{margin:0 0 6px}}
 #ctx{{position:sticky;bottom:0;background:#0b0f16f2;border:1px solid var(--bd);
@@ -320,8 +322,10 @@ def main() -> int:
             else snippet(text, n.char_start, n.char_end))
         fg_first = (f'<span class="fg only-first">FIG. {first}'
                     f'</span>') if first else ""
-        fg_all = (f'<span class="fg only-all">FIGS. {", ".join(allf)}</span>'
-                  if allf else '<span class="fg only-all mut">not located on a sheet</span>')
+        fg_all = (f'<span class="fg only-all">FIGS. {", ".join(allf)}</span>' if allf
+                  else ((f'<span class="fg only-all">FIG. {first}</span>' if first else "")
+                        if not is_locatable(str(n.number))   # text figure, not OCR
+                        else '<span class="fg only-all mut">not located on a sheet</span>'))
         page_method: dict[int, str] = {}
         for s in sightings_by_num.get(n.number, []):
             prev = page_method.get(s.page)
@@ -338,6 +342,12 @@ def main() -> int:
             return (f'<span class="sh{cls}" data-page="{p}" data-n="{n}" '
                     f'title="{title}">{mark}p.{p}</span>')
         located = "".join(_sh(p) for p in sorted(page_method))
+        if not is_locatable(str(n.number)):
+            # D30: recited and named, but deliberately NOT located on the sheets —
+            # say so instead of showing an empty or wrong position.
+            located = ('<span class="sh to" title="sub-10 numeral: recited in the text '
+                       'with its element and figure, but not located on the drawing '
+                       '(OCR is unreliable at this size)">text-only</span>')
         nums_html.append(
             f'<span class="num" data-n="{n.number}" data-fig="{first or ""}" '
             f'data-figs="{",".join(allf)}">'

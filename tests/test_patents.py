@@ -288,10 +288,10 @@ def test_figures_validate_on_the_real_patent():
     labels = [f.label for f in parse_figures(t)]
     # the caption block yields 1/2/4/5/6; sub-figures 3A-3C share one caption
     # ("FIGS. 3 A-C are respective right, left and rear views…") so they are emitted
-    # from the references — every figure the text names must be listed & selectable.
-    assert labels[:5] == ["FIG. 1", "FIG. 2", "FIG. 4", "FIG. 5", "FIG. 6"]
-    assert set(labels) == {"FIG. 1", "FIG. 2", "FIG. 3A", "FIG. 3B", "FIG. 3C",
-                           "FIG. 4", "FIG. 5", "FIG. 6"}
+    # from the references — every figure the text names must be listed & selectable,
+    # and sorted so a sub-figure sits beside its parent.
+    assert labels == ["FIG. 1", "FIG. 2", "FIG. 3A", "FIG. 3B", "FIG. 3C",
+                      "FIG. 4", "FIG. 5", "FIG. 6"]
     nums = {n.number: n.element for n in reference_numerals(t)}
     assert "microwave reactor chamber" in nums["12"]
     assert "ceramic filter material" in nums["38"]
@@ -401,3 +401,13 @@ def test_element_phrase_may_end_in_punctuation():
     nums = {n.number for n in reference_numerals(
         "a sink (with a garbage disposal) 3, dishwasher 4 and clothes washer 5.")}
     assert {"3", "4", "5"} <= nums
+
+
+def test_figures_sort_with_sub_figures_beside_their_parent():
+    """3A/3B/3C must sit right after 2, not at the end (they are emitted from
+    references, after the caption block, so the list needs a natural sort)."""
+    from attest.patents import numeral_key, parse_figures
+    text = ("FIG. 1 is a schematic; FIG. 2 is a perspective view; FIGS. 3 A-C are "
+            "respective views of FIG. 2; FIG. 4 is a separator; FIG. 10 is a chart.")
+    assert [f.number for f in parse_figures(text)] == ["1", "2", "3A", "3B", "3C", "4", "10"]
+    assert sorted(["12b", "3A", "2", "12"], key=numeral_key) == ["2", "3A", "12", "12b"]
