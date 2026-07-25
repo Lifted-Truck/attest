@@ -479,3 +479,28 @@ def test_sub_ten_absence_is_not_reported_as_an_ocr_miss():
                            numeral_sightings(man))
     assert "2" not in cov.recited_not_drawn        # policy, not a miss
     assert "10" in cov.recited_not_drawn           # genuinely not located
+
+
+def test_unrotate_observation_round_trips():
+    """D31: sheets printed sideways must be OCR'd rotated and mapped back. Validated
+    against known controls on US5447630A FIG 1 (mean error 0.002 in both axes); this
+    pins the algebra. 270° CCW: x→1-y-h, y→x, and w/h swap."""
+    from attest.figures_map import unrotate_observation
+    o = {"text": "33", "confidence": 1.0, "x": 0.20, "y": 0.60, "w": 0.03, "h": 0.02}
+    r = unrotate_observation(o, 270)
+    assert (r["x"], r["y"], r["w"], r["h"]) == (1 - 0.60 - 0.02, 0.20, 0.02, 0.03)
+    assert r["text"] == "33" and r["confidence"] == 1.0        # payload preserved
+    b = unrotate_observation(o, 90)
+    assert (b["x"], b["y"], b["w"], b["h"]) == (0.60, 1 - 0.20 - 0.03, 0.02, 0.03)
+    assert unrotate_observation(o, 0) == o                      # upright is identity
+
+
+def test_unrotate_270_and_90_are_inverse_on_the_axes():
+    """A 270° map followed by a 90° map returns the original box (the two rotations
+    compose to identity), which is the invariant that keeps boxes landing right."""
+    from attest.figures_map import unrotate_observation
+    o = {"text": "x", "confidence": 1.0, "x": 0.31, "y": 0.42, "w": 0.05, "h": 0.02}
+    there = unrotate_observation(o, 270)
+    back = unrotate_observation(there, 90)
+    assert (round(back["x"], 4), round(back["y"], 4)) == (o["x"], o["y"])
+    assert (back["w"], back["h"]) == (o["w"], o["h"])

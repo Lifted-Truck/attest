@@ -66,6 +66,32 @@ def is_locatable(label: str) -> bool:
 # format (text, confidence 0..1, x/y/w/h normalized, origin bottom-left) so the
 # frozen manifest and everything downstream stay engine-agnostic.
 
+def unrotate_observation(o: dict, angle: int) -> dict:
+    """Map an observation read on a ROTATED sheet back to the original frame (D31).
+
+    Patent sheets are sometimes printed sideways (US5447630A's FIG. 1 fills a
+    landscape page), and every OCR engine reads upright text only — so those sheets
+    must be OCR'd rotated and the coordinates mapped back, or the boxes land nowhere.
+
+    `angle` is the CCW rotation applied before OCR (PIL's convention). Coordinates are
+    normalized with a BOTTOM-left origin. For 270° CCW (= 90° CW) the derivation is
+    x_orig = 1 - y - h, y_orig = x (NOT x - w — the box's leading edge in the rotated
+    frame is already the bottom edge in the original, and subtracting the width
+    shifted every box down by one glyph, ~0.02).
+    """
+    x, y, w, h = o["x"], o["y"], o["w"], o["h"]
+    if angle % 360 == 270:
+        nx, ny, nw, nh = 1 - y - h, x, h, w
+    elif angle % 360 == 90:
+        nx, ny, nw, nh = y, 1 - x - w, h, w
+    elif angle % 360 == 180:
+        nx, ny, nw, nh = 1 - x - w, 1 - y - h, w, h
+    else:
+        return dict(o)
+    return {**o, "x": round(nx, 4), "y": round(ny, 4),
+            "w": round(nw, 4), "h": round(nh, 4)}
+
+
 def tesseract_tsv_to_observations(tsv: str, width: int, height: int) -> list[dict]:
     """Tesseract `tsv` output → common observations. Pixel boxes are TOP-left origin
     (flip y); conf is 0-100 with -1 on non-word rows (skipped)."""

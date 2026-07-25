@@ -39,7 +39,7 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path for the --confirm pass)
 
-from attest.figures_map import is_locatable
+from attest.figures_map import is_locatable, unrotate_observation
 
 # Engine imports are OPTIONAL — ATTEST ingests on non-Mac systems too (D29):
 # Vision is darwin-only; RapidOCR is a pip extra; Tesseract is a system binary.
@@ -131,6 +131,38 @@ def ocr_image(path: Path) -> list[dict]:
             "w": round(float(bb.size.width), 4), "h": round(float(bb.size.height), 4),
         })
     return out
+
+
+ROTATIONS = (0, 270, 90)          # sheets are printed upright or sideways (D31)
+
+
+def _rotated_copy(path: Path, angle: int) -> Path:
+    from PIL import Image
+    out = path.parent / f".rot{angle}_{path.name}"
+    Image.open(path).rotate(angle, expand=True).save(out)
+    return out
+
+
+def detect_orientation(path: Path, engines: list[str]) -> int:
+    """The rotation at which this sheet actually reads (D31). A patent figure that
+    fills a landscape page is printed SIDEWAYS, and every engine reads upright text
+    only — US5447630A's FIG. 1 yields ~7 numeric tokens upright and 24 at 270°.
+    Chosen by evidence (most label-shaped tokens), per sheet, and recorded in the
+    manifest so the choice is auditable rather than assumed."""
+    best, best_n = 0, -1
+    for angle in ROTATIONS:
+        p = path if angle == 0 else _rotated_copy(path, angle)
+        try:
+            n = 0
+            for eng in engines:
+                for o in ENGINE_READERS[eng](p):
+                    n += len(_DIGIT_RUN.findall(o["text"])) + len(_DIM_RUN.findall(o["text"]))
+        finally:
+            if angle:
+                p.unlink(missing_ok=True)
+        if n > best_n:
+            best, best_n = angle, n
+    return best
 
 
 def obs_tesseract(path: Path) -> list[dict]:
@@ -497,22 +529,30 @@ def main() -> int:
 
     pages = []
     for p in sheets:
+        angle = detect_orientation(p, engines)
+        read_from = p if angle == 0 else _rotated_copy(p, angle)
         obs = []
-        for eng in engines:
-            for o in ENGINE_READERS[eng](p):
-                o["engine"] = eng
-                obs.append(o)
+        try:
+            for eng in engines:
+                for o in ENGINE_READERS[eng](read_from):
+                    o["engine"] = eng
+                    obs.append(unrotate_observation(o, angle) if angle else o)
+        finally:
+            if angle:
+                read_from.unlink(missing_ok=True)
         d = derive(obs)
         pages.append({
             "file": p.name,
             "page": int(re.search(r"page-(\d+)", p.name).group(1)),
             "image_sha256": hashlib.sha256(p.read_bytes()).hexdigest(),
+            "orientation": angle,          # rotation the sheet was READ at (D31)
             **d, "observations": obs,
         })
         figs = ",".join(f["fig"] for f in d["fig_labels"]) or "—"
         sid = d["sheet_id"] or {}
-        print(f"  ✓ {p.name}: FIG {figs} · sheet {sid.get('sheet','?')}/{sid.get('of','?')} "
-              f"· {len(d['numerals'])} numeral candidates · {len(obs)} observations")
+        rot = "" if angle == 0 else f" · read at {angle}°"
+        print(f"  ✓ {p.name}: FIG {figs} · sheet {sid.get('sheet','?')}/{sid.get('of','?')}"
+              f"{rot} · {len(d['numerals'])} numeral candidates · {len(obs)} observations")
 
     recovered = 0
     if ns.confirm:
