@@ -452,23 +452,25 @@ class Numeral:
 # classifier — the drawings adjudicate. FIG/FIGS are figure syntax, not labels.
 _ACRONYM = re.compile(r"\b([A-Z]{2,5})\b")
 _NOT_A_LABEL = frozenset("FIG FIGS US NO PCT CIP CFM RPM PSI GPM".split())
-_MIN_ACRONYM_MENTIONS = 2     # a one-off is usually an OCR/typo fragment, not a label
 
 
 def acronym_labels(text: str) -> list[str]:
     """Candidate acronym reference labels the spec uses for components.
 
-    Requires >= _MIN_ACRONYM_MENTIONS mentions (a single occurrence is noise) and
-    excludes figure syntax and unit abbreviations. Locate-only (D10): these are
-    candidates to LOOK FOR on the drawings, never an assertion that they are labels.
+    **No frequency floor.** An earlier cut required >=2 mentions on the theory that a
+    one-off is noise; that deleted real labels — US5447630A defines "CZ" ("the shaded
+    region CZ represents a cooling zone") and "CL" ("CL designates the center line")
+    exactly once each, and both are plainly drawn. The DRAWINGS are the filter that
+    matters: a candidate that is really prose ("PVC", 4 mentions) simply is not found
+    as a label and costs nothing, while a real one-off is recovered. Only figure
+    syntax and unit abbreviations are excluded outright.
+
+    Locate-only (D10): these are candidates to LOOK FOR on the drawings, never an
+    assertion that they are labels.
     """
     cm = _CLAIMS_MARKER.search(text)
     region = text[:cm.start()] if cm else text          # specification only
-    counts: dict[str, int] = {}
-    for m in _ACRONYM.finditer(region):
-        counts[m.group(1)] = counts.get(m.group(1), 0) + 1
-    return sorted(a for a, n in counts.items()
-                  if n >= _MIN_ACRONYM_MENTIONS and a not in _NOT_A_LABEL)
+    return sorted({m.group(1) for m in _ACRONYM.finditer(region)} - _NOT_A_LABEL)
 
 
 def numeral_key(label: str) -> tuple:

@@ -331,10 +331,13 @@ def test_acronym_labels_are_candidates_from_the_spec():
             "The STM houses a central processing unit CPU; the CPU drives it. "
             "The LTM is PVC. See FIG. 1 and FIGS. 2-3. Airflow is 300 CFM.")
     got = acronym_labels(spec)
-    assert "STM" in got and "LTM" in got and "CPU" in got   # >=2 mentions each
+    assert "STM" in got and "LTM" in got and "CPU" in got
     assert "FIG" not in got and "FIGS" not in got           # figure syntax
     assert "CFM" not in got                                 # unit abbreviation
-    assert "PVC" not in got                                 # single mention here
+    # "PVC" (a material) IS a candidate — deliberately permissive, because the
+    # DRAWINGS adjudicate: it is never found as a label, at zero cost. The floor
+    # that used to exclude it also deleted real single-mention labels (CZ/CL).
+    assert "PVC" in got
 
 
 def test_label_pattern_numeric_vs_acronym():
@@ -357,3 +360,16 @@ def test_list_sibling_numerals_inherit_the_head_element():
     assert "56" in nums and "58" in nums
     assert nums["58"] == nums["56"]                      # sibling inherits the element
     assert "96" in nums and "98" in nums
+
+
+def test_acronym_labels_have_no_frequency_floor():
+    """L0006 again (5th instance): a >=2-mention floor deleted REAL labels —
+    US5447630A defines "CZ" (cooling zone) and "CL" (center line) exactly once each
+    and both are plainly drawn. The DRAWINGS are the filter: a prose-only candidate
+    is simply never found on a sheet and costs nothing."""
+    from attest.patents import acronym_labels
+    spec = ("The shaded region CZ represents a cooling zone. "
+            "CL designates the center line. See FIG. 1. Airflow is 300 CFM.")
+    got = acronym_labels(spec)
+    assert "CZ" in got and "CL" in got            # single-mention labels survive
+    assert "FIG" not in got and "CFM" not in got  # syntax + units still excluded

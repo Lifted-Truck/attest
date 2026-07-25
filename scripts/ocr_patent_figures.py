@@ -66,11 +66,17 @@ def _pkg_version(name: str) -> str | None:
         return None
 
 _FIG_LABEL = re.compile(r"FIGS?\.?\s*(\d+[A-Z]?)", re.IGNORECASE)
+# A caption read GARBLED still isn't a numeral: tesseract renders "FIG.6" as
+# "FICG.6" and "FIG.3A" as bare "3", leaking 6/3 into the numeral set. This
+# tolerant form ("F" + optional junk + "G") guards the digit extraction.
+_FIG_FUZZY = re.compile(r"\bF[I1l|]?[CG]?G?\s*\.?\s*\d", re.IGNORECASE)
 _SHEET_ID = re.compile(r"Sheet\s+(\d+)\s+of\s+(\d+)", re.IGNORECASE)
 # A reference LABEL: digits + an optional single letter suffix ("12a" is a distinct
 # part from "12" — dropping the suffix reports 12 present and 12a missing, both wrong).
 # Still letter-PREFIX rejected: "D1"/"D6" are FIG. 6's DIMENSION labels, not numerals.
-_DIGIT_RUN = re.compile(r"(?<![A-Za-z0-9])(\d{1,3}[a-z]?)(?![\da-z])")
+_DIGIT_RUN = re.compile(r"(?<![A-Za-z0-9])(\d{1,3}[a-z]?)(?![\dA-Za-z])")
+# "0" is never a reference numeral — it is always a fragment of line art ("/0").
+_NOT_A_NUMERAL = frozenset({"0"})
 # Header furniture that must not yield numeral candidates (patent number, dates).
 _HEADER_BAND = 0.88          # normalized y above this = the running header band
 # Page/patent furniture whose digits are NOT reference numerals — the first pass
@@ -201,8 +207,8 @@ def tiled_search(path: Path, targets: set[str], *, rows: int = 4, cols: int = 2,
                     text = cand.string()
                     if _FURNITURE.search(text):          # "Sheet N of M", patent number
                         continue
-                    if _FIG_LABEL.search(text):          # "FIG.4"'s own digits ≠ numeral 4
-                        continue
+                    if _FIG_LABEL.search(text) or _FIG_FUZZY.search(text):
+                        continue                     # "FIG.4"/"FICG.4" digits ≠ numeral 4
                     # numeric labels come from the digit-run pattern; acronym labels
                     # ("STM") are matched whole-word; a SINGLE-letter view marker ("A")
                     # only as an exact token (a lone letter is too noisy as a substring);
@@ -270,11 +276,13 @@ def derive(observations: list[dict]) -> dict:
                          "x": o["x"], "y": o["y"]})
         if o["y"] >= _HEADER_BAND:               # header: patent no., date — not numerals
             continue
-        if _FIG_LABEL.search(o["text"]):         # a FIG label's digits are not numerals
-            continue
+        if _FIG_LABEL.search(o["text"]) or _FIG_FUZZY.search(o["text"]):
+            continue                             # a FIG caption's digits ≠ numerals
         if _PROSE.search(o["text"]):             # prose annotation, not a numeral read
             continue
         for run in _DIGIT_RUN.findall(o["text"]):
+            if run in _NOT_A_NUMERAL:
+                continue
             numerals.append({
                 "numeral": run.lower(), "source_text": o["text"],
                 "confidence": o["confidence"], "method": "first-pass",

@@ -391,3 +391,16 @@ def test_merge_same_spot_numerals_corroborates_across_engines():
     assert by_x[0.50]["engines"] == ["tesseract", "vision"]   # corroborated
     assert by_x[0.50]["confidence"] == 0.9                    # best read kept
     assert by_x[0.80]["engines"] == ["rapidocr"]
+
+
+def test_sub_figure_caption_is_not_a_numeral():
+    """Patents write reference numerals with a LOWERCASE suffix ("12a") and
+    sub-figures with an UPPERCASE one ("FIG. 3A"), so a digit run followed by an
+    uppercase letter is a caption fragment. This pins the discriminator the OCR
+    token pattern relies on (audit found bare '3' leaking from '3A'/'3C' reads)."""
+    import re
+    digit_run = re.compile(r"(?<![A-Za-z0-9])(\d{1,3}[a-z]?)(?![\dA-Za-z])")
+    assert digit_run.findall("12a") == ["12a"]     # real numeral, lowercase suffix
+    assert digit_run.findall("3A") == []           # sub-figure caption fragment
+    assert digit_run.findall("3C") == []
+    assert digit_run.findall("the valve 34.") == ["34"]
