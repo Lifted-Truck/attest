@@ -56,6 +56,15 @@ except Exception:
     RAPID_OK = False
 TESSERACT_OK = shutil.which("tesseract") is not None
 
+
+def _pkg_version(name: str) -> str | None:
+    """Installed version of a pip package (the module often has no __version__)."""
+    import importlib.metadata as md
+    try:
+        return md.version(name)
+    except Exception:
+        return None
+
 _FIG_LABEL = re.compile(r"FIGS?\.?\s*(\d+[A-Z]?)", re.IGNORECASE)
 _SHEET_ID = re.compile(r"Sheet\s+(\d+)\s+of\s+(\d+)", re.IGNORECASE)
 # A reference LABEL: digits + an optional single letter suffix ("12a" is a distinct
@@ -232,7 +241,8 @@ def tiled_search(path: Path, targets: set[str], *, rows: int = 4, cols: int = 2,
                         conf = round(float(cand.confidence()), 3)
                         hit = {
                             "numeral": num, "source_text": text, "confidence": conf,
-                            "method": "text-guided", "x": x_full, "y": y_full,
+                            "method": "text-guided", "engine": "vision",
+                            "x": x_full, "y": y_full,
                             "w": round(float(bb.size.width) * w / W, 4),
                             "h": round(float(bb.size.height) * h / H, 4),
                         }
@@ -418,6 +428,8 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
             hits += [h for h in marker_band_rescue(fig_dir / page_of[page]["file"],
                                                    still_mk)
                      if h["numeral"] in still_mk]
+        for h in hits:                                # same provenance shape as first-pass
+            h["engines"] = sorted({h.pop("engine", "unknown")})
         if hits:
             page_of[page]["numerals"].extend(hits)
             got = ", ".join(str(h["numeral"]) for h in hits)
@@ -496,8 +508,7 @@ def main() -> int:
             "tesseract": (subprocess.run(["tesseract", "--version"], capture_output=True)
                           .stdout.decode("utf-8", "replace").split("\n")[0]
                           if "tesseract" in engines else None),
-            "rapidocr": (getattr(__import__("rapidocr_onnxruntime"), "__version__", "?")
-                         if "rapidocr" in engines else None),
+            "rapidocr": _pkg_version("rapidocr-onnxruntime") if "rapidocr" in engines else None,
         },
         "warning": ("OCR-derived: strong but not 100% reliable (leader lines fuse with "
                     "digits; rotated text garbles). Confidence + method (first-pass / "
