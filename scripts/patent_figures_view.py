@@ -136,9 +136,22 @@ cursor:pointer;border:1px solid var(--bd);border-radius:4px;padding:0 4px}}
 border-radius:8px;padding:11px 13px;font-size:12.5px;min-height:20px;color:var(--mut)}}
 #ctx b{{color:var(--tx);background:#243; padding:0 2px;border-radius:3px}}
 .note{{color:var(--mut);font-size:11.5px;margin:14px 0 0;line-height:1.5}}
+/* The OCR caveat leads the page on purpose: this is the least reliable step in
+   ATTEST, and a caveat discovered at the bottom is a caveat that did not work. */
+.alarm{{border:1px solid #f85149;border-left:5px solid #f85149;background:#2a1416;
+  border-radius:8px;padding:13px 16px;margin:0 0 16px;font-size:12.5px;line-height:1.55}}
+.alarm h2{{margin:0 0 7px;font-size:14px;color:#ff9a92;letter-spacing:.02em}}
+.alarm .tally{{margin:9px 0 0;padding:0;list-style:none;
+  display:flex;flex-wrap:wrap;gap:6px}}
+.alarm .tally li{{background:#3a1d20;border:1px solid #6b2b2b;border-radius:5px;
+  padding:3px 9px;font-size:12px;color:#ffc9c4}}
+.alarm .tally li.zero{{background:#16241a;border-color:#2b5c33;color:#8fd39b}}
+.alarm .fine{{color:#d6a8a3;font-size:11.5px;margin:9px 0 0;line-height:1.5}}
+.alarm a{{color:#ff9a92}}
 </style></head><body>
 <h2 class="sr-only">{title}: drawing sheets beside parsed figure captions and numerals.</h2>
 <header><h1>{h1}</h1><div class="sub">{sub}</div></header>
+{banner}
 <div class="cols">
   <div class="pane left"><h2>Drawing sheets ({nsheets})</h2>{sheets}</div>
   <div class="pane right">
@@ -353,7 +366,7 @@ def main() -> int:
             f'data-figs="{",".join(allf)}">'
             f'<b>{n.number}</b> {html.escape(n.element)}{fg_first}{fg_all}{located}</span>'
         )
-    issues_html = ""
+    issues_html, banner = "", ""
     if cov is not None:
         def _nlist(nums_list):
             return ", ".join(str(n) for n in nums_list) or "none"
@@ -371,8 +384,51 @@ def main() -> int:
             f'recovered {n_recovered} (marked <span class="sh tg">↻ p.N</span> above). '
             f'The prediction pushes the truth from both angles — text and image.</li>'
             if n_recovered else "")
+        # --- the caveat leads, and the discrepancies lead with it -------------------
+        # Julian's framing: "for the sake of honoring this tool's entire premise."
+        # A tool whose whole claim is ground-or-abstain cannot bury the one step that
+        # is neither — so the OCR caveat and the discrepancy tally sit ABOVE the
+        # evidence, not under it. Precision matters more than alarm here: OCR is
+        # frozen at ingestion, so everything DOWNSTREAM is byte-reproducible (I6);
+        # what is not reproducible is the reading itself across engines/versions.
+        # Saying "OCR is nondeterministic" flat would be the easier line and the
+        # wrong one — it would understate the determinism we do have and overstate
+        # the run-to-run variance we do not.
+        def _cell(n, label, anchor):
+            cls = "zero" if not n else ""
+            return (f'<li class="{cls}"><a href="#{anchor}" style="text-decoration:none;'
+                    f'color:inherit"><b>{n}</b> {label}</a></li>')
+
+        banner = (
+            '<div class="alarm" role="alert">'
+            '<h2>⚠ Numeral locations on this page are OCR-derived — the weakest link</h2>'
+            'Every box drawn on a drawing is a <b>machine reading of pixels</b>, not a '
+            'transcription guarantee and not a citation. This is the one step in ATTEST '
+            'that is neither grounded nor abstained: it is <i>judged</i>. Treat it as a '
+            'reviewer&rsquo;s aid to be confirmed by eye, never as a settled fact.'
+            '<ul class="tally">'
+            f'{_cell(len(cov.recited_not_drawn), "recited, not located", "issues")}'
+            f'{_cell(len(cov.drawn_not_recited), "located, not recited", "issues")}'
+            f'{_cell(len(cov.figure_mismatches), "figure mismatches", "issues")}'
+            f'{_cell(len(_unr), "engine disagreements unresolved", "issues")}'
+            f'{_cell(len(unlocated_markers), "markers not located", "issues")}</ul>'
+            '<p class="fine"><b>What is and is not reproducible.</b> The reading is '
+            'frozen into a hashed manifest at ingestion, so everything downstream of it '
+            'is byte-identical on every run (I6) and the sheets are never re-OCR&rsquo;d '
+            'at answer time. The <i>reading itself</i> carries no such guarantee: a '
+            'different engine version, OS, or machine can resolve the same pixels '
+            'differently, so re-ingesting elsewhere may not reproduce these boxes. '
+            'Three engines are run and cross-checked precisely because each is fallible '
+            '&mdash; but they share blind spots, and agreement is corroboration, not proof.'
+            '<br><b>Absence of a flag is not evidence of correctness.</b> The checks below '
+            'compare the drawings against the specification, so a numeral that OCR missed '
+            '<i>and</i> the spec never recites is invisible to every check on this page. '
+            'The counts above are a floor on the discrepancies, not a ceiling.</p></div>'
+        )
+
         issues_html = (
-            f'<h2 style="margin-top:20px">Numeral coverage &amp; consistency ({flags} flags)</h2>'
+            f'<h2 id="issues" style="margin-top:20px">Numeral coverage &amp; consistency '
+            f'({flags} flags)</h2>'
             f'<ul class="pe2">'
             f'{recovered_line}'
             + ("".join(f'<li><b>View marker not located:</b> {html.escape(u)} '
@@ -418,6 +474,7 @@ def main() -> int:
             f"{len(nums)} reference numerals",
         nsheets=len(manifest["sheets"]), nfigs=len(figs), nnums=len(nums),
         sheets=sheets_html, figs=figs_html, nums="".join(nums_html), issues=issues_html,
+        banner=banner,
         ctx_json=json.dumps(ctx_json), note=note,
     )
     Path(ns.out).write_text(page, encoding="utf-8")
