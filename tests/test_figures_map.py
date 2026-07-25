@@ -504,3 +504,43 @@ def test_unrotate_270_and_90_are_inverse_on_the_axes():
     back = unrotate_observation(there, 90)
     assert (round(back["x"], 4), round(back["y"], 4)) == (o["x"], o["y"])
     assert (back["w"], back["h"]) == (o["w"], o["h"])
+
+
+def test_upright_reads_are_never_gated():
+    """D32: the union across rotations may only ADD. Over-filtering has bitten this
+    pipeline repeatedly (the >=10 floor, the >=2-mention floor), so a label read
+    upright is admitted whatever the spec says and however few engines saw it."""
+    from attest.figures_map import gate_rotated_numerals
+    up = {"numeral": "77", "angles": [0], "engines": ["vision"]}
+    assert gate_rotated_numerals([up], recited=set()) == [up]   # unknown to spec, kept
+
+
+def test_rotated_only_reads_need_corroboration():
+    """D32: a label seen ONLY on a rotated pass is admitted on spec recital or on
+    cross-engine agreement, and rejected when it has neither."""
+    from attest.figures_map import gate_rotated_numerals
+    def n(label, angles, engines):
+        return {"numeral": label, "angles": angles, "engines": engines}
+    kept = gate_rotated_numerals([
+        n("38", [90, 270], ["tesseract"]),           # spec recites it
+        n("33", [90], ["vision", "rapidocr"]),       # off-spec but two engines agree
+        n("607", [90], ["vision"]),                  # neither → artifact
+    ], recited={"38"})
+    assert [k["numeral"] for k in kept] == ["38", "33"]
+    assert [k["corroboration"] for k in kept] == ["spec", "cross-engine"]
+
+
+def test_upside_down_is_held_to_cross_engine_only():
+    """D32: 180° is the 6<->9 artifact generator (FIG 4's real 86 produced a phantom
+    98; FIG 5's real 98 produced a phantom 86) and no printed sheet is inverted. Spec
+    recital cannot filter those — BOTH members of a 6/9 pair are usually recited — so
+    at 180° alone, spec recital is not enough."""
+    from attest.figures_map import gate_rotated_numerals
+    recited = {"86", "98"}
+    phantom = {"numeral": "98", "angles": [180], "engines": ["tesseract"]}
+    assert gate_rotated_numerals([phantom], recited) == []       # spec alone: rejected
+    two = {"numeral": "98", "angles": [180], "engines": ["tesseract", "vision"]}
+    assert len(gate_rotated_numerals([two], recited)) == 1       # cross-engine: admitted
+    # ...and 180° alongside a physically plausible angle is fine on spec alone.
+    sideways = {"numeral": "98", "angles": [180, 270], "engines": ["tesseract"]}
+    assert len(gate_rotated_numerals([sideways], recited)) == 1

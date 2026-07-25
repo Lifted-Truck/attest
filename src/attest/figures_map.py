@@ -70,8 +70,12 @@ def unrotate_observation(o: dict, angle: int) -> dict:
     """Map an observation read on a ROTATED sheet back to the original frame (D31).
 
     Patent sheets are sometimes printed sideways (US5447630A's FIG. 1 fills a
-    landscape page), and every OCR engine reads upright text only — so those sheets
-    must be OCR'd rotated and the coordinates mapped back, or the boxes land nowhere.
+    landscape page), and the engines read ISOLATED glyphs upright only — so those
+    sheets must be OCR'd rotated and the coordinates mapped back, or the boxes land
+    nowhere. (Dense text lines are orientation-robust: the running header "Sheet 1 of
+    8" parses at all four angles, because a long line has language-model support a
+    lone "33" on a leader line does not. That asymmetry is why rotation is a per-GLYPH
+    property, not a per-page one — see D32.)
 
     `angle` is the CCW rotation applied before OCR (PIL's convention). Coordinates are
     normalized with a BOTTOM-left origin. For 270° CCW (= 90° CW) the derivation is
@@ -146,13 +150,62 @@ def merge_same_spot_numerals(numerals: list[dict], *, radius: float = 0.02) -> l
         if dup is None:
             n = dict(n)
             n["engines"] = sorted(set(n.get("engines") or [n.get("engine", "unknown")]))
-            n.pop("engine", None)
+            # which rotations this mark was legible at — provenance for the D32 gate,
+            # and the signal the review GUI shows as "read at 270°".
+            n["angles"] = sorted(set(n.get("angles") or [n.get("angle", 0)]))
+            n.pop("engine", None), n.pop("angle", None)
             kept.append(n)
         else:
             dup["engines"] = sorted(set(dup["engines"])
                                     | set(n.get("engines") or [n.get("engine", "unknown")]))
+            dup["angles"] = sorted(set(dup["angles"])
+                                   | set(n.get("angles") or [n.get("angle", 0)]))
     return kept
 
+
+
+def gate_rotated_numerals(numerals: list[dict], recited: set[str]) -> list[dict]:
+    """Admission rule for labels seen ONLY on a rotated pass (D32).
+
+    Reading every sheet at 0/90/180/270 and unioning the results raises recall a lot
+    (pick-one-angle loses labels on 7 of US5447630A's 8 sheets), but it also invites
+    the rotational-symmetry artifact: upside down, 6 reads as 9 and "106" reads as
+    "901". Those artifacts are indistinguishable from real labels by shape alone, so
+    an angle-only find must be CORROBORATED before it is admitted:
+
+      · the specification recites that numeral (text-guided — the same principle as
+        the confirmation pass: the spec predicts, the sheet confirms), OR
+      · two or more engines independently read it at the same spot (D29 — engines
+        have complementary blind spots, so agreement is real evidence).
+
+    UPSIDE DOWN (180°) IS HELD TO THE STRICTER BAR — cross-engine only. Two reasons,
+    both measured on US5447630A:
+      · No printed patent sheet is inverted. A sheet is portrait or landscape, so 90°
+        and 270° are physically motivated in a way 180° is not.
+      · 180° is precisely the rotational-symmetry generator: it turns 6 into 9. FIG 4's
+        real "86" produced a phantom "98"; FIG 5's real "98" produced a phantom "86".
+    Spec recital cannot filter those, because BOTH members of a 6/9 pair are usually
+    recited — a 68-numeral spec "corroborates" almost any plausible two-digit artifact.
+    So spec recital is necessary-but-weak evidence, and at the one angle that mass
+    produces spec-shaped artifacts it is not enough on its own.
+
+    Anything read upright (angle 0) is admitted as before: that is the primary pass,
+    and gating it would re-introduce the over-filtering that has bitten this pipeline
+    repeatedly (the >=10 floor, the >=2-mention floor). This gate only ever ADMITS
+    labels the old pick-one-angle design could not see; it never removes an upright one.
+    """
+    out = []
+    for n in numerals:
+        angles = n.get("angles") or [n.get("angle", 0)]
+        if 0 in angles:
+            out.append(n)
+            continue
+        cross = len(n.get("engines") or []) >= 2
+        if cross:
+            out.append({**n, "corroboration": "cross-engine"})
+        elif str(n["numeral"]) in recited and set(angles) != {180}:
+            out.append({**n, "corroboration": "spec"})
+    return out
 
 
 def is_fragment(hit: dict, page: dict, *, radius: float = 0.025) -> bool:

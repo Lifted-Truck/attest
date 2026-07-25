@@ -133,7 +133,7 @@ def ocr_image(path: Path) -> list[dict]:
     return out
 
 
-ROTATIONS = (0, 270, 90)          # sheets are printed upright or sideways (D31)
+ROTATIONS = (0, 90, 180, 270)     # every quarter turn — see read_all_rotations (D32)
 
 
 def _rotated_copy(path: Path, angle: int) -> Path:
@@ -143,26 +143,37 @@ def _rotated_copy(path: Path, angle: int) -> Path:
     return out
 
 
-def detect_orientation(path: Path, engines: list[str]) -> int:
-    """The rotation at which this sheet actually reads (D31). A patent figure that
-    fills a landscape page is printed SIDEWAYS, and every engine reads upright text
-    only — US5447630A's FIG. 1 yields ~7 numeric tokens upright and 24 at 270°.
-    Chosen by evidence (most label-shaped tokens), per sheet, and recorded in the
-    manifest so the choice is auditable rather than assumed."""
-    best, best_n = 0, -1
+def read_all_rotations(path: Path, engines: list[str]) -> list[dict]:
+    """OCR a sheet at every quarter turn and union the observations in page
+    coordinates (D32, superseding D31's single best angle).
+
+    D31 assumed a sheet has ONE orientation and picked it by token count. Both halves
+    were wrong, and the measurements are in the D32 row:
+
+      · Rotation is a per-GLYPH property, not a per-page one. The running header
+        "Sheet 1 of 8" parses at all four angles — a long line carries enough context
+        to be found however it lies — while an isolated "33" on a leader line only
+        reads when it is upright in the raster. So a sheet whose header is upright and
+        whose drawing is sideways (US5447630A p.2) has no single correct angle, and
+        picking one loses labels on 7 of its 8 sheets.
+      · Token count is the wrong chooser: it picked 90° for p.2, where 270° is the
+        human-confirmed truth, because upside-down digits still look like digits.
+
+    Union raises recall; the rotational-symmetry artifact it invites (upside down,
+    "106" reads "901") is held out by gate_rotated_numerals, not by guessing an angle.
+    """
+    obs = []
     for angle in ROTATIONS:
         p = path if angle == 0 else _rotated_copy(path, angle)
         try:
-            n = 0
             for eng in engines:
                 for o in ENGINE_READERS[eng](p):
-                    n += len(_DIGIT_RUN.findall(o["text"])) + len(_DIM_RUN.findall(o["text"]))
+                    o["engine"], o["angle"] = eng, angle
+                    obs.append(unrotate_observation(o, angle) if angle else o)
         finally:
             if angle:
                 p.unlink(missing_ok=True)
-        if n > best_n:
-            best, best_n = angle, n
-    return best
+    return obs
 
 
 def obs_tesseract(path: Path) -> list[dict]:
@@ -300,7 +311,7 @@ def tiled_search(path: Path, targets: set[str], *, rows: int = 4, cols: int = 2,
     return sorted(found, key=lambda d: (d["numeral"], -d["y"]))
 
 
-def derive(observations: list[dict]) -> dict:
+def derive(observations: list[dict], recited: set[str] | None = None) -> dict:
     """Deterministic extraction over raw observations: FIG labels, sheet self-id,
     numeral candidates (digit runs outside the header band, with provenance)."""
     figs, sheet_id, numerals = [], None, []
@@ -321,6 +332,7 @@ def derive(observations: list[dict]) -> dict:
             numerals.append({
                 "numeral": run, "source_text": o["text"], "confidence": o["confidence"],
                 "method": "first-pass", "engine": o.get("engine", "vision"),
+                "angle": o.get("angle", 0),
                 "x": o["x"], "y": o["y"], "w": o["w"], "h": o["h"],
             })
         for run in _DIGIT_RUN.findall(o["text"]):
@@ -329,19 +341,22 @@ def derive(observations: list[dict]) -> dict:
             numerals.append({
                 "numeral": run.lower(), "source_text": o["text"],
                 "confidence": o["confidence"], "method": "first-pass",
-                "engine": o.get("engine", "vision"),
+                "engine": o.get("engine", "vision"), "angle": o.get("angle", 0),
                 # full normalized bbox (origin bottom-left) — carried through so the
                 # figures view can draw a confirmation box around the located numeral.
                 "x": o["x"], "y": o["y"], "w": o["w"], "h": o["h"],
             })
-    from attest.figures_map import merge_same_spot_numerals
+    from attest.figures_map import gate_rotated_numerals, merge_same_spot_numerals
     best_fig: dict[str, dict] = {}
     for fg in figs:                              # engines re-read the same FIG label
         if fg["fig"] not in best_fig or fg["confidence"] > best_fig[fg["fig"]]["confidence"]:
             best_fig[fg["fig"]] = fg
+    # merge first (so `angles`/`engines` are unioned per mark), then gate: a label seen
+    # only on a rotated pass needs corroboration to be admitted (D32).
+    merged = merge_same_spot_numerals(numerals)
     return {"fig_labels": sorted(best_fig.values(), key=lambda f: f["fig"]),
             "sheet_id": sheet_id,
-            "numerals": merge_same_spot_numerals(numerals)}
+            "numerals": gate_rotated_numerals(merged, recited or set())}
 
 
 
@@ -527,32 +542,32 @@ def main() -> int:
         print(f"no drawing sheets under {fig_dir} — run fetch_patent_figures.py first")
         return 1
 
+    # The spec's recited numerals corroborate rotated-only reads (D32 gate).
+    recited: set[str] = set()
+    if ns.doc:
+        from attest.ingest.store import DocumentStore
+        from attest.patents import reference_numerals
+        _doc = DocumentStore(Path(ns.store)).load(ns.doc)
+        recited = {n.number for n in reference_numerals(_doc.canonical_text)}
+        print(f"spec recites {len(recited)} numerals (corroborates rotated reads — D32)")
+
     pages = []
     for p in sheets:
-        angle = detect_orientation(p, engines)
-        read_from = p if angle == 0 else _rotated_copy(p, angle)
-        obs = []
-        try:
-            for eng in engines:
-                for o in ENGINE_READERS[eng](read_from):
-                    o["engine"] = eng
-                    obs.append(unrotate_observation(o, angle) if angle else o)
-        finally:
-            if angle:
-                read_from.unlink(missing_ok=True)
-        d = derive(obs)
+        obs = read_all_rotations(p, engines)
+        d = derive(obs, recited)
         pages.append({
             "file": p.name,
             "page": int(re.search(r"page-(\d+)", p.name).group(1)),
             "image_sha256": hashlib.sha256(p.read_bytes()).hexdigest(),
-            "orientation": angle,          # rotation the sheet was READ at (D31)
+            "angles_read": list(ROTATIONS),     # every quarter turn, unioned (D32)
             **d, "observations": obs,
         })
         figs = ",".join(f["fig"] for f in d["fig_labels"]) or "—"
         sid = d["sheet_id"] or {}
-        rot = "" if angle == 0 else f" · read at {angle}°"
+        rot_only = sum(1 for n in d["numerals"] if 0 not in n.get("angles", [0]))
+        rot = f" ({rot_only} rotated-only)" if rot_only else ""
         print(f"  ✓ {p.name}: FIG {figs} · sheet {sid.get('sheet','?')}/{sid.get('of','?')}"
-              f"{rot} · {len(d['numerals'])} numeral candidates · {len(obs)} observations")
+              f" · {len(d['numerals'])} numeral candidates{rot} · {len(obs)} observations")
 
     recovered = 0
     if ns.confirm:
