@@ -45,6 +45,7 @@ from attest.ingest import DocumentStore
 from attest.patents import (
     Numeral,
     acronym_labels,
+    dimension_labels,
     figure_references,
     parse_figures,
     reference_numerals,
@@ -241,7 +242,7 @@ def main() -> int:
         # without this they false-flag as "drawn but never recited".
         recited_for_cov = list(nums) + [
             Numeral(a, "(text label)", 0, 0)
-            for a in acronym_labels(text) if a in sightings_by_num
+            for a in acronym_labels(text) + dimension_labels(text) if a in sightings_by_num
         ]
         cov = numeral_coverage(recited_for_cov, text, refs, assign_list, sights)
 
@@ -287,10 +288,11 @@ def main() -> int:
     # confirmation boxes already exist in the manifest; without a chip they would be
     # unreachable in the UI. Only acronyms actually SIGHTED on a sheet get a chip
     # (a prose-only candidate like "PVC" would be noise).
-    for a in acronym_labels(text):
+    for a in acronym_labels(text) + dimension_labels(text):
         m = re.search(rf"\b{re.escape(a)}\b", text)
         if m and a in sightings_by_num:
-            nums = list(nums) + [Numeral(a, "(text label on drawing)", m.start(), m.end())]
+            kind = "dimension callout" if a[0].isalpha() and a[1:].isdigit() else "text label"
+            nums = list(nums) + [Numeral(a, f"({kind} on drawing)", m.start(), m.end())]
 
     # View-marker letters (A/B/C from FIGS. 3A-3C): a sighted letter gets a chip
     # tagged to its sub-figure; an UNLOCATED one is surfaced in the review list —
@@ -345,7 +347,9 @@ def main() -> int:
     if cov is not None:
         def _nlist(nums_list):
             return ", ".join(str(n) for n in nums_list) or "none"
-        flags = (len(cov.recited_not_drawn) + len(cov.drawn_not_recited)
+        _res = [mm for mm in cov.likely_misreads if not mm.get("unresolved")]
+        _unr = [mm for mm in cov.likely_misreads if mm.get("unresolved")]
+        flags = (len(_unr) + len(cov.recited_not_drawn) + len(cov.drawn_not_recited)
                  + len(cov.figure_mismatches) + len(unlocated_markers))
         mism = "".join(f'<li>{html.escape(m["message"])}</li>' for m in cov.figure_mismatches)
         n_recovered = sum(1 for ss in sightings_by_num.values()
@@ -365,10 +369,13 @@ def main() -> int:
                        f'<span class="mut">— OCR could not read it on any sheet; if it is '
                        f'visibly drawn, this is a known OCR blind spot; review.</span></li>'
                        for u in unlocated_markers))
-            + ((f'<li><b style="color:var(--fig)">Likely misreads resolved '
-                f'({len(cov.likely_misreads)}):</b> '
-                + "; ".join(html.escape(mm["message"]) for mm in cov.likely_misreads)
-                + "</li>") if cov.likely_misreads else "")
+            + ((f'<li><b style="color:var(--fig)">Likely misreads resolved ({len(_res)}):</b> '
+                + "; ".join(html.escape(mm["message"]) for mm in _res)
+                + "</li>") if _res else "")
+            + ((f'<li><b style="color:#f85149">Engine disagreements NOT resolved '
+                f'({len(_unr)}):</b> '
+                + "; ".join(html.escape(mm["message"]) for mm in _unr)
+                + "</li>") if _unr else "")
             + f'<li><b>Recited in the spec but not found on any drawing '
             f'({len(cov.recited_not_drawn)}):</b> {_nlist(cov.recited_not_drawn)} '
             f'<span class="mut">— OCR miss, or the number is not drawn; review.</span></li>'

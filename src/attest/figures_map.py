@@ -411,6 +411,23 @@ class NumeralCoverage:
     likely_misreads: list[dict]     # sheet-only "140" that is positionally the recited "14a"
 
 
+def _same_spot_conflicts(sightings: list[NumeralSighting], *, radius: float = 0.01):
+    """Pairs of DIFFERENT labels sighted at the same position on the same page — one
+    mark two engines read differently (the "58"/"38" class). Distinct from
+    `merge_same_spot_numerals`, which merges IDENTICAL labels as corroboration."""
+    out = []
+    for i, a in enumerate(sightings):
+        if a.bbox is None:
+            continue
+        for b in sightings[i + 1:]:
+            if (b.bbox is None or b.page != a.page or b.numeral == a.numeral
+                    or not (a.numeral.isdigit() and b.numeral.isdigit())):
+                continue
+            if (abs(a.bbox[0] - b.bbox[0]) < radius and abs(a.bbox[1] - b.bbox[1]) < radius):
+                out.append((a, b))
+    return out
+
+
 def numeral_coverage(
     numerals, text, fig_refs, assignments: list[SheetAssignment],
     sightings: list[NumeralSighting], *, min_confidence: float = 0.0,
@@ -461,9 +478,12 @@ def numeral_coverage(
                             f"FIG(S). {', '.join(missing)}, but OCR did not locate it there "
                             f"— an OCR miss or the number is not labeled on that sheet; review"),
             })
-    # a↔0 OCR confusion: a sheet-only "140" whose suffixed twin "14a" is recited AND
-    # sighted within 0.03 on the same page is (very probably) the same ink — surfaced
-    # as a likely misread, not an anomaly. The raw record is never deleted (D28).
+    # OCR confusions, surfaced for review (never deleted — D28 keeps the raw read):
+    #  (a) a↔0 — a sheet-only "140" sitting on top of the recited "14a";
+    #  (b) same-spot DISAGREEMENT — two different labels read at the SAME position by
+    #      different engines are ONE mark read two ways ("58" vs "38" within 0.003 on
+    #      FIG 2's sheet), not two marks. Resolved toward the reading the text ties to
+    #      that figure; the loser is reported, never silently dropped.
     drawn_only = ocr_nums - text_nums
     misreads = []
     for lbl in sorted(drawn_only, key=numeral_key):
@@ -472,8 +492,6 @@ def numeral_coverage(
         twin = lbl[:-1] + "a"
         if twin not in text_nums:
             continue
-        # box overlap, not center distance: the raw read is often WIDE ("14 140")
-        # and the twin sits at its end — same principle as is_fragment.
         spots = [(s0, s1) for s0 in sightings if s0.numeral == lbl and s0.bbox
                  for s1 in sightings if s1.numeral == twin and s1.page == s0.page and s1.bbox
                  if s0.bbox[0] - 0.02 <= s1.bbox[0] <= s0.bbox[0] + s0.bbox[2] + 0.02
@@ -484,6 +502,36 @@ def numeral_coverage(
                                          f'recited "{twin}" — the a↔0 OCR confusion; treated '
                                          f"as {twin}, raw read preserved")})
             drawn_only = drawn_only - {lbl}
+
+    fig_of_page = {a.page: a.fig for a in assignments}
+    for a, b in _same_spot_conflicts(sightings):
+        fig = fig_of_page.get(a.page)
+        a_tied = fig in text_figs_of.get(a.numeral, [])
+        b_tied = fig in text_figs_of.get(b.numeral, [])
+        if a_tied == b_tied:
+            # No text evidence either way (the spec ties no numeral to FIG 3C, whose
+            # caption is shared). We cannot RESOLVE it — but a disagreement about one
+            # mark is exactly what a reviewer should see, so report it unresolved.
+            hi, lo = sorted((a, b), key=lambda s0: -s0.confidence)
+            misreads.append({
+                "read_as": lo.numeral, "actually": hi.numeral, "page": a.page,
+                "unresolved": True,
+                "message": (f'engines disagree on one mark on FIG. {fig}\'s sheet — '
+                            f'"{a.numeral}" vs "{b.numeral}" at the same position, and the '
+                            f"text ties neither to that figure, so this is NOT resolved; "
+                            f"a reviewer must read the sheet"),
+            })
+            continue
+        win, lose = (a, b) if a_tied else (b, a)
+        misreads.append({
+            "read_as": lose.numeral, "actually": win.numeral, "page": a.page,
+            "message": (f'engines disagree on one mark on FIG. {fig}\'s sheet — '
+                        f'"{lose.numeral}" vs "{win.numeral}" at the same position. The '
+                        f'text ties "{win.numeral}" to that figure, so the other is very '
+                        f"likely a misread of it; review"),
+        })
+        drawn_only = drawn_only - {lose.numeral}
+
     # single-letter view markers are a different class (derived from sub-figure
     # suffixes, not recited as numerals) — not anomalies.
     drawn_only = {n for n in drawn_only if not (len(n) == 1 and n.isalpha())}

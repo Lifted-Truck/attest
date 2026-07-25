@@ -401,7 +401,9 @@ _FIG_REF = re.compile(
 #   · SUFFIXES — "12a"/"14a" are DISTINCT labels from "12"/"14" (a variant part), so
 #     the suffix is captured; without it 12a collapses into 12 and both are wrong.
 _NUMERAL = re.compile(
-    r"\b((?:the |a |an |said )?(?:[a-z]+ ){0,2}[a-z]+)\s+(\d{1,3}[a-z]?)(?![\da-z])(?!\.\d)"
+    # The element phrase may end in punctuation — "…garbage disposal) 3, dishwasher 4"
+    # recites 3, but a bare `[a-z]+\s+` boundary skips it (the ")" intervenes).
+    r"\b((?:the |a |an |said )?(?:[a-z]+ ){0,2}[a-z]+)[)\]]?\s+(\d{1,3}[a-z]?)(?![\da-z])(?!\.\d)"
 )
 _UNIT_AFTER = re.compile(
     r"^\s*(?:W|watts?|mm|cm|m|in|inch(?:es)?|ft|kg|lbs?|°|degrees?|%|percent|hours?|"
@@ -454,6 +456,23 @@ _ACRONYM = re.compile(r"\b([A-Z]{2,5})\b")
 _NOT_A_LABEL = frozenset("FIG FIGS US NO PCT CIP CFM RPM PSI GPM".split())
 
 
+# Dimension callouts ("D1".."D6") are letter-PREFIXED, which the reference-numeral
+# pattern rejects by design (L0005: they would otherwise pollute the numeral set as
+# 1..6). But they are real, spec-recited labels — US5447630A states "the respective
+# dimensions D1-D6 can be as follows: D1 3.25\" D2 1.50\" …" — and they are drawn on
+# the sheet, so they belong in the label model as their own CLASS.
+_DIMENSION = re.compile(r"\b([A-Z]\d{1,2})\b")
+
+
+def dimension_labels(text: str) -> list[str]:
+    """Dimension callouts the spec recites (D1, D2, …). A distinct class from
+    reference numerals: letter-prefixed, and they label a measurement rather than a
+    part. Locate-only (D10) — candidates to look for on the sheets."""
+    cm = _CLAIMS_MARKER.search(text)
+    region = text[:cm.start()] if cm else text
+    return sorted({m.group(1) for m in _DIMENSION.finditer(region)}, key=numeral_key)
+
+
 def acronym_labels(text: str) -> list[str]:
     """Candidate acronym reference labels the spec uses for components.
 
@@ -501,6 +520,7 @@ def parse_figures(text: str) -> list[Figure]:
             break
         block.append(m)
     out: list[Figure] = []
+    seen: set[str] = set()
     for i, m in enumerate(block):
         if i + 1 < len(block):
             end = block[i + 1].start()
@@ -509,6 +529,18 @@ def parse_figures(text: str) -> list[Figure]:
             end = dot + 1 if dot != -1 else len(text)
         desc = text[m.start():end].rstrip(" ;\n\t")
         out.append(Figure(f"FIG. {m.group(1)}", m.group(1), desc, m.start(), m.start() + len(desc)))
+        seen.add(m.group(1).upper())
+    # Sub-figures share a caption ("FIGS. 3 A-C are respective right, left and rear
+    # views…"), so they never match the caption pattern individually — but they ARE
+    # figures, need their own sheets, and must be selectable. Emit them from the
+    # references, carrying the shared caption as their description.
+    for r in figure_references(text):
+        if r.number.upper() in seen or not r.number[-1].isalpha():
+            continue
+        parent_cap = next((f for f in out if r.number.startswith(f.number)), None)
+        desc = parent_cap.description if parent_cap else ""
+        out.append(Figure(f"FIG. {r.number}", r.number, desc, r.char_start, r.char_end))
+        seen.add(r.number.upper())
     return out
 
 

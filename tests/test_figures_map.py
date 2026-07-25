@@ -404,3 +404,50 @@ def test_sub_figure_caption_is_not_a_numeral():
     assert digit_run.findall("3A") == []           # sub-figure caption fragment
     assert digit_run.findall("3C") == []
     assert digit_run.findall("the valve 34.") == ["34"]
+
+
+def test_same_spot_conflict_resolves_toward_the_text_tied_reading():
+    """Julian's case: engines read ONE mark two ways ("58" vs "38" at the same
+    position on FIG 2). The text ties 58 to that figure, so 38 is reported as its
+    misread — and 38 leaves the drawn-not-recited anomaly list."""
+    from attest.figures_map import numeral_coverage
+    from attest.patents import Numeral, figure_references
+    man = {"pages": [{"page": 3, "file": "p.png",
+                      "fig_labels": [{"fig": "2", "confidence": 1.0, "x": 0.5, "y": 0.9}],
+                      "sheet_id": None,
+                      "numerals": [
+                          {"numeral": "58", "source_text": "58", "confidence": 0.67,
+                           "x": 0.591, "y": 0.382, "w": 0.027, "h": 0.02},
+                          {"numeral": "38", "source_text": "38", "confidence": 0.81,
+                           "x": 0.594, "y": 0.384, "w": 0.020, "h": 0.02},
+                      ]}]}
+    text = "Referring to FIG. 2, the outlet pipes 56, 58 feed the manifold."
+    cov = numeral_coverage([Numeral("58", "outlet pipe", 0, 1)], text,
+                           figure_references(text), fig_to_sheets(man, ["2"]),
+                           numeral_sightings(man))
+    mm = {m["read_as"]: m for m in cov.likely_misreads}
+    assert "38" in mm and mm["38"]["actually"] == "58"
+    assert not mm["38"].get("unresolved")          # text evidence decided it
+    assert "38" not in cov.drawn_not_recited       # no longer a bare anomaly
+
+
+def test_same_spot_conflict_stays_unresolved_without_text_evidence():
+    """On a sub-figure the spec ties no numerals to (FIG 3C shares a caption), a
+    disagreement cannot be RESOLVED — it must still be REPORTED for a reviewer."""
+    from attest.figures_map import numeral_coverage
+    from attest.patents import figure_references
+    man = {"pages": [{"page": 6, "file": "p.png",
+                      "fig_labels": [{"fig": "3C", "confidence": 1.0, "x": 0.5, "y": 0.9}],
+                      "sheet_id": None,
+                      "numerals": [
+                          {"numeral": "54", "source_text": "54", "confidence": 0.63,
+                           "x": 0.582, "y": 0.330, "w": 0.025, "h": 0.02},
+                          {"numeral": "34", "source_text": "34", "confidence": 0.72,
+                           "x": 0.585, "y": 0.331, "w": 0.021, "h": 0.02},
+                      ]}]}
+    text = "FIGS. 3 A-C are respective views of the module of FIG. 2."
+    cov = numeral_coverage([], text, figure_references(text),
+                           fig_to_sheets(man, ["3C"]), numeral_sightings(man))
+    unres = [m for m in cov.likely_misreads if m.get("unresolved")]
+    assert unres and {unres[0]["read_as"], unres[0]["actually"]} == {"34", "54"}
+    assert "NOT resolved" in unres[0]["message"]

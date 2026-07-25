@@ -77,6 +77,9 @@ _SHEET_ID = re.compile(r"Sheet\s+(\d+)\s+of\s+(\d+)", re.IGNORECASE)
 _DIGIT_RUN = re.compile(r"(?<![A-Za-z0-9])(\d{1,3}[a-z]?)(?![\dA-Za-z])")
 # "0" is never a reference numeral — it is always a fragment of line art ("/0").
 _NOT_A_NUMERAL = frozenset({"0"})
+# Dimension callouts ("D1".."D6") — letter-prefixed, so the numeral pattern rejects
+# them by design; they are a separate, spec-recited label class (see patents.py).
+_DIM_RUN = re.compile(r"(?<![A-Za-z0-9])([A-Z]\d{1,2})(?![\dA-Za-z])")
 # Header furniture that must not yield numeral candidates (patent number, dates).
 _HEADER_BAND = 0.88          # normalized y above this = the running header band
 # Page/patent furniture whose digits are NOT reference numerals — the first pass
@@ -280,6 +283,12 @@ def derive(observations: list[dict]) -> dict:
             continue                             # a FIG caption's digits ≠ numerals
         if _PROSE.search(o["text"]):             # prose annotation, not a numeral read
             continue
+        for run in _DIM_RUN.findall(o["text"]):          # dimension callouts
+            numerals.append({
+                "numeral": run, "source_text": o["text"], "confidence": o["confidence"],
+                "method": "first-pass", "engine": o.get("engine", "vision"),
+                "x": o["x"], "y": o["y"], "w": o["w"], "h": o["h"],
+            })
         for run in _DIGIT_RUN.findall(o["text"]):
             if run in _NOT_A_NUMERAL:
                 continue
@@ -365,6 +374,7 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
     from attest.ingest import DocumentStore
     from attest.patents import (
         acronym_labels,
+        dimension_labels,
         figure_references,
         numeral_key,
         parse_figures,
@@ -385,7 +395,8 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
     # pass did NOT already place on that figure's sheet.
     want_per_page: dict[int, set[str]] = {}
     from attest.figures_map import sub_figure_parent, view_marker_letters
-    labels = [n.number for n in reference_numerals(text)] + acronym_labels(text)
+    labels = ([n.number for n in reference_numerals(text)]
+              + acronym_labels(text) + dimension_labels(text))
     reserved = set(labels)                                # gates the a↔0 confusion match
     markers = view_marker_letters(known)
     for lbl in labels:

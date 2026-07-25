@@ -286,7 +286,12 @@ def test_figures_validate_on_the_real_patent():
     from attest.patents import parse_figures, reference_numerals
     t = real.read_text(encoding="utf-8")
     labels = [f.label for f in parse_figures(t)]
-    assert labels == ["FIG. 1", "FIG. 2", "FIG. 4", "FIG. 5", "FIG. 6"]  # clean block
+    # the caption block yields 1/2/4/5/6; sub-figures 3A-3C share one caption
+    # ("FIGS. 3 A-C are respective right, left and rear views…") so they are emitted
+    # from the references — every figure the text names must be listed & selectable.
+    assert labels[:5] == ["FIG. 1", "FIG. 2", "FIG. 4", "FIG. 5", "FIG. 6"]
+    assert set(labels) == {"FIG. 1", "FIG. 2", "FIG. 3A", "FIG. 3B", "FIG. 3C",
+                           "FIG. 4", "FIG. 5", "FIG. 6"}
     nums = {n.number: n.element for n in reference_numerals(t)}
     assert "microwave reactor chamber" in nums["12"]
     assert "ceramic filter material" in nums["38"]
@@ -373,3 +378,26 @@ def test_acronym_labels_have_no_frequency_floor():
     got = acronym_labels(spec)
     assert "CZ" in got and "CL" in got            # single-mention labels survive
     assert "FIG" not in got and "CFM" not in got  # syntax + units still excluded
+
+
+def test_dimension_labels_are_their_own_class():
+    """D1-D6 are letter-PREFIXED (so the numeral pattern rejects them — L0005) but
+    they are real, spec-recited labels: "the respective dimensions D1-D6 can be as
+    follows: D1 3.25\"…". They belong in the model as a distinct class."""
+    from attest.patents import dimension_labels, reference_numerals
+    spec = ('CL designates the center line, and the respective dimensions D1-D6 can '
+            'be as follows: D1 3.25" D2 1.50" D6 3.50". The valve 34 is shown.')
+    dims = dimension_labels(spec)
+    assert {"D1", "D2", "D6"} <= set(dims)
+    nums = {n.number for n in reference_numerals(spec)}
+    assert "1" not in nums and "2" not in nums   # D1/D2 must NOT pollute numerals
+    assert "34" in nums
+
+
+def test_element_phrase_may_end_in_punctuation():
+    """"…garbage disposal) 3, dishwasher 4" recites 3 — a bracket between the noun
+    and the numeral was hiding sub-10 labels entirely."""
+    from attest.patents import reference_numerals
+    nums = {n.number for n in reference_numerals(
+        "a sink (with a garbage disposal) 3, dishwasher 4 and clothes washer 5.")}
+    assert {"3", "4", "5"} <= nums
