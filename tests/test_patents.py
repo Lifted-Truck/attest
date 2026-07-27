@@ -411,3 +411,30 @@ def test_figures_sort_with_sub_figures_beside_their_parent():
             "respective views of FIG. 2; FIG. 4 is a separator; FIG. 10 is a chart.")
     assert [f.number for f in parse_figures(text)] == ["1", "2", "3A", "3B", "3C", "4", "10"]
     assert sorted(["12b", "3A", "2", "12"], key=numeral_key) == ["2", "3A", "12", "12b"]
+
+
+def test_four_digit_and_uppercase_suffix_numerals_are_expressible():
+    """D34: the extractor capped at three lowercase-suffixed digits, which broke two
+    ways. The figure-keyed 1000-series (FIG. 10 -> 1000/1010) was unreadable, so on a
+    post-2000 patent BOTH sides of the drawing/spec reconciliation come back empty and
+    the coverage report reads clean over an empty map. Worse, "12A" fell through the
+    lowercase-only suffix and matched as bare "12" — binding a DISTINCT part to its
+    base numeral's span, on the path where grounding actually binds (I1)."""
+    from attest.patents import reference_numerals
+    got = {n.number: n.element for n in
+           reference_numerals("The controller 1002 drives the bus 1010.")}
+    assert set(got) == {"1002", "1010"}
+
+    got = {n.number for n in
+           reference_numerals("The housing 12A supports the housing 12.")}
+    assert got == {"12a", "12"}, "an uppercase suffix must not collapse into its base"
+
+
+def test_quantities_are_not_bound_as_reference_numerals():
+    """D34: "at temperatures exceeding 500" bound 500 as a part whose element phrase
+    was "at temperatures exceeding". A part is never named "with" or "exceeding", so
+    those join the function-word class that already blocks "at"/"of"/"between"."""
+    from attest.patents import reference_numerals
+    text = ("The reactor operates at temperatures exceeding 500 and with 150 "
+            "at temperatures below 220.")
+    assert reference_numerals(text) == []

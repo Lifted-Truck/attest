@@ -176,16 +176,50 @@ def read_all_rotations(path: Path, engines: list[str]) -> list[dict]:
     return obs
 
 
+class EngineFailure(RuntimeError):
+    """An engine did not run. Distinct from an engine that ran and read nothing."""
+
+
+def _assert_engine_ran(engine: str, r: subprocess.CompletedProcess, path: Path,
+                       *, require_output: bool = True) -> None:
+    """Fail loudly when a subprocess engine did not actually run (D34).
+
+    This is LIBRARY L0009 installed in code rather than prose. That lesson was written
+    after a sandbox made /tmp unreadable to spawned binaries: Tesseract failed, its
+    error went to stderr, the harness decoded stdout and never checked either — so a
+    dead engine was indistinguishable from a diligent engine finding nothing, and we
+    concluded from it that Tesseract was *blind to this corpus*. The lesson was
+    recorded and never enforced; the check below is the enforcement.
+
+    Silence is the danger. A non-zero exit or empty stdout with a stderr message means
+    the instrument is broken, and a broken instrument reads exactly like a clean sheet.
+    Every USPTO sheet carries a running header, so a full-sheet read yielding nothing
+    is definitionally an instrument failure, not a fact about the drawing. That
+    reasoning is why `require_output` is False for TILES and bands: a crop of blank
+    drawing legitimately contains no text, so there the exit code is the only signal.
+    """
+    err = r.stderr.decode("utf-8", "replace").strip()
+    if r.returncode != 0:
+        raise EngineFailure(f"{engine} exited {r.returncode} on {path.name}: "
+                            f"{err or '(no stderr)'}")
+    if require_output and not r.stdout.strip():
+        raise EngineFailure(f"{engine} produced no output on {path.name}: "
+                            f"{err or '(no stderr)'} — a dead engine reads as a blank "
+                            f"sheet, so this is refused rather than recorded as zero.")
+
+
 def obs_tesseract(path: Path) -> list[dict]:
     """Tesseract sparse-text pass (`--psm 11`) → common observations. A system
     binary, cross-platform — and empirically complementary to Vision (it reads the
     isolated view-marker glyphs and 14a/64 that Vision drops on this corpus)."""
+    # NB the liveness assert below is not defensive boilerplate — see L0009.
     from PIL import Image
 
     from attest.figures_map import tesseract_tsv_to_observations
     w, h = Image.open(path).size
     r = subprocess.run(["tesseract", str(path), "stdout", "--psm", "11", "tsv"],
                        capture_output=True)
+    _assert_engine_ran("tesseract", r, path)
     return tesseract_tsv_to_observations(r.stdout.decode("utf-8", "replace"), w, h)
 
 
@@ -380,6 +414,7 @@ def marker_band_rescue(path: Path, letters: set[str]) -> list[dict]:
         img.crop((x0, y0, x1, y1)).save(tmp)
         r = subprocess.run(["tesseract", str(tmp), "stdout", "--psm", "11", "tsv"],
                            capture_output=True)
+        _assert_engine_ran("tesseract", r, tmp, require_output=False)
         obs = tesseract_tsv_to_observations(
             r.stdout.decode("utf-8", "replace"), x1 - x0, y1 - y0)
         tmp.unlink(missing_ok=True)

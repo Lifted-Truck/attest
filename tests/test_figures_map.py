@@ -544,3 +544,58 @@ def test_upside_down_is_held_to_cross_engine_only():
     # ...and 180° alongside a physically plausible angle is fine on spec alone.
     sideways = {"numeral": "98", "angles": [180, 270], "engines": ["tesseract"]}
     assert len(gate_rotated_numerals([sideways], recited)) == 1
+
+
+def test_raster_drift_is_refused(tmp_path):
+    """D34: `image_sha256` had exactly one consumer — the line that wrote it. Every box
+    is a NORMALIZED fraction, so a re-fetched or re-cropped sheet still resolves every
+    box, silently, onto a different raster. That is the wrong-place class."""
+    import hashlib
+    import json as _json
+
+    import pytest
+
+    from attest.figures_map import RasterDrift, verify_raster_binding
+    figs = tmp_path / "figures"
+    figs.mkdir()
+    sheet = figs / "drawings-page-2.png"
+    sheet.write_bytes(b"original raster")
+    m = {"pages": [{"file": sheet.name, "page": 2,
+                    "image_sha256": hashlib.sha256(b"original raster").hexdigest()}]}
+    verify_raster_binding(m, figs)                      # matching bytes: silent
+    sheet.write_bytes(b"a re-fetched, re-cropped raster")
+    with pytest.raises(RasterDrift, match="changed since OCR"):
+        verify_raster_binding(m, figs)
+    # The manifest is portable; the sheets are gitignored client material, so an
+    # ABSENT sheet is not drift — only a mismatch is.
+    sheet.unlink()
+    verify_raster_binding(m, figs)
+    _json.dumps(m)                                       # manifest stays serialisable
+
+
+def test_a_dead_engine_is_refused_not_recorded_as_zero():
+    """D34 / L0009 installed in code. A sandbox once made /tmp unreadable to spawned
+    binaries: Tesseract failed, its error went to stderr, the harness read stdout and
+    checked neither — so a dead engine was indistinguishable from a diligent engine
+    finding nothing, and we concluded Tesseract was blind to this corpus. Silence is
+    the danger: a broken instrument reads exactly like a clean sheet."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    import pytest
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from ocr_patent_figures import EngineFailure, _assert_engine_ran
+
+    def proc(rc, out, err):
+        return subprocess.CompletedProcess(["tesseract"], rc, out, err)
+
+    p = Path("drawings-page-2.png")
+    with pytest.raises(EngineFailure, match="exited 1"):
+        _assert_engine_ran("tesseract", proc(1, b"", b"cannot read input"), p)
+    with pytest.raises(EngineFailure, match="no output"):
+        _assert_engine_ran("tesseract", proc(0, b"  \n", b"Error in pixReadStream"), p)
+    _assert_engine_ran("tesseract", proc(0, b"level\tconf\n5\t88\n", b""), p)   # alive
+    # A tile of blank drawing legitimately has no text, so there the exit code is the
+    # only signal available — an empty read must NOT fail.
+    _assert_engine_ran("tesseract", proc(0, b"", b""), p, require_output=False)

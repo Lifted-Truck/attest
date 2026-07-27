@@ -403,7 +403,17 @@ _FIG_REF = re.compile(
 _NUMERAL = re.compile(
     # The element phrase may end in punctuation — "…garbage disposal) 3, dishwasher 4"
     # recites 3, but a bare `[a-z]+\s+` boundary skips it (the ")" intervenes).
-    r"\b((?:the |a |an |said )?(?:[a-z]+ ){0,2}[a-z]+)[)\]]?\s+(\d{1,3}[a-z]?)(?![\da-z])(?!\.\d)"
+    # 1-4 digits, EITHER case of suffix (D34). Three digits excluded the figure-keyed
+    # 1000-series (FIG. 10 -> 1000/1010/1020) that dominates post-2000 software and
+    # electronics art; on such a patent BOTH sides of the drawing/spec reconciliation
+    # come back empty and the coverage report reads clean over an empty map. The
+    # lowercase-only suffix was worse than a gap: it made a FALSE ASSERTION. "12A" fell
+    # through the `[a-z]?` and matched as bare "12" (the `(?![\da-z])` guard lets an
+    # uppercase letter pass), so a distinct part was bound to its base numeral's span
+    # — and text is where grounding binds (I1), so that is a wrong citation, not a
+    # missing aid. Found by the OCR failure-mode swarm, 2026-07-25.
+    r"\b((?:the |a |an |said )?(?:[a-z]+ ){0,2}[a-z]+)[)\]]?\s+"
+    r"(\d{1,4}[a-zA-Z]?)(?![\dA-Za-z])(?!\.\d)"
 )
 _UNIT_AFTER = re.compile(
     r"^\s*(?:W|watts?|mm|cm|m|in|inch(?:es)?|ft|kg|lbs?|°|degrees?|%|percent|hours?|"
@@ -412,7 +422,12 @@ _UNIT_AFTER = re.compile(
 )
 _NOT_ELEMENT = frozenset(
     "at by to of from in on and or is are than about over under approximately as "
-    "reference numeral generally designated designate shown between within claim claims".split()
+    "reference numeral generally designated designate shown between within claim claims "
+    # A part is never named "with" or "below". These close the same function-word class
+    # as the words above, and they matter: without them "at temperatures exceeding 500"
+    # bound 500 as a reference numeral with the element phrase "at temperatures
+    # exceeding" — a QUANTITY asserted as a part, on the grounding path (D34).
+    "with below exceeding above near into onto through during per".split()
 )
 SPEC_FIGURE_EDGE = "SPEC→FIGURE"     # typed provenance (§4): displayed, not cited
 _CAPTION_GAP = 400                   # max chars between consecutive drawings captions

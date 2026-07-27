@@ -17,6 +17,7 @@ Honesty rules (D21/D28), enforced in the data model:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -322,6 +323,37 @@ class NumeralSighting:
     method: str = "first-pass"  # "first-pass" | "text-guided" (D28 confirmation pass)
 
 
+class RasterDrift(RuntimeError):
+    """A sheet's bytes no longer match the raster its boxes were measured against."""
+
+
+def verify_raster_binding(manifest: dict, fig_dir: str | Path) -> None:
+    """Re-hash each sheet and check it against the `image_sha256` frozen with it (D34).
+
+    Until now that field had exactly ONE consumer in the whole tree: the line that
+    wrote it. A hash nobody checks is decoration — and this one guards the assumption
+    the whole figures view rests on, because every box is stored as a NORMALIZED
+    fraction. Re-fetch or re-crop a sheet without re-OCRing and every fraction still
+    resolves, silently, to a different place on a different raster. That is the
+    wrong-place class: a confident box drawn over the wrong mark, which is exactly
+    what ATTEST claims never to do. Absent bytes are not an error (the manifest is
+    portable; the sheets are gitignored client material) — only a MISMATCH is.
+    """
+    fig_dir = Path(fig_dir)
+    for page in manifest.get("pages", []):
+        want = page.get("image_sha256")
+        sheet = fig_dir / page["file"]
+        if not want or not sheet.exists():
+            continue
+        got = hashlib.sha256(sheet.read_bytes()).hexdigest()
+        if got != want:
+            raise RasterDrift(
+                f"{page['file']} changed since OCR (manifest {want[:12]}…, "
+                f"file {got[:12]}…). Every box on this sheet is a normalized "
+                f"fraction of the raster it was measured on, so they now point "
+                f"somewhere else. Re-run scripts/ocr_patent_figures.py.")
+
+
 def load_manifest(store_dir: str | Path) -> dict:
     """The frozen OCR manifest, plus any MANUAL annotations from the sidecar
     `figures/manual_annotations.json` — reviewer/visually-confirmed marks the OCR
@@ -332,6 +364,7 @@ def load_manifest(store_dir: str | Path) -> dict:
     this is the adjudication-record shape RT-5 anticipates)."""
     fig_dir = Path(store_dir).parent / "figures"
     manifest = json.loads((fig_dir / "ocr_manifest.json").read_text(encoding="utf-8"))
+    verify_raster_binding(manifest, fig_dir)
     sidecar = fig_dir / "manual_annotations.json"
     if sidecar.exists():
         by_page = {p["page"]: p for p in manifest["pages"]}
