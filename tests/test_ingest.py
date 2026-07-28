@@ -76,3 +76,24 @@ GOLDEN_EVIDENCE = [
 def test_canonical_preserves_golden_evidence(doc):
     missing = [s for s in GOLDEN_EVIDENCE if s not in doc.canonical_text]
     assert not missing, f"normalization dropped golden evidence: {missing}"
+
+
+def test_doc_id_cannot_escape_the_corpus_root(tmp_path):
+    """D35: `root / doc_id` is unsafe, and not in the obvious way — pathlib DISCARDS
+    the root when the operand is absolute, so `store / "/etc/passwd"` is `/etc/passwd`:
+    traversal with no `..` at all. Containment is checked after canonicalization, which
+    is what makes encoded and symlinked variants fail too."""
+    import pytest
+
+    from attest.ingest.store import DocIdError, DocumentStore
+    store = DocumentStore(tmp_path / "corpus")
+    (tmp_path / "corpus").mkdir()
+
+    for hostile in ["/etc/passwd", "../../../etc/passwd", "..", "", "a\x00b",
+                    "sub/../../escape"]:
+        with pytest.raises(DocIdError):
+            store.doc_dir(hostile)
+
+    ok = store.doc_dir("US5447630A")                    # ordinary ids still resolve
+    assert ok.parent == (tmp_path / "corpus").resolve()
+    assert store.doc_dir("nested/doc").name == "doc"    # nesting inside root is fine

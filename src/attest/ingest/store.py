@@ -19,12 +19,40 @@ CANONICAL = "canonical.txt"
 META = "meta.json"
 
 
+class DocIdError(ValueError):
+    """A doc_id that does not name a document inside this store's root."""
+
+
 class DocumentStore:
     def __init__(self, root: Path | str):
         self.root = Path(root)
 
     def doc_dir(self, doc_id: str) -> Path:
-        return self.root / doc_id
+        """Resolve a doc_id to its directory, refusing anything outside the root (D35).
+
+        `self.root / doc_id` is not safe on its own, and the failure is not the obvious
+        one: pathlib DISCARDS the left operand entirely when the right is absolute, so
+        `Path("corpus/store") / "/etc/passwd"` is `/etc/passwd` — traversal without a
+        single `..`. Canonicalize and containment-check instead of pattern-matching for
+        `..`, which URL- and unicode-encoding both defeat.
+
+        The MCP surface does not currently reach here — `SpanStore` is dict-backed and
+        refuses an unknown doc_id — but that guard is INCIDENTAL, a property of one
+        class's storage choice, not a boundary anyone designed. The RAG extension under
+        discussion contemplates corpora too large to preload, and lazy loading is
+        exactly the refactor that would quietly make this reachable from a caller-
+        supplied argument. Safety by construction, not by vigilance: put the boundary
+        where the path is built, so it survives the refactor that removes the accident.
+        """
+        if not doc_id or doc_id in (".", "..") or "\x00" in doc_id:
+            raise DocIdError(f"invalid doc_id: {doc_id!r}")
+        root = self.root.resolve()
+        target = (root / doc_id).resolve()
+        if target != root and root not in target.parents:
+            raise DocIdError(
+                f"doc_id {doc_id!r} resolves outside the corpus root ({target}). "
+                f"The corpus is a closed set; a document is named, never addressed.")
+        return target
 
     def write(self, doc: Document) -> Path:
         d = self.doc_dir(doc.doc_id)
