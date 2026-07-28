@@ -26,6 +26,10 @@ import hashlib
 import json
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .spans import SpanStore
 
 
 def ratified_manifest_sha256(items: list[dict], item_ids: list[str]) -> str:
@@ -58,6 +62,10 @@ ANSWER, ABSTAIN, CORRECTION, PARTIAL, REFUSE = (
 )
 PRESENTS = {ANSWER, CORRECTION, PARTIAL}  # classes where the agent SHOULD present
 
+# The corpus a golden item belongs to when it does not name one. Per-item `doc_id`
+# wins, so a patent item resolves against the patent store without a code change.
+GOLDEN_DOC_ID = "AAPL-10K-FY2024"
+
 
 def expected_outcome(item: dict) -> str:
     """Derive the expected outcome class from the golden item (no seed edits)."""
@@ -80,18 +88,83 @@ class ItemScore:
     presented: bool            # a passing verify record exists → the agent presented
     decision_correct: bool     # present/abstain decision matches the expected class
     verify_failures: int       # verify records the agent ran that did NOT pass
+    evidence_correct: bool | None = None   # cited the RIGHT span, not merely a real one
 
 
-def score_item(item: dict, log_segment: list[dict]) -> ItemScore:
+def gold_spans(item: dict, store: SpanStore) -> list[tuple[str, int, int]]:
+    """The golden item's supporting quotes resolved to offsets (RT-8).
+
+    A SET, not a single span: a figure recurs across a 10-K (the same total appears in
+    the balance sheet, the MD&A and a note), so more than one location can be the right
+    answer. `resolve_quote` enforces the D7 resolution invariant, so an ambiguous quote
+    raises rather than silently binding to the first hit. Unresolvable quotes are
+    skipped — an item with none is simply not evidence-scoreable, which is reported
+    rather than counted as a pass.
+    """
+    out = []
+    for s in item.get("supporting", []):
+        quote = s.get("verbatim_quote")
+        if not quote:
+            continue
+        try:
+            start, end = store.resolve_quote(item.get("doc_id", GOLDEN_DOC_ID), quote)
+        except Exception:  # noqa: BLE001 — unresolvable gold is reported, not fatal
+            continue
+        out.append((item.get("doc_id", GOLDEN_DOC_ID), start, end))
+    return out
+
+
+def cited_spans(log_segment: list[dict]) -> list[tuple[str, int, int]]:
+    """Every atom location the agent actually bound, from the logged answers."""
+    out = []
+    for e in log_segment:
+        if e.get("kind") != "verify" or not e.get("ok"):
+            continue
+        for sent in (e.get("answer") or {}).get("sentences", []):
+            for a in sent.get("atoms", []):
+                if {"doc_id", "char_start", "char_end"} <= a.keys():
+                    out.append((a["doc_id"], a["char_start"], a["char_end"]))
+            for d in sent.get("derived", []):
+                for o in d.get("operands", []):
+                    if {"doc_id", "char_start", "char_end"} <= o.keys():
+                        out.append((o["doc_id"], o["char_start"], o["char_end"]))
+    return out
+
+
+def _overlaps(a: tuple[str, int, int], b: tuple[str, int, int]) -> bool:
+    """Same document and the ranges intersect. Overlap rather than equality: the agent
+    may cite a tighter slice ("364,980") than the gold quote ("Total assets $ 364,980
+    $ 352,583") or a wider one, and both point at the same evidence."""
+    return a[0] == b[0] and a[1] < b[2] and b[1] < a[2]
+
+
+def score_item(item: dict, log_segment: list[dict],
+               store: SpanStore | None = None) -> ItemScore:
+    """Score one item. Pass `store` to also grade the EVIDENCE (RT-8).
+
+    Without it this measures only the present/abstain decision — label-only accuracy,
+    in FEVER's exact sense, for a system whose entire product claim is span provenance.
+    FEVER's published 50.91% -> 31.87% drop when evidence is scored conjunctively is the
+    size of what that omission can hide.
+    """
     verifies = [e for e in log_segment if e.get("kind") == "verify"]
     presented = any(e.get("ok") for e in verifies)
     expected = expected_outcome(item)
+
+    evidence_correct: bool | None = None
+    if store is not None and expected in PRESENTS and presented:
+        gold = gold_spans(item, store)
+        if gold:                       # no resolvable gold → not scoreable, stays None
+            cited = cited_spans(log_segment)
+            evidence_correct = any(_overlaps(c, g) for c in cited for g in gold)
+
     return ItemScore(
         item_id=item["id"],
         expected=expected,
         presented=presented,
         decision_correct=(presented == (expected in PRESENTS)),
         verify_failures=sum(1 for e in verifies if not e.get("ok")),
+        evidence_correct=evidence_correct,
     )
 
 
@@ -116,6 +189,30 @@ def aggregate(scores: list[ItemScore]) -> dict:
         "refusal_accuracy": rate([not s.presented for s in of(REFUSE)]),
         "verify_catches": sum(s.verify_failures for s in scores),
         "failures": [s.item_id for s in scores if not s.decision_correct],
+        # RT-8: the conjunctive number — did it cite the RIGHT span, not merely a real
+        # one — reported ALONGSIDE the decision number, with the gap between them
+        # published rather than smoothed. The gap is the honest headline: a decision
+        # score that outruns its evidence score is measuring the verdict, not the
+        # provenance, and provenance is the whole product claim.
+        **_evidence_block(scores),
+    }
+
+
+def _evidence_block(scores: list[ItemScore]) -> dict:
+    scored = [s for s in scores if s.evidence_correct is not None]
+    if not scored:
+        # Never emit a null that reads as 0% or as "clean" — say it wasn't measured.
+        return {"evidence_accuracy": None,
+                "evidence_note": "not scored (no store passed to score_item)"}
+    ev = round(sum(s.evidence_correct for s in scored) / len(scored), 4)
+    dec = [s for s in scored if s.decision_correct]
+    dec_rate = round(len(dec) / len(scored), 4)
+    return {
+        "evidence_accuracy": ev,
+        "evidence_n": len(scored),
+        "evidence_unscoreable": len(scores) - len(scored),
+        "decision_minus_evidence": round(dec_rate - ev, 4),
+        "evidence_failures": [s.item_id for s in scored if not s.evidence_correct],
     }
 
 

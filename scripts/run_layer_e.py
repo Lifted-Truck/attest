@@ -174,10 +174,12 @@ def main() -> int:
             print(f"  ⚠ {item['id']:<5} agent error / no output — {snip}")
             continue
 
-        s = score_item(item, segment)
+        s = score_item(item, segment, store)   # RT-8: grade the citation too
         scores.append(s)
         mark = "✓" if s.decision_correct else "✗"
-        print(f"  {mark} {item['id']:<5} {s.expected:<10} presented={s.presented}")
+        ev = "" if s.evidence_correct is None else (
+            "  evidence=✓" if s.evidence_correct else "  evidence=✗ WRONG SPAN")
+        print(f"  {mark} {item['id']:<5} {s.expected:<10} presented={s.presented}{ev}")
 
         if s.presented:
             # entailment: LLM-judge each cited span against its claim (billed)

@@ -165,3 +165,63 @@ def test_refusal_accuracy_aggregated_separately():
     assert agg["by_class"]["refuse"] == 2
     assert agg["refusal_accuracy"] == 0.5
     assert agg["abstention_accuracy"] is None    # refusals are NOT counted as abstains
+
+
+def _seg(atoms, ok=True):
+    return [{"kind": "verify", "ok": ok,
+             "answer": {"sentences": [{"text": "s", "atoms": atoms, "derived": []}]}}]
+
+
+def test_evidence_scoring_catches_a_right_answer_from_the_wrong_span():
+    """RT-8: `decision_correct` only asks whether the agent presented. A citation that
+    is REAL but points somewhere else passes that check while failing the product's
+    actual claim. This is FEVER's label-only-accuracy illusion (50.91% → 31.87% when
+    evidence is scored conjunctively), and for a provenance system it is the whole
+    ballgame."""
+    from attest.ingest.document import make_document
+    from attest.layer_e import score_item
+    from attest.spans import SpanStore
+
+    text = "Total assets $ 364,980 and elsewhere the same 364,980 appears again."
+    store = SpanStore([make_document("D", text)])
+    item = {"id": "X1", "answerable": True, "doc_id": "D",
+            "supporting": [{"verbatim_quote": "Total assets $ 364,980"}]}
+    gold_at = text.index("Total assets $ 364,980")
+
+    right = score_item(item, _seg([{"text": "364,980", "doc_id": "D",
+                                    "char_start": gold_at + 14,
+                                    "char_end": gold_at + 21}]), store)
+    assert right.decision_correct and right.evidence_correct       # inside the gold span
+
+    wrong_at = text.index("364,980 appears")
+    wrong = score_item(item, _seg([{"text": "364,980", "doc_id": "D",
+                                    "char_start": wrong_at,
+                                    "char_end": wrong_at + 7}]), store)
+    assert wrong.decision_correct, "the decision is still 'presented' — that is the trap"
+    assert wrong.evidence_correct is False
+
+
+def test_evidence_is_unscored_rather_than_assumed_passing():
+    """RT-8: a metric that cannot be computed must read as 'not measured', never as 0%
+    and never as clean. Omitting the store leaves it None and the aggregate says so."""
+    from attest.layer_e import aggregate, score_item
+    s = score_item({"id": "X2", "answerable": True}, _seg([]))
+    assert s.evidence_correct is None
+    agg = aggregate([s])
+    assert agg["evidence_accuracy"] is None
+    assert "not scored" in agg["evidence_note"]
+
+
+def test_aggregate_publishes_the_decision_minus_evidence_gap():
+    """RT-8: the gap is the honest headline — a decision score that outruns its
+    evidence score is measuring the verdict, not the provenance."""
+    from attest.layer_e import ANSWER, ItemScore, aggregate
+    scores = [
+        ItemScore("a", ANSWER, True, True, 0, evidence_correct=True),
+        ItemScore("b", ANSWER, True, True, 0, evidence_correct=False),
+    ]
+    agg = aggregate(scores)
+    assert agg["decision_accuracy"] == 1.0
+    assert agg["evidence_accuracy"] == 0.5
+    assert agg["decision_minus_evidence"] == 0.5
+    assert agg["evidence_failures"] == ["b"]
