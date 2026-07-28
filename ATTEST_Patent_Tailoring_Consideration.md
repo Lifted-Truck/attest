@@ -3,7 +3,7 @@
 
 **Status:** Provisional / v0.1. Expect refinement as client details emerge (see §10 and the companion `ATTEST_Client_Intake_Questions.md`). Subordinate to `ROADMAP.md`: where this document conflicts with the roadmap, the roadmap governs until the two are reconciled.
 
-**Context:** ATTEST's first corpus was SEC EDGAR 10-K/10-Q. This document retargets the system for a single patent *refresh-and-update* engagement. It does **not** replace the core architecture — provenance-first retrieval, the zero-hallucination oracle, and the two-layer eval stack (Layer-0 deterministic / CI-blocking + Layer-E agent end-to-end). It specializes that architecture for the patent domain.
+**Context:** ATTEST's first corpus was SEC EDGAR 10-K/10-Q. This document retargets the system for a single patent *refresh-and-update* engagement. It does **not** replace the core architecture — provenance-first retrieval, the ground-or-abstain oracle, and the two-layer eval stack (Layer-0 deterministic / CI-blocking + Layer-E agent end-to-end). It specializes that architecture for the patent domain.
 
 ---
 

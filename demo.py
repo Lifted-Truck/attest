@@ -107,8 +107,14 @@ def main() -> int:
         print()
 
     print("═" * W)
-    print("  Across all 20 golden items: 100% citation precision, 0 hallucinations,")
-    print("  100% abstention on every unanswerable question. (python attest_rig.py)")
+    # Scoped to its mechanism and its corpus, deliberately (D38). The previous line
+    # read "100% citation precision, 0 hallucinations" — an absolute claim from a
+    # 20-item measurement, computed by gold-string containment. That is the exact
+    # shape our own truth contract forbids, and the shape regulators have acted on.
+    print("  On this 20-item golden set (Apple FY2024 10-K, seeded, no model calls):")
+    print("  every citation resolved at its offset and hash-matched, and every")
+    print("  unanswerable question was refused. Measured on one corpus — not a")
+    print("  general accuracy claim. (python attest_rig.py)")
     print("═" * W)
     return 0
 
