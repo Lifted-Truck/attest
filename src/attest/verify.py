@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import math
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 
 from .ingest.document import content_hash
@@ -45,6 +46,20 @@ def salient_tokens(text: str) -> set[str]:
     toks = {m.group(0).strip("()") for m in _FIGURE.finditer(text)}
     toks |= {m.group(0) for m in _DATE.finditer(text)}
     return toks
+
+
+def salient_counts(text: str) -> Counter[str]:
+    """Load-bearing atoms WITH multiplicity (D37).
+
+    Coverage was computed as a set difference, so one binding discharged every
+    occurrence of a figure in a sentence: "Total assets were 364,980 and total
+    liabilities were also 364,980" passed with a single binding and reported no unbound
+    atoms — the second assertion, about a different metric, was an ungrounded claim that
+    `verify` blessed. Multiplicity is what makes N assertions require N bindings.
+    """
+    c = Counter(m.group(0).strip("()") for m in _FIGURE.finditer(text))
+    c.update(m.group(0) for m in _DATE.finditer(text))
+    return c
 
 
 def numeric_core(text: str) -> str | None:
@@ -291,14 +306,17 @@ def verify(answer: Answer, store: SpanStore) -> VerifyResult:
 
         # Independent extraction: every load-bearing atom (figure or date) in the
         # prose must be covered by a binding/derivation, or it is flagged unbound.
-        covered: set[str] = set()
+        # Counted, not set-differenced (D37): a figure asserted twice in one sentence
+        # needs two bindings, or the second assertion is ungrounded prose that the
+        # first citation silently vouches for.
+        covered: Counter[str] = Counter()
         for a in sent.atoms:
-            covered |= salient_tokens(a.text)
+            covered += salient_counts(a.text)
         for d in sent.derived:
-            covered |= salient_tokens(d.text)
+            covered += salient_counts(d.text)
             for o in d.operands:
-                covered |= salient_tokens(o.text)
-        unbound = sorted(salient_tokens(sent.text) - covered)
+                covered += salient_counts(o.text)
+        unbound = sorted((salient_counts(sent.text) - covered).elements())
 
         ok = (
             all(v.status == "ok" for v in atom_verdicts)

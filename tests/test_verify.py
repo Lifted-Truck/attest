@@ -204,3 +204,31 @@ def test_comparison_equations(store):
            bind(store, "364,980", TOTAL_ASSETS)]
     assert equation(DerivedAtom("true", "within_range", vlh)) == \
         "352,583 ≤ 364,980 ≤ 364,980 → true"
+
+
+def test_a_figure_asserted_twice_needs_two_bindings():
+    """D37 (I1): coverage was a SET difference, so one binding discharged every
+    occurrence of a figure in a sentence. "Total assets were 364,980 and total
+    liabilities were also 364,980" passed with a single binding and reported nothing
+    unbound — the second assertion, about a different metric, was ungrounded prose that
+    the first citation silently vouched for. Multiplicity is what makes N assertions
+    require N bindings."""
+    from attest.ingest.document import make_document
+    from attest.spans import SpanStore
+    from attest.verify import Answer, AtomBinding, Sentence, verify
+
+    text = "Total assets were 364,980 million as of year end."
+    doc = make_document("D", text)
+    store = SpanStore([doc])
+    i = text.index("364,980")
+    b = AtomBinding("364,980", "D", i, i + len("364,980"))
+
+    twice = Sentence("Assets were 364,980 and liabilities were also 364,980.", atoms=[b])
+    r = verify(Answer([twice]), store)
+    assert not r.ok and r.unbound() == ["364,980"]
+
+    r = verify(Answer([Sentence(twice.text, atoms=[b, b])]), store)
+    assert r.ok and r.unbound() == []          # both assertions bound: passes
+
+    once = Sentence("Assets were 364,980 million.", atoms=[b])
+    assert verify(Answer([once]), store).ok    # the ordinary case is unaffected
