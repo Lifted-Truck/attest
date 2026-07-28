@@ -599,3 +599,36 @@ def test_a_dead_engine_is_refused_not_recorded_as_zero():
     # A tile of blank drawing legitimately has no text, so there the exit code is the
     # only signal available — an empty read must NOT fail.
     _assert_engine_ran("tesseract", proc(0, b"", b""), p, require_output=False)
+
+
+def test_strobogrammatic_transform():
+    """D36: rotation reverses left-to-right order as well as mapping each digit, so
+    "86" reads "98" and "106" reads "901" — the two phantoms observed on US5447630A."""
+    from attest.figures_map import strobogrammatic
+    assert strobogrammatic("86") == "98"
+    assert strobogrammatic("98") == "86"
+    assert strobogrammatic("106") == "901"
+    assert strobogrammatic("88") == "88"            # self-inverse
+    assert strobogrammatic("12a") is None           # suffixed: not digits
+    assert strobogrammatic("34") is None            # 3/4 do not invert legibly
+
+
+def test_a_180_read_over_an_upright_mark_is_the_same_ink():
+    """D36 (Julian's inversion test): a phantom is not a second mark, it is one mark
+    read twice. Un-rotation puts it at the SAME page position as its upright source,
+    and its label is that source's strobogrammatic inverse — position coincidence plus
+    inverse label is proof of double-reading, not evidence of it."""
+    from attest.figures_map import drop_strobogrammatic_twins
+    real = {"numeral": "86", "angles": [0], "engines": ["vision"], "x": 0.598, "y": 0.314}
+    phantom = {"numeral": "98", "angles": [180], "engines": ["vision", "tesseract"],
+               "x": 0.599, "y": 0.315}
+    kept = drop_strobogrammatic_twins([real, phantom], [real])
+    assert [k["numeral"] for k in kept] == ["86"]
+
+    # It catches what corroboration cannot: the phantom above was read by TWO engines.
+    # Engines fed the same inverted ink agree with each other, so cross-engine
+    # agreement is no defence against a defect that lives in the pixels.
+    far = {**phantom, "x": 0.20, "y": 0.80}          # same label, elsewhere: a real mark
+    assert len(drop_strobogrammatic_twins([real, far], [real])) == 2
+    upright_too = {**phantom, "angles": [0, 180]}     # legible upright: never dropped
+    assert len(drop_strobogrammatic_twins([real, upright_too], [real])) == 2

@@ -380,7 +380,11 @@ def derive(observations: list[dict], recited: set[str] | None = None) -> dict:
                 # figures view can draw a confirmation box around the located numeral.
                 "x": o["x"], "y": o["y"], "w": o["w"], "h": o["h"],
             })
-    from attest.figures_map import gate_rotated_numerals, merge_same_spot_numerals
+    from attest.figures_map import (
+        drop_strobogrammatic_twins,
+        gate_rotated_numerals,
+        merge_same_spot_numerals,
+    )
     best_fig: dict[str, dict] = {}
     for fg in figs:                              # engines re-read the same FIG label
         if fg["fig"] not in best_fig or fg["confidence"] > best_fig[fg["fig"]]["confidence"]:
@@ -388,9 +392,13 @@ def derive(observations: list[dict], recited: set[str] | None = None) -> dict:
     # merge first (so `angles`/`engines` are unioned per mark), then gate: a label seen
     # only on a rotated pass needs corroboration to be admitted (D32).
     merged = merge_same_spot_numerals(numerals)
+    # Two independent questions, in order: is this the same ink as an upright mark
+    # (D36 — a mechanism), and if it is a separate mark, is it corroborated (D32).
+    upright = [n for n in merged if 0 in n.get("angles", [0])]
     return {"fig_labels": sorted(best_fig.values(), key=lambda f: f["fig"]),
             "sheet_id": sheet_id,
-            "numerals": gate_rotated_numerals(merged, recited or set())}
+            "numerals": gate_rotated_numerals(
+                drop_strobogrammatic_twins(merged, upright), recited or set())}
 
 
 

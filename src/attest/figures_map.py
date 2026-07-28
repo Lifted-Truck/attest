@@ -165,6 +165,61 @@ def merge_same_spot_numerals(numerals: list[dict], *, radius: float = 0.02) -> l
 
 
 
+# Digits that stay legible when the page is turned upside down. Deliberately
+# conservative — 2/5/7 invert plausibly in some typefaces and not others, and a wrong
+# entry here DELETES a real label, which is the failure mode this repo keeps repeating.
+_STROBOGRAMMATIC = {"0": "0", "1": "1", "6": "9", "8": "8", "9": "6"}
+
+
+def strobogrammatic(label: str) -> str | None:
+    """What `label` would read as if the same ink were rotated 180°, or None if it
+    would not read as digits at all. The string REVERSES as well as mapping, because
+    rotation reverses left-to-right order: "86" → "98", "106" → "901"."""
+    if not label.isdigit():
+        return None
+    out = []
+    for ch in reversed(label):
+        if ch not in _STROBOGRAMMATIC:
+            return None
+        out.append(_STROBOGRAMMATIC[ch])
+    return "".join(out)
+
+
+def drop_strobogrammatic_twins(numerals: list[dict], upright: list[dict],
+                               *, radius: float = 0.02) -> list[dict]:
+    """Reject a rotated read that is the SAME INK as an upright read (D36, Julian).
+
+    The mechanism, not a heuristic: a 180° phantom is not a second mark, it is one mark
+    read twice. Because observations are un-rotated back into page coordinates, the
+    phantom lands at the *same page position* as the upright read it came from — and
+    its label is the upright label's strobogrammatic inverse. Position coincidence plus
+    inverse label is therefore proof of double-reading, not evidence of it.
+
+    Measured on US5447630A: 19 coincidences, including every phantom identified by hand
+    (FIG 4's "98" over the real "86", FIG 5's "86" over the real "98", "901" over "106").
+
+    This catches strictly more than the cross-engine bar it supplements: several
+    phantoms were read by two or three engines, which is exactly what one would expect
+    — engines fed the same inverted ink agree with each other. Corroboration cannot see
+    a defect that lives in the pixels rather than in the models (the D31 lesson again),
+    so both rules are kept: corroboration decides whether a mark is real, and this
+    decides whether it is a *separate* mark.
+    """
+    kept = []
+    for n in numerals:
+        angles = n.get("angles") or [n.get("angle", 0)]
+        inv = strobogrammatic(str(n["numeral"]))
+        if 0 in angles or 180 not in angles or inv is None:
+            kept.append(n)
+            continue
+        twin = any(str(u["numeral"]) == inv
+                   and abs(u["x"] - n["x"]) < radius and abs(u["y"] - n["y"]) < radius
+                   for u in upright)
+        if not twin:
+            kept.append(n)
+    return kept
+
+
 def gate_rotated_numerals(numerals: list[dict], recited: set[str]) -> list[dict]:
     """Admission rule for labels seen ONLY on a rotated pass (D32).
 
