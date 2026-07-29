@@ -373,8 +373,15 @@ def regime_flag(fm: FrontMatter) -> dict | None:
 # The verb must follow the label directly, which distinguishes a *caption* from a
 # detailed-description reference ("FIG. 4, a perspective view …" — comma, no verb).
 _FIG_CAPTION = re.compile(
-    r"FIGS?\.?\s*(\d+[A-Z]?)\s+(?:is|are|shows?|depicts?|illustrates?|"
-    r"comprises?|represents?)\b",
+    # The optional range tail is load-bearing (D43). Without it a RANGE caption
+    # ("FIGS. 4A-4B illustrate the GUI display…") cannot match — "-4B" sits between the
+    # number and the verb — and that costs twice: the caption is lost, AND the unmatched
+    # text inflates the gap to the NEXT caption past _CAPTION_GAP, terminating the
+    # caption run early. On US8046721B2 that dropped FIG. 6, 9 and 10 (each recited
+    # three times) because the gap across the invisible 4A-4B and 5A-5D captions
+    # measured 450 > 400. Found by running the RT-6 protocol on a second patent.
+    r"FIGS?\.?\s*(\d+[A-Z]?)(?:\s*[-–]\s*\d*[A-Z]?)?\s+"
+    r"(?:is|are|shows?|depicts?|illustrates?|comprises?|represents?)\b",
     re.IGNORECASE,
 )
 # Any FIG reference (offset-bearing), incl. "FIGS. 4-5", "FIG.5", and the

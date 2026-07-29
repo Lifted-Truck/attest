@@ -470,3 +470,27 @@ def test_and_joined_list_siblings_are_recited():
            reference_numerals("The pipe 56 and the valve 58 are shown.")}
     assert got["56"] == "pipe"
     assert got["58"] != "pipe", "a noun phrase after 'and' names its own element"
+
+
+def test_range_captions_are_matched_so_the_caption_run_survives_them():
+    """D43: `_FIG_CAPTION` required `FIG. N <verb>`, so a RANGE caption
+    ("FIGS. 4A-4B illustrate…") could not match — "-4B" sits between the number and the
+    verb. That cost twice: the caption was lost, AND the unmatched text inflated the gap
+    to the next caption past `_CAPTION_GAP`, terminating the caption run early.
+
+    On US8046721B2 this dropped FIG. 6, 9 and 10 — each recited three times — because the
+    gap across the invisible 4A-4B and 5A-5D captions measured 450 against a 400 limit.
+    Found by running the RT-6 corpus-fitting protocol on a second patent."""
+    from cairn.patents import parse_figures
+    text = (
+        "FIG. 1 is a block diagram illustrating a portable electronic device. "
+        "FIGS. 4A-4B illustrate the GUI display of a device in a lock state, according "
+        "to some embodiments of the invention, at considerable length so that the prose "
+        "between the previous caption and the next one comfortably exceeds the caption "
+        "gap that terminates a caption run when a caption cannot be matched at all. "
+        "FIG. 6 is a flow diagram illustrating a process for indicating progress."
+    )
+    got = [f.number for f in parse_figures(text)]
+    assert "6" in got, "a plain caption after a range caption must survive"
+    assert "4A" in got and "4B" in got
+    assert got.index("1") < got.index("4A") < got.index("6")

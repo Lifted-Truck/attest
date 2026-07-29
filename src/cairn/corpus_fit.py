@@ -58,7 +58,9 @@ FITTED: list[FittedConstant] = [
         "on such a patent BOTH sides of the drawing/spec reconciliation come back empty "
         "so coverage reads clean over an empty map (D34).",
         "A patent reciting a five-digit reference numeral, or one whose numerals collide "
-        "with four-digit quantities the unit guard does not catch.",
+        "with four-digit quantities the unit guard does not catch. TESTED on US8046721B2 "
+        "(2026-07-28): 13 four-digit numerals (1000-1108) extracted, all invisible under "
+        "the pre-D34 cap; no 5+-digit shapes present. Transfers.",
     ),
     FittedConstant(
         "figures_map.MIN_LOCATABLE_NUMERAL", 10, CORPUS,
@@ -68,7 +70,8 @@ FITTED: list[FittedConstant] = [
         "A corpus whose single-digit numerals ARE reliably readable — likely any clean "
         "modern vector PDF rather than a 1990s raster scan. This is the constant most "
         "likely to be wrong on corpus #2, and it fails SILENTLY: it suppresses "
-        "locations rather than producing wrong ones.",
+        "locations rather than producing wrong ones. US8046721B2 left it INERT (lowest "
+        "numeral recited is 36), so it is still UNTESTED — inert is not validated.",
     ),
     FittedConstant(
         "figures_map.HEADER_BAND", 0.88, DOMAIN,
@@ -88,7 +91,12 @@ FITTED: list[FittedConstant] = [
         "patents._CAPTION_GAP", 400, CORPUS,
         "Max chars between consecutive 'BRIEF DESCRIPTION OF THE DRAWINGS' captions when "
         "parsing the figure list; fitted to US5447630A's caption block.",
-        "A patent with a long prose aside between two figure captions.",
+        "A patent with a long prose aside between two figure captions. FIRED on US8046721B2, "
+        "but the diagnosis was elsewhere: `_FIG_CAPTION` could not match a RANGE caption "
+        "('FIGS. 4A-4B illustrate'), which both lost those captions and inflated the gap "
+        "to 450. After the D43 regex fix the largest in-run gap is 160, so 400 transfers. "
+        "General lesson: a threshold that looks too tight may be measuring a parse "
+        "failure upstream of it.",
     ),
     FittedConstant(
         "cues.CUE_WINDOW", 160, CORPUS,
@@ -102,7 +110,10 @@ FITTED: list[FittedConstant] = [
         "on the EDGAR golden set (D20) — a score threshold is scale-dependent on corpus "
         "length and term distribution, so it is corpus-fitted by construction.",
         "Any new corpus. A BM25 score is not comparable across corpora; this must be "
-        "re-calibrated, and the risk-coverage curve RT-8 notes is how to price it.",
+        "re-calibrated, and the risk-coverage curve RT-8 notes is how to price it. "
+        "CONFIRMED on US8046721B2: 'how is the device unlocked' — the patent's entire subject "
+        "— scores 4.56 against a 15.0 floor, so Cairn would FALSELY ABSTAIN on an "
+        "answerable question. Does not transfer. RT-9 tracks the missing mechanism.",
     ),
     FittedConstant(
         "figures_map.merge_same_spot_numerals(radius=)", 0.02, CORPUS,
@@ -158,7 +169,12 @@ FITTED: list[FittedConstant] = [
         "FIG FIGS US NO PCT CIP, plus the unit acronyms CFM RPM PSI GPM seen on "
         "US5447630A's drawings.",
         "A domain with different unit acronyms (a chemical patent's ppm/pH, an electrical "
-        "one's VAC/AWG) — each would be admitted as a reference label.",
+        "one's VAC/AWG) — each would be admitted as a reference label. CONFIRMED on "
+        "US8046721B2, worse than predicted: 34 'labels' including CDMA GSM CMOS CPU GPS "
+        "IEEE CODEC and the section headings BRIEF and FIELD. Does not transfer, and the "
+        "fix is NOT a longer blocklist — `acronym_labels` has no frequency floor because "
+        "DRAWINGS adjudicate, so it over-generates by design wherever no OCR'd sheets "
+        "exist. It must not be consumed without drawing evidence (RT-9).",
     ),
     FittedConstant(
         "cues.DENIAL_CUES", None, CORPUS,
