@@ -39,10 +39,12 @@ from ocr_patent_figures import (
 )
 
 from cairn.figures_map import load_manifest, merge_same_spot_numerals
+from cairn.patents import NUMERAL_DIGITS
 
 # What counts as a candidate LABEL on a drawing: a reference numeral (digits + an
 # optional letter suffix), an acronym (STM/LTM/CPU/CL), or a lone view/section letter.
-_LABEL = re.compile(r"(?<![A-Za-z0-9])(\d{1,3}[a-z]?|[A-Z]{1,4})(?![\da-z])")
+_LABEL = re.compile(
+    rf"(?<![A-Za-z0-9])(\d{{1,{NUMERAL_DIGITS}}}[a-z]?|[A-Z]{{1,4}})(?![\da-z])")
 _FURNITURE = re.compile(r"sheet\s+\d+\s+of\s+\d+|\b\d+\s+of\s+\d+\b|5[,\s]*447[,\s]*630|"
                         r"u\.?s\.?\s*patent|sep\.?\s*5|1995|FIGS?\b", re.IGNORECASE)
 _PROSE = re.compile(r"[A-Za-z]{5,}")     # prose annotation, not a label

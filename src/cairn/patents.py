@@ -400,6 +400,14 @@ _FIG_REF = re.compile(
 #   · UNITS — "400 W", "60 degrees" are quantities, not pointers.
 #   · SUFFIXES — "12a"/"14a" are DISTINCT labels from "12"/"14" (a variant part), so
 #     the suffix is captured; without it 12a collapses into 12 and both are wrong.
+# The widest reference numeral this domain expresses. FOUR digits, because the
+# figure-keyed 1000-series (FIG. 10 -> 1000/1010/1020) dominates post-2000 software
+# and electronics art. Named because it must hold at EVERY extraction site: D34
+# widened the head pattern and left the list-sibling pattern at three, so
+# "the pipes 1002, 1010" recited 1002 and silently dropped 1010 (D42).
+NUMERAL_DIGITS = 4
+_LABEL_RE = rf"\d{{1,{NUMERAL_DIGITS}}}[a-zA-Z]?"
+
 _NUMERAL = re.compile(
     # The element phrase may end in punctuation — "…garbage disposal) 3, dishwasher 4"
     # recites 3, but a bare `[a-z]+\s+` boundary skips it (the ")" intervenes).
@@ -413,7 +421,7 @@ _NUMERAL = re.compile(
     # — and text is where grounding binds (I1), so that is a wrong citation, not a
     # missing aid. Found by the OCR failure-mode swarm, 2026-07-25.
     r"\b((?:the |a |an |said )?(?:[a-z]+ ){0,2}[a-z]+)[)\]]?\s+"
-    r"(\d{1,4}[a-zA-Z]?)(?![\dA-Za-z])(?!\.\d)"
+    rf"({_LABEL_RE})(?![\dA-Za-z])(?!\.\d)"
 )
 _UNIT_AFTER = re.compile(
     r"^\s*(?:W|watts?|mm|cm|m|in|inch(?:es)?|ft|kg|lbs?|°|degrees?|%|percent|hours?|"
@@ -609,7 +617,12 @@ def reference_numerals(text: str) -> list[Numeral]:
         # US5447630A and was invisible without this.)
         tail = m.end()
         while True:
-            sib = re.match(r",\s*(\d{1,3}[a-z]?)(?![\da-z])(?!\.\d)", region[tail:])
+            # "pipes 56, 58 and 60" — the LAST element of a recited list is joined
+            # by "and", not a comma, so a comma-only pattern drops it. Safe because the
+            # label must follow immediately: in "the pipe 56 and the valve 58", "the"
+            # follows "and", so 58 is not mis-inherited as a sibling of "pipe".
+            sib = re.match(rf"(?:,\s*|,?\s+and\s+)({_LABEL_RE})(?![\dA-Za-z])(?!\.\d)",
+                           region[tail:])
             if not sib:
                 break
             sn = sib.group(1).lower()

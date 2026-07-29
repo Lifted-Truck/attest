@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import inspect
 import json
 import platform
 import re
@@ -39,7 +40,15 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path for the --confirm pass)
 
-from cairn.figures_map import is_locatable, unrotate_observation
+from cairn.figures_map import (
+    HEADER_BAND as _HEADER_BAND,  # one fitted value, one definition (D42)
+)
+from cairn.figures_map import (
+    is_locatable,
+    merge_same_spot_numerals,
+    unrotate_observation,
+)
+from cairn.patents import NUMERAL_DIGITS
 
 # Engine imports are OPTIONAL — CAIRN ingests on non-Mac systems too (D29):
 # Vision is darwin-only; RapidOCR is a pip extra; Tesseract is a system binary.
@@ -76,14 +85,17 @@ _SHEET_ID = re.compile(r"Sheet\s+(\d+)\s+of\s+(\d+)", re.IGNORECASE)
 # A reference LABEL: digits + an optional single letter suffix ("12a" is a distinct
 # part from "12" — dropping the suffix reports 12 present and 12a missing, both wrong).
 # Still letter-PREFIX rejected: "D1"/"D6" are FIG. 6's DIMENSION labels, not numerals.
-_DIGIT_RUN = re.compile(r"(?<![A-Za-z0-9])(\d{1,3}[a-z]?)(?![\dA-Za-z])")
+_DIGIT_RUN = re.compile(
+    rf"(?<![A-Za-z0-9])(\d{{1,{NUMERAL_DIGITS}}}[a-z]?)(?![\dA-Za-z])")
 # "0" is never a reference numeral — it is always a fragment of line art ("/0").
 _NOT_A_NUMERAL = frozenset({"0"})
 # Dimension callouts ("D1".."D6") — letter-prefixed, so the numeral pattern rejects
 # them by design; they are a separate, spec-recited label class (see patents.py).
 _DIM_RUN = re.compile(r"(?<![A-Za-z0-9])([A-Z]\d{1,2})(?![\dA-Za-z])")
 # Header furniture that must not yield numeral candidates (patent number, dates).
-_HEADER_BAND = 0.88          # normalized y above this = the running header band
+# _HEADER_BAND is IMPORTED from figures_map, not redefined: two copies of one
+# fitted constant can drift apart silently, and the runtime layer reads the
+# manifest this script writes — they must agree by construction (D42/RT-6).
 # Page/patent furniture whose digits are NOT reference numerals — the first pass
 # drops these via the header BAND, but the tiled confirmation pass reads tiles with
 # no absolute-y context, so it also string-matches these ("Sheet 1 of 8" boxed the
@@ -256,7 +268,10 @@ def available_engines() -> list[str]:
     return out
 
 
-_SAME_SPOT = 0.02        # normalized distance under which two reads are one instance
+# Imported from the merge function's own default so the ingestion pass and the
+# runtime merge cannot disagree about what 'the same spot' means (D42).
+_SAME_SPOT = inspect.signature(
+    merge_same_spot_numerals).parameters["radius"].default
 
 
 def tiled_search(path: Path, targets: set[str], *, rows: int = 4, cols: int = 2,

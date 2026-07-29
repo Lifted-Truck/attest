@@ -438,3 +438,35 @@ def test_quantities_are_not_bound_as_reference_numerals():
     text = ("The reactor operates at temperatures exceeding 500 and with 150 "
             "at temperatures below 220.")
     assert reference_numerals(text) == []
+
+
+def test_every_extraction_site_shares_one_digit_cap():
+    """D42: D34 widened the numeral cap to four digits at the HEAD pattern and left the
+    list-sibling pattern at three, so "the pipes 1002, 1010" recited 1002 and silently
+    dropped 1010. Four sites must agree (spec head, spec sibling, image, audit sweep);
+    they now all interpolate `NUMERAL_DIGITS`, and this pins that they cannot diverge."""
+    import re
+    from pathlib import Path
+
+    from cairn.patents import NUMERAL_DIGITS
+    root = Path(__file__).resolve().parents[1]
+    sites = ["src/cairn/patents.py", "scripts/ocr_patent_figures.py",
+             "scripts/audit_sheet_labels.py"]
+    for rel in sites:
+        src = (root / rel).read_text()
+        hard = re.findall(r"\\d\{1,(\d)\}\[a-z", src, re.IGNORECASE)
+        assert not hard, f"{rel} hardcodes a digit cap {hard}; interpolate NUMERAL_DIGITS"
+    assert NUMERAL_DIGITS == 4
+
+
+def test_and_joined_list_siblings_are_recited():
+    """D42: patents write "pipes 56, 58 and 60" — a comma-only sibling pattern drops the
+    last element. The label must follow the conjunction IMMEDIATELY, so a following noun
+    phrase is not mis-inherited."""
+    from cairn.patents import reference_numerals
+    assert [n.number for n in
+            reference_numerals("The pipes 56, 58 and 60 carry flow.")] == ["56", "58", "60"]
+    got = {n.number: n.element for n in
+           reference_numerals("The pipe 56 and the valve 58 are shown.")}
+    assert got["56"] == "pipe"
+    assert got["58"] != "pipe", "a noun phrase after 'and' names its own element"
