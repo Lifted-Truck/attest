@@ -16,7 +16,10 @@ lives in `mcp_server.py`, kept out of the Layer-0 gate.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import hashlib
+import json
+import re
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -42,14 +45,31 @@ class Tool:
 
 # --- JSON-Schema fragments (the on-the-wire contract; advertised by the MCP adapter) ---
 
+# --- Reject-by-default input bounds (D41; MCP hardening brief P0.2) ---
+# "The model proposes arguments; the schema decides admissibility" — validation is
+# deterministic code running BEFORE any tool logic, which is the AI/deterministic
+# boundary doing security work. `_obj` already closes the object
+# (`additionalProperties: False`); these close the VALUES, which were unbounded.
+#
+# The doc_id pattern is deliberately stricter than `DocumentStore.doc_dir` accepts
+# (which permits nesting): defence in depth. doc_dir containment-checks after
+# canonicalization (D35) and this refuses the shapes outright, so a traversal
+# attempt fails at the wire before it reaches a path join at all.
+_DOC_ID = {"type": "string", "minLength": 1, "maxLength": 128,
+           "pattern": r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+           "description": "A document id in this corpus — a NAME, never a path."}
+_TEXT = {"type": "string", "minLength": 1, "maxLength": 8192}
+_OFFSET = {"type": "integer", "minimum": 0, "maximum": 100_000_000}
+_TOPK = {"type": "integer", "minimum": 1, "maximum": 100, "default": 10}
+
 _ATOM_SCHEMA: dict = {
     "type": "object",
     "description": "A load-bearing atom bound to an exact source location (D9/I1).",
     "properties": {
         "text": {"type": "string", "description": "The literal asserted at the location."},
-        "doc_id": {"type": "string"},
-        "char_start": {"type": "integer", "minimum": 0},
-        "char_end": {"type": "integer", "minimum": 0},
+        "doc_id": _DOC_ID,
+        "char_start": _OFFSET,
+        "char_end": _OFFSET,
         "content_hash": {
             "type": ["string", "null"],
             "description": "Doc hash the binding was made against (drift check, I3).",
@@ -95,6 +115,46 @@ _ANSWER_SCHEMA: dict = {
     "required": ["sentences"],
     "additionalProperties": False,
 }
+
+
+
+
+def _tools(tools: Iterable[Tool] | dict[str, Tool]) -> list[Tool]:
+    return list(tools.values() if isinstance(tools, dict) else tools)
+
+
+def tool_manifest(tools: Iterable[Tool] | dict[str, Tool]) -> list[dict]:
+    """The advertised surface: name + description + schema, in a stable order."""
+    return [{"name": t.name, "description": t.description, "input_schema": t.input_schema}
+            for t in sorted(_tools(tools), key=lambda x: x.name)]
+
+
+def tool_manifest_sha256(tools: Iterable[Tool] | dict[str, Tool]) -> str:
+    """Content hash of the whole advertised tool surface (D41; brief P0.1).
+
+    Tool metadata is a TRUST SURFACE, not documentation: an agent reads descriptions
+    and schemas and acts on them, so a description edit is a behaviour change with the
+    reach of a code change. That is the rug-pull shape — a server ships benign metadata,
+    earns trust, then quietly rewrites what the model is told a tool does. Hashing the
+    manifest means unreviewed drift fails the gate instead of shipping silently.
+    """
+    blob = json.dumps(tool_manifest(tools), sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+# Descriptions DESCRIBE; they never DIRECT. An imperative aimed at the model rather
+# than at the human reader is the tool-poisoning shape — instructions smuggled into
+# metadata the model treats as trusted. Checked, not merely asked for.
+_INSTRUCTION_LIKE = re.compile(
+    r"\b(ignore|disregard|instead of|you must|always call|never call|do not tell|"
+    r"before (?:answering|responding)|regardless of|override)\b", re.IGNORECASE)
+
+
+def lint_tool_descriptions(tools: Iterable[Tool] | dict[str, Tool]) -> list[str]:
+    """Description strings that read as instructions to the model. Empty = clean."""
+    return [f"{t.name}: {m.group(0)!r}"
+            for t in _tools(tools) if (m := _INSTRUCTION_LIKE.search(t.description))]
 
 
 def _obj(properties: dict, required: list[str]) -> dict:
@@ -151,8 +211,8 @@ def default_registry(
         lambda a: {"hits": [_hit(h) for h in retriever.search(a["query"], a.get("k", 10))]},
         _obj(
             {
-                "query": {"type": "string"},
-                "k": {"type": "integer", "minimum": 1, "default": 10},
+                "query": _TEXT,
+                "k": _TOPK,
             },
             ["query"],
         ))
@@ -161,16 +221,16 @@ def default_registry(
         lambda a: {"text": span_store.get_span(a["doc_id"], a["start"], a["end"])},
         _obj(
             {
-                "doc_id": {"type": "string"},
-                "start": {"type": "integer", "minimum": 0},
-                "end": {"type": "integer", "minimum": 0},
+                "doc_id": _DOC_ID,
+                "start": _OFFSET,
+                "end": _OFFSET,
             },
             ["doc_id", "start", "end"],
         ))
 
     reg("get_document", "Full hash-verified canonical text — read freely (D11).",
         lambda a: {"doc_id": a["doc_id"], "text": span_store.get_document(a["doc_id"])},
-        _obj({"doc_id": {"type": "string"}}, ["doc_id"]))
+        _obj({"doc_id": _DOC_ID}, ["doc_id"]))
 
     # --- Write tools: append a replayable record to the audit log (I5); read_only=False ---
 
@@ -205,10 +265,10 @@ def default_registry(
         return out
 
     reg("check_support", "Supporting spans or 'insufficient' — the abstention decision (I2).",
-        _check_support, _obj({"query": {"type": "string"}}, ["query"]), read_only=False)
+        _check_support, _obj({"query": _TEXT}, ["query"]), read_only=False)
 
     reg("check_claim", "Resolve a user-supplied claim to supporting spans (or none).",
-        _check_claim, _obj({"claim": {"type": "string"}}, ["claim"]), read_only=False)
+        _check_claim, _obj({"claim": _TEXT}, ["claim"]), read_only=False)
 
     reg("verify", "Resolve every bound atom + recompute derivations; flag unbound figures (I1/D9).",
         _verify, _obj({
