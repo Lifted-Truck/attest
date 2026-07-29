@@ -27,8 +27,8 @@ import re
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
-from attest.cues import CUE_WINDOW, DENIAL_CUES, denial_cue_hits
-from attest.ingest import DocumentStore
+from cairn.cues import CUE_WINDOW, DENIAL_CUES, denial_cue_hits
+from cairn.ingest import DocumentStore
 
 # A figure-like token: comma-grouped financials (364,980) or bare 2-4 digit numbers
 # (patent numerals/quantities). Deliberately broad — the census over-approximates the

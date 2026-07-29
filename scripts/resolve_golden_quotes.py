@@ -20,8 +20,8 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
-from attest.ingest import DocumentStore
-from attest.spans import SpanStore
+from cairn.ingest import DocumentStore
+from cairn.spans import SpanStore
 
 ROOT = Path(__file__).resolve().parent.parent
 SEED = ROOT / "golden_seed.json"

@@ -12,11 +12,11 @@ from pathlib import Path
 
 import pytest
 
-from attest.evidence_view import Interaction, render_evidence_view
-from attest.frame import Constraint, QuestionFrame
-from attest.ingest import DocumentStore
-from attest.spans import SpanStore
-from attest.verify import Answer, AtomBinding, Sentence, verify
+from cairn.evidence_view import Interaction, render_evidence_view
+from cairn.frame import Constraint, QuestionFrame
+from cairn.ingest import DocumentStore
+from cairn.spans import SpanStore
+from cairn.verify import Answer, AtomBinding, Sentence, verify
 
 ROOT = Path(__file__).resolve().parent.parent
 DOC = "AAPL-10K-FY2024"
@@ -91,8 +91,8 @@ def test_unbound_claim_is_flagged_not_linked(store):
 
 
 def test_abstention_shows_closest_spans(store):
-    from attest.retrieval import Retriever
-    from attest.support import check_support
+    from cairn.retrieval import Retriever
+    from cairn.support import check_support
     res = check_support("What is Apple's customer churn rate?", Retriever(store))
     inter = Interaction("churn?", "abstain", reason="insufficient", closest=res.closest)
     html = render_evidence_view([inter], store)
@@ -100,7 +100,7 @@ def test_abstention_shows_closest_spans(store):
 
 
 def test_derived_value_shows_its_equation(store):
-    from attest.verify import DerivedAtom
+    from cairn.verify import DerivedAtom
     sent = Sentence(
         "Total assets rose by $12,397 million (from $352,583M to $364,980M).",
         derived=[DerivedAtom("12,397", "subtract",
@@ -123,7 +123,7 @@ def test_render_is_deterministic(store):
 
 def test_interactions_from_audit_rebuilds_presented(store):
     """The Desktop bridge: a real session's audit log → evidence-view interactions."""
-    from attest.evidence_view import interactions_from_audit
+    from cairn.evidence_view import interactions_from_audit
 
     atom = _bind(store, "364,980", TOTAL_ASSETS)
     answer_json = {"sentences": [{
@@ -161,7 +161,7 @@ def test_correction_renders_distinctly(store):
 
 def test_from_audit_tags_outcome(store):
     """interactions_from_audit reads the logged D16 outcome → the card's kind."""
-    from attest.evidence_view import interactions_from_audit
+    from cairn.evidence_view import interactions_from_audit
 
     atom = _bind(store, "352,583", TOTAL_ASSETS)
     answer_json = {"sentences": [{
@@ -190,7 +190,7 @@ def test_table_figure_lights_its_column_header(store):
 
 def test_refuse_renders_distinctly(store):
     """D22: a refusal-to-adjudicate is its own kind — distinct badge/colour from abstain."""
-    from attest.retrieval import Retriever
+    from cairn.retrieval import Retriever
     inter = Interaction(
         "Is claim 1 valid?", "refuse",
         reason="Refusal to adjudicate (D10): validity is a professional's conclusion; "
@@ -205,8 +205,8 @@ def test_refuse_renders_distinctly(store):
 
 def test_sessions_from_audit_groups_by_marker(store):
     """RT-1: session_start markers delimit history; pre-marker entries stay browsable."""
-    from attest.evidence_view import sessions_from_audit
-    from attest.session import session_start_record
+    from cairn.evidence_view import sessions_from_audit
+    from cairn.session import session_start_record
 
     atom = _bind(store, "364,980", TOTAL_ASSETS)
     ans = {"sentences": [{"text": "Total assets were $364,980 million.",
@@ -235,7 +235,7 @@ _STUB_PNG = ("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC
 
 
 def test_figures_render_and_wire_to_the_interaction(store):
-    from attest.evidence_view import FigurePanel
+    from cairn.evidence_view import FigurePanel
     inter = _clean(store)
     inter.figures = ["FIG. 4"]
     figs = [FigurePanel("FIG. 4", "a disassembled separator", _STUB_PNG),
@@ -260,7 +260,7 @@ def test_figures_absent_leaves_the_view_unchanged(store):
 
 def test_interaction_figure_not_in_catalog_is_dropped(store):
     """An interaction naming a figure the caller didn't supply is filtered, not faked."""
-    from attest.evidence_view import FigurePanel
+    from cairn.evidence_view import FigurePanel
     inter = _clean(store)
     inter.figures = ["FIG. 4", "FIG. 99"]               # 99 has no panel
     html = render_evidence_view([inter], store,
@@ -273,8 +273,8 @@ def test_denial_cue_advisory_renders_non_blocking(tmp_path):
     """D24: a cited span carrying a span-local denial cue gets the advisory line —
     while verify stays ✓ (it gates nothing). Built on a synthetic store so the
     fixture is hermetic."""
-    from attest.ingest import DocumentStore
-    from attest.ingest.files import ingest_paths
+    from cairn.ingest import DocumentStore
+    from cairn.ingest.files import ingest_paths
 
     doc_text = ("Financial note.\n"
                 "When speaking of total assets and liabilities, the number $2,000,000 has "

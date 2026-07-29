@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Ingest your own plain-text files into an ATTEST document store (corpus-agnostic).
+"""Ingest your own plain-text files into an CAIRN document store (corpus-agnostic).
 
 The generic counterpart to `ingest_corpus.py` (which is EDGAR-specific). Use it to
-stand up a new engagement's corpus, then point `ATTEST_STORE` (in `.mcp.json`) at it.
+stand up a new engagement's corpus, then point `CAIRN_STORE` (in `.mcp.json`) at it.
 
 Usage:
     python scripts/ingest_files.py patent.txt --store corpus/acme/store
@@ -18,11 +18,11 @@ import argparse
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
-from attest.ingest.files import ingest_paths
+from cairn.ingest.files import ingest_paths
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Ingest plain-text files into an ATTEST store")
+    ap = argparse.ArgumentParser(description="Ingest plain-text files into an CAIRN store")
     ap.add_argument("paths", nargs="+", help="files or a folder of .txt/.md")
     ap.add_argument("--store", required=True, help="target store dir (keep engagements separate)")
     ap.add_argument("--kind", default=None, help="optional metadata tag (e.g. 'patent')")
@@ -40,7 +40,7 @@ def main() -> int:
     for d in docs:
         print(f"  {d.doc_id:<24} {len(d):>8} chars  sha256={d.content_hash[:12]}…")
     print(f"\nOK — {len(docs)} document(s) in {ns.store}  "
-          f"(set ATTEST_STORE={ns.store} to use it)")
+          f"(set CAIRN_STORE={ns.store} to use it)")
     return 0
 
 

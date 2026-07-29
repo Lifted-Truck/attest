@@ -5,8 +5,8 @@ AC for M0-T1: a clean install runs an empty test suite green. This is the
 Real Layer-0 deterministic component evals (brief §3) arrive at M2.
 """
 
-import attest
+import cairn
 
 
 def test_package_imports():
-    assert attest.__version__ == "0.1.0"
+    assert cairn.__version__ == "0.1.0"

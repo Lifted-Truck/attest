@@ -59,7 +59,7 @@ def is_locatable(label: str) -> bool:
 
 
 # --- multi-engine OCR support (D29) ------------------------------------------------
-# ATTEST runs on non-Mac systems too, and engines have COMPLEMENTARY blind spots
+# CAIRN runs on non-Mac systems too, and engines have COMPLEMENTARY blind spots
 # (measured on US5447630A/FIG 2: Vision reads the view-marker B but is totally blind
 # to A; Tesseract reads A in sparse/single-glyph mode but misses B; RapidOCR has the
 # best whole-image recall — 24/30 labels vs Vision's ~18 — but reads neither letter).
@@ -391,7 +391,7 @@ def verify_raster_binding(manifest: dict, fig_dir: str | Path) -> None:
     fraction. Re-fetch or re-crop a sheet without re-OCRing and every fraction still
     resolves, silently, to a different place on a different raster. That is the
     wrong-place class: a confident box drawn over the wrong mark, which is exactly
-    what ATTEST claims never to do. Absent bytes are not an error (the manifest is
+    what CAIRN claims never to do. Absent bytes are not an error (the manifest is
     portable; the sheets are gitignored client material) — only a MISMATCH is.
     """
     fig_dir = Path(fig_dir)

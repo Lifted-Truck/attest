@@ -1,16 +1,16 @@
 export const meta = {
   name: 'provability-research',
-  description: 'Research swarm: formal/statistical routes to stronger deterministic claim checking in ATTEST',
-  whenToUse: 'Queued 2026-07-08 at Julian\'s request. Explores decomposing complex claims into formal logic + statistical guarantees, so ATTEST can push runtime checking closer to its theoretical ceiling. Fire when ready — it is research-only and writes no code.',
+  description: 'Research swarm: formal/statistical routes to stronger deterministic claim checking in CAIRN',
+  whenToUse: 'Queued 2026-07-08 at Julian\'s request. Explores decomposing complex claims into formal logic + statistical guarantees, so CAIRN can push runtime checking closer to its theoretical ceiling. Fire when ready — it is research-only and writes no code.',
   phases: [
     { title: 'Sweep', detail: '8 literature lenses in parallel (Opus 4.8, per Julian 2026-07-16)' },
     { title: 'Interrogate', detail: 'adversarial reality-check of each candidate (Opus 4.8)' },
-    { title: 'Synthesise', detail: 'map onto ATTEST decisions + testing protocol + the honest ceiling (Opus 4.8)' },
+    { title: 'Synthesise', detail: 'map onto CAIRN decisions + testing protocol + the honest ceiling (Opus 4.8)' },
   ],
 }
 
 // ── The problem this swarm exists to solve ───────────────────────────────────
-// ATTEST today: `verify` proves a cited atom RESOLVES (exists at its offset, hash
+// CAIRN today: `verify` proves a cited atom RESOLVES (exists at its offset, hash
 // matches). `check_coverage` proves the cited span CONTAINS the question's literal
 // constraints. Neither proves the span ASSERTS the claim. Julian's falsifying case,
 // confirmed live 2026-07-08:
@@ -26,7 +26,7 @@ export const meta = {
 // check, and, just as importantly, what provably cannot move.
 
 const HOUSE_RULES = `
-ATTEST's non-negotiable constraints — judge every candidate technique against these:
+CAIRN's non-negotiable constraints — judge every candidate technique against these:
 · I6 DETERMINISM on the evidence path: same corpus + query → identical result, seeded.
 · v1 makes ZERO model calls at runtime. A technique needing an LLM at decide-time is
   not disqualified, but it is an ARCHITECTURE CHANGE requiring a new logged decision
@@ -103,7 +103,7 @@ parser must supply and how brittle that is on real financial/legal prose.`,
 Cover: Saurí & Pustejovsky (FactBank, De Facto); NegEx / ConText; BioScope hedging;
 attribution & source-tagging (who asserts what — "X has been claimed" attributes to an
 unnamed other, not the document); factuality profiling; speculation detection. This lens
-is the closest existing match to ATTEST's failing case: text that MENTIONS a value while
+is the closest existing match to CAIRN's failing case: text that MENTIONS a value while
 ATTRIBUTING it elsewhere or REFUTING it. Report what precision these achieve on real
 prose and their standard false-positive modes.`,
   },
@@ -112,7 +112,7 @@ prose and their standard false-positive modes.`,
     prompt: `Research SEMANTIC PARSING TO LOGICAL FORM.
 Cover: AMR; Discourse Representation Theory/Structures (Boxer, DRS); FOL translation;
 neuro-symbolic NLI; LLM→logic pipelines (Logic-LM, SatLM, LINC) and their measured
-failure rates. Key question for ATTEST: can a claim + its cited span be compiled into
+failure rates. Key question for CAIRN: can a claim + its cited span be compiled into
 comparable logical forms so entailment becomes a DECIDABLE check? Be brutally honest
 about where the compilation step itself is the weak link, and whether it can be made
 deterministic.`,
@@ -123,7 +123,7 @@ deterministic.`,
 Cover: SMT solvers (Z3, CVC5) applied to NL-derived constraints; proof-carrying code and
 its analogues for NL claims; certified/verified outputs; theorem-prover-checked
 pipelines. Key question: once a claim is in logical form, what does a solver actually buy
-us — a machine-checkable PROOF OBJECT that could be shipped in ATTEST's audit log
+us — a machine-checkable PROOF OBJECT that could be shipped in CAIRN's audit log
 alongside the citation? What does that proof actually certify, and what does it NOT?`,
   },
   {
@@ -132,9 +132,9 @@ alongside the citation? What does that proof actually certify, and what does it 
 Cover: conformal prediction (incl. split/inductive conformal, and conformal for NLG);
 selective prediction / the reject option / Chow's rule; PAC-Bayes; calibration
 (temperature scaling, Brier/ECE); risk-controlling prediction sets (RCPS), Learn-then-Test.
-Key question for ATTEST: can we put a RIGOROUS, distribution-free bound on the residual
+Key question for CAIRN: can we put a RIGOROUS, distribution-free bound on the residual
 error of a present/abstain decision — i.e. "at most X% of what we present is wrong, with
-Y confidence" — and what exchangeability assumptions does that need? ATTEST already
+Y confidence" — and what exchangeability assumptions does that need? CAIRN already
 tracks Brier + abstention; this lens should say what a real guarantee (not a metric)
 would require.`,
   },
@@ -174,11 +174,11 @@ on financial/legal prose, and what does that imply for using them as a GATE vs a
 ]
 
 phase('Sweep')
-log(`Sweeping ${LENSES.length} literatures against ATTEST's constraints…`)
+log(`Sweeping ${LENSES.length} literatures against CAIRN's constraints…`)
 
 const swept = await parallel(LENSES.map(l => () =>
   agent(
-    `You are researching for ATTEST, a grounded-retrieval system whose cardinal rule is
+    `You are researching for CAIRN, a grounded-retrieval system whose cardinal rule is
 "ground or abstain — never invent". Use web search extensively; cite real papers with
 authors/venues/years. Do not invent citations — a fabricated source here would be
 darkly ironic and is an automatic failure.
@@ -189,7 +189,7 @@ THE CONCRETE FAILING CASE this research must speak to:
   passage: "When speaking of total assets and liabilities, the number $2,000,000 has
             been claimed, but in fact this is incorrect when accounting for the revaluation."
   question: "What are the total assets and liabilities?"   answer given: "$2,000,000"
-  ATTEST today: verify ok = TRUE, coverage complete = TRUE → it would PRESENT this.
+  CAIRN today: verify ok = TRUE, coverage complete = TRUE → it would PRESENT this.
   The span mentions the metric and the figure — and refutes them. Co-presence ≠ assertion.
 
 YOUR LENS: ${l.prompt}
@@ -211,7 +211,7 @@ log(`${found.length}/${LENSES.length} lenses returned · ${allCandidates.length}
 phase('Interrogate')
 const verdicts = await parallel(allCandidates.map(c => () =>
   agent(
-    `You are a hostile reviewer protecting ATTEST from a plausible-but-wrong idea.
+    `You are a hostile reviewer protecting CAIRN from a plausible-but-wrong idea.
 A research sweep proposes this technique for making claim-checking more rigorous:
 
 ${JSON.stringify(c, null, 2)}
@@ -221,7 +221,7 @@ ${HOUSE_RULES}
 Try to REFUTE it. Specifically interrogate:
 1. Does the claimed capability survive contact with a REAL 300-page 10-K or a 1995
    patent scan — or is the reported performance from short, clean benchmark sentences?
-2. What is its false-POSITIVE behaviour? (For ATTEST, a check that wrongly blocks good
+2. What is its false-POSITIVE behaviour? (For CAIRN, a check that wrongly blocks good
    answers is bad; a check that wrongly passes bad ones is disqualifying.)
 3. Does it secretly need a model at decide-time, breaking I6 determinism? Does the sweep
    admit this?
@@ -239,10 +239,10 @@ const graded = verdicts.filter(Boolean)
 const survivors = graded.filter(v => v.survives)
 log(`interrogated ${graded.length} · ${survivors.length} survived`)
 
-// ── Phase 3 — synthesise into something ATTEST can actually act on ───────────
+// ── Phase 3 — synthesise into something CAIRN can actually act on ───────────
 phase('Synthesise')
 const report = await agent(
-  `Synthesise a research report for ATTEST's owner (Julian) and its ROADMAP.
+  `Synthesise a research report for CAIRN's owner (Julian) and its ROADMAP.
 
 ${HOUSE_RULES}
 
@@ -256,7 +256,7 @@ ${JSON.stringify(graded.filter(v => !v.survives).map(v => ({ name: v.candidate, 
 CEILINGS reported by each lens:
 ${JSON.stringify(found.map(f => ({ lens: f.lens, ceiling: f.ceiling })), null, 2)}
 
-Write markdown, in the register of ATTEST's own docs: plain, concrete, no jargon-as-proof,
+Write markdown, in the register of CAIRN's own docs: plain, concrete, no jargon-as-proof,
 honest about limits. Structure:
 
 1. **The verdict in five sentences** — can the $2,000,000 refutation case be caught at

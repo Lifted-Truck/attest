@@ -10,7 +10,7 @@ card again clears. This keeps "which highlight belongs to which query"
 unambiguous (D15).
 
 Read-only (I4), deterministic, no server. Renders the normalized canonical text
-ATTEST hashes and cites (D8). Your review is the un-gated step: does the
+CAIRN hashes and cites (D8). Your review is the un-gated step: does the
 highlighted span actually support the claim (entailment)?
 """
 
@@ -566,7 +566,7 @@ def _abstain_card(inter: Interaction, seg_id) -> str:
 
 def render_evidence_view(
     interactions: list[Interaction], store: SpanStore, *,
-    title: str = "ATTEST — evidence view", figures: list[FigurePanel] | None = None,
+    title: str = "CAIRN — evidence view", figures: list[FigurePanel] | None = None,
 ) -> str:
     raw = _gather(interactions, store)
     painted = {doc_id: _paint(rs) for doc_id, rs in raw.items()}

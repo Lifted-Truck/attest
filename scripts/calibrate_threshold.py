@@ -4,7 +4,7 @@
 Fits the per-corpus relevance floor from labels instead of hand-tuning it: it
 separates answerable golden queries (top span should clear) from content-absent
 ones (should not), and reports the value + the separation so the choice is
-auditable. Record the result in the engagement's `ATTEST_SUPPORT_THRESHOLD`.
+auditable. Record the result in the engagement's `CAIRN_SUPPORT_THRESHOLD`.
 
 Usage:
     python scripts/calibrate_threshold.py                                  # EDGAR golden
@@ -20,10 +20,10 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
-from attest.ingest import DocumentStore
-from attest.retrieval import Retriever
-from attest.spans import SpanStore
-from attest.support import calibrate_threshold
+from cairn.ingest import DocumentStore
+from cairn.retrieval import Retriever
+from cairn.spans import SpanStore
+from cairn.support import calibrate_threshold
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -39,7 +39,7 @@ def main() -> int:
     c = calibrate_threshold(items, retriever)
 
     sep = "clean separation" if c.clean else "OVERLAP — not separable by a single floor"
-    print(f"recommended ATTEST_SUPPORT_THRESHOLD = {c.threshold}")
+    print(f"recommended CAIRN_SUPPORT_THRESHOLD = {c.threshold}")
     print(f"  answerable (n={c.n_present}): top scores ≥ {c.present_min}")
     print(f"  content-absent (n={c.n_absent}): top scores ≤ {c.absent_max}")
     print(f"  gap = {c.gap}  ({sep});  {c.excluded} trap items excluded (handled by reasoning)")

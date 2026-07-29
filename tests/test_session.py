@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from attest.audit import AuditLog
-from attest.ingest import DocumentStore
-from attest.retrieval import Retriever
-from attest.session import replay_support, replays_identically, support_record
-from attest.spans import SpanStore
-from attest.support import check_support
+from cairn.audit import AuditLog
+from cairn.ingest import DocumentStore
+from cairn.retrieval import Retriever
+from cairn.session import replay_support, replays_identically, support_record
+from cairn.spans import SpanStore
+from cairn.support import check_support
 
 ROOT = Path(__file__).resolve().parent.parent
 DOC_ID = "AAPL-10K-FY2024"
@@ -63,8 +63,8 @@ class _OkResult:
 
 def test_records_carry_contract_provenance_and_replay(retriever):
     """TC-2/D21: records stamp contract_version + methods, and still replay (I6)."""
-    from attest.contract import CONTRACT_VERSION
-    from attest.session import verify_record
+    from cairn.contract import CONTRACT_VERSION
+    from cairn.session import verify_record
 
     q = "How much term debt does Apple carry?"
     rec = support_record(q, check_support(q, retriever), threshold=15.0,
@@ -100,11 +100,11 @@ def test_replay_preserves_recorded_provenance_across_versions(retriever):
 
 def test_verify_record_with_frame_replays_byte_identically(retriever):
     """M2-T8: frame + coverage in the record; coverage re-derives on replay (I6)."""
-    from attest.frame import coverage_for_answer, coverage_to_json, frame_from_json
-    from attest.ingest import DocumentStore
-    from attest.session import verify_record
-    from attest.spans import SpanStore
-    from attest.verify import answer_from_json, verify
+    from cairn.frame import coverage_for_answer, coverage_to_json, frame_from_json
+    from cairn.ingest import DocumentStore
+    from cairn.session import verify_record
+    from cairn.spans import SpanStore
+    from cairn.verify import answer_from_json, verify
 
     store = SpanStore.from_store(DocumentStore(ROOT / "corpus" / "store"))
     hits = retriever.search("total assets", 5)
@@ -124,7 +124,7 @@ def test_verify_record_with_frame_replays_byte_identically(retriever):
 
 def test_session_marker_replays_and_chains(retriever, tmp_path):
     """RT-1: the marker is pure metadata — chain-covered (I5), trivially replayable."""
-    from attest.session import session_start_record
+    from cairn.session import session_start_record
 
     rec = session_start_record("run", "2026-07-06T00:00:00")
     assert rec == {"kind": "session_start", "label": "run", "ts": "2026-07-06T00:00:00"}

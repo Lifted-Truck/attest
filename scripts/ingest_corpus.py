@@ -17,8 +17,8 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
-from attest.ingest import DocumentStore
-from attest.ingest.edgar import FILINGS, ingest
+from cairn.ingest import DocumentStore
+from cairn.ingest.edgar import FILINGS, ingest
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW_DIR = ROOT / "data" / "raw"

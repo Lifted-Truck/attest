@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "attest"
+name = "cairn"
 version = "0.1.0"
 description = "Grounded-retrieval tools: ground or abstain, never invent. Every claim traceable to a verbatim, hash-matched source span."
 readme = "README.md"
@@ -25,7 +25,7 @@ ocr = [
   # Multi-engine with COMPLEMENTARY recall — Vision (darwin-only), RapidOCR
   # (cross-platform, ONNX, no torch), and the tesseract system binary (installed
   # separately: apt/brew install tesseract). NEVER a runtime or CI dependency —
-  # runtime/CI consume only the frozen ocr_manifest.json via attest.figures_map.
+  # runtime/CI consume only the frozen ocr_manifest.json via cairn.figures_map.
   "pyobjc-framework-Vision; sys_platform == 'darwin'",
   "pyobjc-framework-Quartz; sys_platform == 'darwin'",
   "rapidocr-onnxruntime",
@@ -33,7 +33,7 @@ ocr = [
 ]
 
 [project.scripts]
-attest = "attest.cli:main"
+cairn = "cairn.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -19,6 +19,15 @@
 
 ---
 
+> **Naming note (added 2026-07-28, D40).** The product was renamed **ATTEST → Cairn**
+> as a direct result of §5 of this report. This document is left **verbatim**: its
+> trademark findings are factual claims about the *ATTEST* mark specifically, and a
+> mechanical rename would have turned a record into fiction (a first pass produced
+> "YOUCAIRN", "cosign cairn" and "askcairn.com" — all fabricated). Read every "ATTEST"
+> below as the former name. The same applies to `ocr_failure_modes.md`.
+
+---
+
 # ATTEST Landscape Report
 
 **Date:** 2026-07-28 · **Scope:** academic attribution/verification literature, claim-verification benchmarks, selective prediction, provenance standards, commercial legal/patent AI, enterprise grounded-RAG platforms, IP/naming.

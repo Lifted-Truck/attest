@@ -1,10 +1,10 @@
 ---
-description: Answer a question through the ATTEST grounded-retrieval loop, then rebuild the evidence view
+description: Answer a question through the CAIRN grounded-retrieval loop, then rebuild the evidence view
 argument-hint: <question>
 ---
 
-Run the **ATTEST grounded-retrieval loop** for the question below, using **only the
-`attest` MCP tools** (do not answer from memory or the open repo — only cited spans).
+Run the **CAIRN grounded-retrieval loop** for the question below, using **only the
+`cairn` MCP tools** (do not answer from memory or the open repo — only cited spans).
 
 QUESTION: $ARGUMENTS
 

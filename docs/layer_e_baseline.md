@@ -1,7 +1,7 @@
 # Layer-E baseline — first live agent pass
 
 First end-to-end run of the **real Claude Code agent** over the 20-item golden set
-through the ATTEST MCP tools (`scripts/run_layer_e.py --live`). Layer-E is
+through the CAIRN MCP tools (`scripts/run_layer_e.py --live`). Layer-E is
 **periodic, not a blocking gate** (brief §3) and **non-deterministic** — these
 numbers are a snapshot, not an oracle.
 

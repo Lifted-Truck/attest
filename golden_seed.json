@@ -1,6 +1,6 @@
 {
   "_readme": {
-    "purpose": "Seed golden dataset for ATTEST (brief §3, ROADMAP M0-T3). Ground truth against which the oracle's gates are measured.",
+    "purpose": "Seed golden dataset for CAIRN (brief §3, ROADMAP M0-T3). Ground truth against which the oracle's gates are measured.",
     "schema_change_vs_brief": "Brief §3 lists `supporting_span_ids`. Span IDs do not exist until M1 builds the span store, and char offsets depend on M1 normalization. So items reference supporting evidence by `locator` + `verbatim_quote` instead. A resolver at M1 binds quote -> span_id and MUST find each verbatim_quote exactly once in the canonical stored text, else hard-fail. Recommend updating brief §3 schema and ROADMAP M0-T3 AC to match.",
     "resolution_invariant": "Every non-empty `supporting[].verbatim_quote` must resolve to exactly one location in the canonical stored document. Zero matches or multiple matches = build-breaking error. This protects the golden set from drifting out of sync with the corpus.",
     "honesty_fields": {

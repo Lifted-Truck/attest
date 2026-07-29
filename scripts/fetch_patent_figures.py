@@ -5,7 +5,7 @@ Patents are read through their drawings — the reference numerals claims turn o
 in the figures. This downloads the drawing-page images from Google Patents' public
 image storage and writes a hashed manifest next to them, so the figures view
 (`scripts/patent_figures_view.py`) can render them alongside the parsed captions and
-numeral legend (`attest.patents.parse_figures` / `reference_numerals`).
+numeral legend (`cairn.patents.parse_figures` / `reference_numerals`).
 
 Locality (I3/I4): the images and manifest live UNDER the engagement store
 (`corpus/engagements/<doc>/figures/`), which is gitignored — the engagement patent

@@ -12,10 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from attest.audit import AuditLog
-from attest.session import replays_identically
-from attest.spans import SpanStore
-from attest.tools import default_registry
+from cairn.audit import AuditLog
+from cairn.session import replays_identically
+from cairn.spans import SpanStore
+from cairn.tools import default_registry
 
 ROOT = Path(__file__).resolve().parent.parent
 STORE = ROOT / "corpus" / "store"
@@ -113,8 +113,8 @@ def test_only_write_tools_append_exactly_one_entry(registry, tmp_path):
 
 def test_appended_records_are_replayable(registry, tmp_path):
     """Every write tool's entry re-derives byte-identically from the log alone (I5/I6)."""
-    from attest.ingest import DocumentStore
-    from attest.retrieval import Retriever
+    from cairn.ingest import DocumentStore
+    from cairn.retrieval import Retriever
 
     store = SpanStore.from_store(DocumentStore(STORE))
     retriever = Retriever(store)

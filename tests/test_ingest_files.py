@@ -6,8 +6,8 @@ No EDGAR, no network; everything runs against tmp files.
 
 import pytest
 
-from attest.ingest import DocumentStore
-from attest.ingest.files import (
+from cairn.ingest import DocumentStore
+from cairn.ingest.files import (
     doc_id_for,
     ingest_file,
     ingest_paths,

@@ -10,7 +10,7 @@ self-identification, and normalized numeral candidates.
 **Where this sits in the architecture (D28):** OCR is an **ingestion-time** step —
 run once per engagement, output hashed and frozen, exactly like the corpus
 content-hash (I3's pattern). Nothing at runtime calls OCR: the evidence path stays
-deterministic *over the manifest* (`attest.figures_map`). Vision's output could
+deterministic *over the manifest* (`cairn.figures_map`). Vision's output could
 change across macOS versions — that is why the manifest is frozen at ingestion,
 not recomputed.
 
@@ -39,9 +39,9 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path for the --confirm pass)
 
-from attest.figures_map import is_locatable, unrotate_observation
+from cairn.figures_map import is_locatable, unrotate_observation
 
-# Engine imports are OPTIONAL — ATTEST ingests on non-Mac systems too (D29):
+# Engine imports are OPTIONAL — CAIRN ingests on non-Mac systems too (D29):
 # Vision is darwin-only; RapidOCR is a pip extra; Tesseract is a system binary.
 try:
     import Quartz
@@ -215,7 +215,7 @@ def obs_tesseract(path: Path) -> list[dict]:
     # NB the liveness assert below is not defensive boilerplate — see L0009.
     from PIL import Image
 
-    from attest.figures_map import tesseract_tsv_to_observations
+    from cairn.figures_map import tesseract_tsv_to_observations
     w, h = Image.open(path).size
     r = subprocess.run(["tesseract", str(path), "stdout", "--psm", "11", "tsv"],
                        capture_output=True)
@@ -230,7 +230,7 @@ def obs_rapidocr(path: Path) -> list[dict]:
     import numpy as np
     from PIL import Image
 
-    from attest.figures_map import rapidocr_result_to_observations
+    from cairn.figures_map import rapidocr_result_to_observations
     img = Image.open(path).convert("RGB")
     result, _ = _RAPID_SINGLETON[0](np.array(img))
     return rapidocr_result_to_observations(result, img.size[0], img.size[1])
@@ -380,7 +380,7 @@ def derive(observations: list[dict], recited: set[str] | None = None) -> dict:
                 # figures view can draw a confirmation box around the located numeral.
                 "x": o["x"], "y": o["y"], "w": o["w"], "h": o["h"],
             })
-    from attest.figures_map import (
+    from cairn.figures_map import (
         drop_strobogrammatic_twins,
         gate_rotated_numerals,
         merge_same_spot_numerals,
@@ -411,7 +411,7 @@ def marker_band_rescue(path: Path, letters: set[str]) -> list[dict]:
     Exact-token acceptance only (a lone letter is too noisy as a substring)."""
     from PIL import Image
 
-    from attest.figures_map import tesseract_tsv_to_observations
+    from cairn.figures_map import tesseract_tsv_to_observations
     img = Image.open(path)
     W, H = img.size
     bands = {"left": (0, 0, int(0.20 * W), H), "right": (int(0.80 * W), 0, W, H),
@@ -454,7 +454,7 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
     (D28/D10); the text prediction resolves many of them — and any it CANNOT recover
     stays flagged, a stronger signal that it needs a human eye.
     """
-    from attest.figures_map import (
+    from cairn.figures_map import (
         drop_fragment_hits,
         fig_to_sheets,
         is_fragment,
@@ -464,8 +464,8 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
         numeral_sightings,
         numeral_text_figures,
     )
-    from attest.ingest import DocumentStore
-    from attest.patents import (
+    from cairn.ingest import DocumentStore
+    from cairn.patents import (
         acronym_labels,
         dimension_labels,
         figure_references,
@@ -473,7 +473,7 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
         parse_figures,
         reference_numerals,
     )
-    from attest.spans import SpanStore
+    from cairn.spans import SpanStore
 
     text = SpanStore.from_store(DocumentStore(store)).get_document(doc)
     refs = figure_references(text)
@@ -487,7 +487,7 @@ def confirm_pass(pages: list[dict], store: str, doc: str, fig_dir: Path) -> int:
     # predicted: numeral → figures the spec discusses it near; keep those the first
     # pass did NOT already place on that figure's sheet.
     want_per_page: dict[int, set[str]] = {}
-    from attest.figures_map import sub_figure_parent, view_marker_letters
+    from cairn.figures_map import sub_figure_parent, view_marker_letters
     labels = [lbl for lbl in ([n.number for n in reference_numerals(text)]
                               + acronym_labels(text) + dimension_labels(text))
               if is_locatable(lbl)]           # sub-10 are text-only by policy (D30)
@@ -588,8 +588,8 @@ def main() -> int:
     # The spec's recited numerals corroborate rotated-only reads (D32 gate).
     recited: set[str] = set()
     if ns.doc:
-        from attest.ingest.store import DocumentStore
-        from attest.patents import reference_numerals
+        from cairn.ingest.store import DocumentStore
+        from cairn.patents import reference_numerals
         _doc = DocumentStore(Path(ns.store)).load(ns.doc)
         recited = {n.number for n in reference_numerals(_doc.canonical_text)}
         print(f"spec recites {len(recited)} numerals (corroborates rotated reads — D32)")

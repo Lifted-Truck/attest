@@ -5,7 +5,7 @@ the answer token appears. "What color is the wheel well?" → citing `red` is
 worthless unless the cited span also carries `wheel well` (the connecting clause).
 
 In v1 the **agent** decomposes the query into a typed `QuestionFrame` (it is the
-parser — no extra model needed); ATTEST then does the **deterministic** check:
+parser — no extra model needed); CAIRN then does the **deterministic** check:
 does the cited evidence cover every constraint? This is corpus-agnostic.
 
 Coverage is **necessary, not sufficient** for entailment — negation ("not red"),

@@ -22,7 +22,7 @@ from pathlib import Path
 
 from .document import Document, make_document
 
-SEC_USER_AGENT = os.environ.get("SEC_USER_AGENT", "ATTEST research contact@example.com")
+SEC_USER_AGENT = os.environ.get("SEC_USER_AGENT", "CAIRN research contact@example.com")
 
 # Filing registry. Each entry is fully self-describing provenance for one document.
 FILINGS: dict[str, dict] = {

@@ -22,16 +22,16 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
-from attest.evidence_view import Interaction, render_evidence_view
-from attest.ingest import DocumentStore
-from attest.patents import (
+from cairn.evidence_view import Interaction, render_evidence_view
+from cairn.ingest import DocumentStore
+from cairn.patents import (
     check_dependencies,
     map_claim_support,
     parse_claims,
     parse_paragraphs,
 )
-from attest.spans import SpanStore
-from attest.verify import Answer, AtomBinding, Sentence, verify
+from cairn.spans import SpanStore
+from cairn.verify import Answer, AtomBinding, Sentence, verify
 
 
 def main() -> int:
@@ -77,7 +77,7 @@ def main() -> int:
                        "review (a retrieval gap, not a written-description/validity conclusion).",
                 trace="no spec paragraph cleared the support floor"))
 
-    title = f"ATTEST — {ns.doc} · claim {claim.number} support ({claim.kind})"
+    title = f"CAIRN — {ns.doc} · claim {claim.number} support ({claim.kind})"
     Path(ns.out).write_text(render_evidence_view(interactions, store, title=title),
                             encoding="utf-8")
     print(f"claim {claim.number} ({claim.kind}): {len(mapping)} limitations, "

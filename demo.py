@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""demo.py — a guided tour of ATTEST in its current (M0) form.
+"""demo.py — a guided tour of CAIRN in its current (M0) form.
 
 Walks a non-specialist through the one promise the system makes — *ground or
 abstain, never invent* — on real questions over Apple's FY2024 10-K. For each
 question it shows what the deterministic evidence layer did: the grounded answer
 with its verbatim source span, or a structured refusal that shows it looked and
-where. The reasoning shown here is the audition rig (attest_rig.py); at M2+ the
+where. The reasoning shown here is the audition rig (cairn_rig.py); at M2+ the
 Claude Code agent drafts the prose, calling the same deterministic tools.
 
 Run:  python demo.py
-Full 20-item gate metrics:  python attest_rig.py
+Full 20-item gate metrics:  python cairn_rig.py
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import re
 
-import attest_rig as rig
+import cairn_rig as rig
 
 W = 78
 SHOWCASE = [
@@ -61,7 +61,7 @@ def main() -> int:
         return f"{src['ticker']} {src['form']} {src['period_of_report']} · {sec}"
 
     print("═" * W)
-    print("  ATTEST — grounded retrieval demo".ljust(W))
+    print("  CAIRN — grounded retrieval demo".ljust(W))
     print(f"  Corpus: {src['company']} {src['form']} (FY ended {src['period_of_report']}), "
           f"accession {src['accession']}".ljust(W))
     print(f"  {len(spans)} source spans indexed · deterministic, no runtime model calls".ljust(W))
@@ -114,7 +114,7 @@ def main() -> int:
     print("  On this 20-item golden set (Apple FY2024 10-K, seeded, no model calls):")
     print("  every citation resolved at its offset and hash-matched, and every")
     print("  unanswerable question was refused. Measured on one corpus — not a")
-    print("  general accuracy claim. (python attest_rig.py)")
+    print("  general accuracy claim. (python cairn_rig.py)")
     print("═" * W)
     return 0
 

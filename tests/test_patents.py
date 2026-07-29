@@ -6,10 +6,10 @@ synthetic sample patent so it is hermetic and free of confidentiality/copyright.
 
 from pathlib import Path
 
-from attest.ingest import DocumentStore
-from attest.ingest.files import ingest_paths
-from attest.patents import parse_claims
-from attest.spans import SpanStore
+from cairn.ingest import DocumentStore
+from cairn.ingest.files import ingest_paths
+from cairn.patents import parse_claims
+from cairn.spans import SpanStore
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / "corpus" / "samples" / "sample_patent.txt"
@@ -52,7 +52,7 @@ def test_no_claims_section_returns_empty():
 
 
 def test_decompose_independent_claim_into_limitations():
-    from attest.patents import decompose_claim
+    from cairn.patents import decompose_claim
     claims = parse_claims(_text())
     lims = decompose_claim(claims[0])               # claim 1: comprising + 2 semicolons
     assert [lim.text for lim in lims] == [
@@ -66,7 +66,7 @@ def test_decompose_independent_claim_into_limitations():
 
 
 def test_dependent_wherein_is_one_limitation():
-    from attest.patents import decompose_claim
+    from cairn.patents import decompose_claim
     claims = parse_claims(_text())
     lims = decompose_claim(claims[1])               # "...wherein the sprocket comprises titanium"
     assert len(lims) == 1
@@ -74,7 +74,7 @@ def test_dependent_wherein_is_one_limitation():
 
 
 def test_limitations_resolve_through_the_span_store(tmp_path):
-    from attest.patents import decompose_claim
+    from cairn.patents import decompose_claim
     store_dir = tmp_path / "store"
     ingest_paths([str(SAMPLE)], store_dir, kind="patent")
     store = SpanStore.from_store(DocumentStore(store_dir))
@@ -85,7 +85,7 @@ def test_limitations_resolve_through_the_span_store(tmp_path):
 
 
 def test_parse_paragraphs_uses_native_numbering():
-    from attest.patents import parse_paragraphs
+    from cairn.patents import parse_paragraphs
     paras = parse_paragraphs(_text())                       # synthetic has [0001]–[0006]
     assert [p.label for p in paras] == ["[0001]", "[0002]", "[0003]",
                                         "[0004]", "[0005]", "[0006]"]
@@ -97,7 +97,7 @@ def test_parse_paragraphs_uses_native_numbering():
 
 
 def test_paragraphs_resolve_through_the_span_store(tmp_path):
-    from attest.patents import parse_paragraphs
+    from cairn.patents import parse_paragraphs
     store_dir = tmp_path / "store"
     ingest_paths([str(SAMPLE)], store_dir, kind="patent")
     store = SpanStore.from_store(DocumentStore(store_dir))
@@ -108,7 +108,7 @@ def test_paragraphs_resolve_through_the_span_store(tmp_path):
 
 def test_support_mapping_links_limitation_to_spec_paragraph():
     """PE-3: claim 2's titanium limitation maps to the spec paragraph that describes it."""
-    from attest.patents import map_claim_support, parse_paragraphs
+    from cairn.patents import map_claim_support, parse_paragraphs
     text = _text()
     claims = parse_claims(text)
     paras = parse_paragraphs(text)
@@ -121,7 +121,7 @@ def test_support_mapping_links_limitation_to_spec_paragraph():
 
 
 def test_support_edges_are_addressable(tmp_path):
-    from attest.patents import map_claim_support, parse_paragraphs
+    from cairn.patents import map_claim_support, parse_paragraphs
     store_dir = tmp_path / "store"
     ingest_paths([str(SAMPLE)], store_dir, kind="patent")
     store = SpanStore.from_store(DocumentStore(store_dir))
@@ -134,12 +134,12 @@ def test_support_edges_are_addressable(tmp_path):
 
 
 def test_dependency_integrity_clean_patent_has_no_issues():
-    from attest.patents import check_dependencies
+    from cairn.patents import check_dependencies
     assert check_dependencies(parse_claims(_text())) == []   # synthetic is well-formed
 
 
 def test_dependency_integrity_flags_missing_and_forward_refs():
-    from attest.patents import Claim, check_dependencies
+    from cairn.patents import Claim, check_dependencies
     claims = [
         Claim(1, "1. A device.", 0, 12, "independent", None),
         Claim(2, "2. The device of claim 9, …", 13, 40, "dependent", 9),    # missing
@@ -156,7 +156,7 @@ def test_dependency_integrity_flags_missing_and_forward_refs():
 
 
 def test_front_matter_parses_the_synthetic_fixture():
-    from attest.patents import effective_filing, parse_front_matter, regime_flag
+    from cairn.patents import effective_filing, parse_front_matter, regime_flag
     fm = parse_front_matter(_text())
     assert fm.application_number == "17/000,000"
     assert fm.filed == "Mar. 15, 2021"
@@ -173,7 +173,7 @@ def test_front_matter_parses_the_synthetic_fixture():
 def test_front_matter_parses_the_real_patent(tmp_path):
     import pathlib
 
-    from attest.patents import parse_front_matter, regime_flag
+    from cairn.patents import parse_front_matter, regime_flag
     real = pathlib.Path("corpus/engagements/US5447630A/US5447630A.txt")
     if not real.exists():
         import pytest as _pytest
@@ -191,7 +191,7 @@ def test_front_matter_parses_the_real_patent(tmp_path):
 
 
 def test_parse_figures_reads_the_drawings_captions():
-    from attest.patents import parse_figures
+    from cairn.patents import parse_figures
     text = _text()
     figs = parse_figures(text)
     assert [f.label for f in figs] == ["FIG. 1", "FIG. 2"]
@@ -203,7 +203,7 @@ def test_parse_figures_reads_the_drawings_captions():
 
 
 def test_figure_references_carry_offsets():
-    from attest.patents import figure_references
+    from cairn.patents import figure_references
     text = _text()
     refs = figure_references(text)
     assert {r.number for r in refs} == {"1", "2"}        # FIG.1 (×2) + FIG.2
@@ -213,7 +213,7 @@ def test_figure_references_carry_offsets():
 
 
 def test_reference_numerals_map_number_to_element():
-    from attest.patents import reference_numerals
+    from cairn.patents import reference_numerals
     nums = {n.number: n.element for n in reference_numerals(_text())}
     assert set(nums) == {"100", "12", "14", "10"}                # the four ≥10 numerals
     assert "device" in nums["100"] and "housing" in nums["10"]
@@ -224,7 +224,7 @@ def test_reference_numerals_ignore_claim_noise_without_a_magnitude_floor():
     """Claim references ('of claim 1/2/4') are excluded STRUCTURALLY — by scanning the
     specification only — not by a minimum-numeral guess. The fixture's claims recite
     "of claim 1/2/4", none of which may appear as numerals."""
-    from attest.patents import parse_claims, reference_numerals
+    from cairn.patents import parse_claims, reference_numerals
     text = _text()
     nums = {n.number: n.element for n in reference_numerals(text)}
     claim_starts = {c.char_start for c in parse_claims(text)}
@@ -244,7 +244,7 @@ def test_single_digit_reference_numerals_are_kept():
     if not real.exists():
         import pytest as _pytest
         _pytest.skip("engagement corpus not present (local-only)")
-    from attest.patents import reference_numerals
+    from cairn.patents import reference_numerals
     nums = {n.number: n.element for n in reference_numerals(real.read_text(encoding="utf-8"))}
     assert "bathtub" in nums["1"] and "toilet" in nums["2"]
     assert "dishwasher" in nums["4"] and "clothes washer" in nums["5"]
@@ -253,7 +253,7 @@ def test_single_digit_reference_numerals_are_kept():
 def test_reference_numerals_reject_decimals_and_quantities():
     """A decimal ("measured as 0.24 mg/l") is not numeral 0; a quantity with a unit
     ("400 W", "60 degrees") is a measurement, not a pointer into a drawing."""
-    from attest.patents import reference_numerals
+    from cairn.patents import reference_numerals
     sample = ("The chlorine residual has been measured as 0.24 mg/l in the tank 42. "
               "The magnetron 44 draws 400 W and the chamber holds 60 degrees.")
     nums = {n.number: n.element for n in reference_numerals(sample)}
@@ -263,7 +263,7 @@ def test_reference_numerals_reject_decimals_and_quantities():
 
 
 def test_figure_and_numeral_spans_resolve_through_the_span_store(tmp_path):
-    from attest.patents import parse_figures, reference_numerals
+    from cairn.patents import parse_figures, reference_numerals
     store_dir = tmp_path / "store"
     ingest_paths([str(SAMPLE)], store_dir, kind="patent")
     store = SpanStore.from_store(DocumentStore(store_dir))
@@ -283,7 +283,7 @@ def test_figures_validate_on_the_real_patent():
     if not real.exists():
         import pytest as _pytest
         _pytest.skip("engagement corpus not present (local-only)")
-    from attest.patents import parse_figures, reference_numerals
+    from cairn.patents import parse_figures, reference_numerals
     t = real.read_text(encoding="utf-8")
     labels = [f.label for f in parse_figures(t)]
     # the caption block yields 1/2/4/5/6; sub-figures 3A-3C share one caption
@@ -302,7 +302,7 @@ def test_figure_reference_letter_range_expands():
     """Regression (D28 work): "FIGS. 3 A-C" (US5447630A's own caption style) must
     expand to 3A/3B/3C — an earlier regex read it as a phantom bare "3", which
     blocked the FIG→sheet elimination."""
-    from attest.patents import figure_references
+    from cairn.patents import figure_references
     refs = figure_references("as shown in FIGS. 3 A-C are respective views; see FIG. 4.")
     assert [r.number for r in refs] == ["3A", "3B", "3C", "4"]
     assert "3" not in {r.number for r in refs}
@@ -311,7 +311,7 @@ def test_figure_reference_letter_range_expands():
 def test_letter_suffixed_reference_numerals_are_distinct():
     """Julian's case: "12a" is a DIFFERENT part from "12". Collapsing the suffix
     reports 12 present and 12a missing — both wrong."""
-    from attest.patents import reference_numerals
+    from cairn.patents import reference_numerals
     sample = ("the housing 12 supports a bracket 12a and a clamp 12b; "
               "the arm 14 carries a pin 14a.")
     nums = {n.number: n.element for n in reference_numerals(sample)}
@@ -321,7 +321,7 @@ def test_letter_suffixed_reference_numerals_are_distinct():
 
 def test_numeral_key_orders_naturally():
     """9 < 10 < 12 < 12a < 12b, and a non-numeric label sorts after the numbered."""
-    from attest.patents import numeral_key
+    from cairn.patents import numeral_key
     labels = ["12b", "10", "STM", "9", "12", "12a"]
     assert sorted(labels, key=numeral_key) == ["9", "10", "12", "12a", "12b", "STM"]
 
@@ -331,7 +331,7 @@ def test_acronym_labels_are_candidates_from_the_spec():
     be digits-only. Candidates come from the spec and need >=2 mentions; figure
     syntax and unit abbreviations are excluded. The DRAWINGS then adjudicate — a
     candidate that is really prose simply isn't found as a label."""
-    from attest.patents import acronym_labels
+    from cairn.patents import acronym_labels
     spec = ("The solid treatment module STM feeds the liquid treatment module LTM. "
             "The STM houses a central processing unit CPU; the CPU drives it. "
             "The LTM is PVC. See FIG. 1 and FIGS. 2-3. Airflow is 300 CFM.")
@@ -348,7 +348,7 @@ def test_acronym_labels_are_candidates_from_the_spec():
 def test_label_pattern_numeric_vs_acronym():
     import re
 
-    from attest.figures_map import label_pattern
+    from cairn.figures_map import label_pattern
     assert re.search(label_pattern("STM"), "the STM feeds")          # word-boundary
     assert not re.search(label_pattern("STM"), "the STMX feeds")     # not a prefix
     assert re.search(label_pattern("12"), "housing 12.")             # sentence-final ok
@@ -359,7 +359,7 @@ def test_label_pattern_numeric_vs_acronym():
 def test_list_sibling_numerals_inherit_the_head_element():
     """"pipes 56, 58" recites BOTH: 58 has no noun phrase of its own (it was
     invisible to the extractor — US5447630A's 58 appears only in lists)."""
-    from attest.patents import reference_numerals
+    from cairn.patents import reference_numerals
     nums = {n.number: n.element for n in reference_numerals(
         "The liquid pipes 56, 58 then feed the drain manifolds 96, 98 below.")}
     assert "56" in nums and "58" in nums
@@ -372,7 +372,7 @@ def test_acronym_labels_have_no_frequency_floor():
     US5447630A defines "CZ" (cooling zone) and "CL" (center line) exactly once each
     and both are plainly drawn. The DRAWINGS are the filter: a prose-only candidate
     is simply never found on a sheet and costs nothing."""
-    from attest.patents import acronym_labels
+    from cairn.patents import acronym_labels
     spec = ("The shaded region CZ represents a cooling zone. "
             "CL designates the center line. See FIG. 1. Airflow is 300 CFM.")
     got = acronym_labels(spec)
@@ -384,7 +384,7 @@ def test_dimension_labels_are_their_own_class():
     """D1-D6 are letter-PREFIXED (so the numeral pattern rejects them — L0005) but
     they are real, spec-recited labels: "the respective dimensions D1-D6 can be as
     follows: D1 3.25\"…". They belong in the model as a distinct class."""
-    from attest.patents import dimension_labels, reference_numerals
+    from cairn.patents import dimension_labels, reference_numerals
     spec = ('CL designates the center line, and the respective dimensions D1-D6 can '
             'be as follows: D1 3.25" D2 1.50" D6 3.50". The valve 34 is shown.')
     dims = dimension_labels(spec)
@@ -397,7 +397,7 @@ def test_dimension_labels_are_their_own_class():
 def test_element_phrase_may_end_in_punctuation():
     """"…garbage disposal) 3, dishwasher 4" recites 3 — a bracket between the noun
     and the numeral was hiding sub-10 labels entirely."""
-    from attest.patents import reference_numerals
+    from cairn.patents import reference_numerals
     nums = {n.number for n in reference_numerals(
         "a sink (with a garbage disposal) 3, dishwasher 4 and clothes washer 5.")}
     assert {"3", "4", "5"} <= nums
@@ -406,7 +406,7 @@ def test_element_phrase_may_end_in_punctuation():
 def test_figures_sort_with_sub_figures_beside_their_parent():
     """3A/3B/3C must sit right after 2, not at the end (they are emitted from
     references, after the caption block, so the list needs a natural sort)."""
-    from attest.patents import numeral_key, parse_figures
+    from cairn.patents import numeral_key, parse_figures
     text = ("FIG. 1 is a schematic; FIG. 2 is a perspective view; FIGS. 3 A-C are "
             "respective views of FIG. 2; FIG. 4 is a separator; FIG. 10 is a chart.")
     assert [f.number for f in parse_figures(text)] == ["1", "2", "3A", "3B", "3C", "4", "10"]
@@ -420,7 +420,7 @@ def test_four_digit_and_uppercase_suffix_numerals_are_expressible():
     the coverage report reads clean over an empty map. Worse, "12A" fell through the
     lowercase-only suffix and matched as bare "12" — binding a DISTINCT part to its
     base numeral's span, on the path where grounding actually binds (I1)."""
-    from attest.patents import reference_numerals
+    from cairn.patents import reference_numerals
     got = {n.number: n.element for n in
            reference_numerals("The controller 1002 drives the bus 1010.")}
     assert set(got) == {"1002", "1010"}
@@ -434,7 +434,7 @@ def test_quantities_are_not_bound_as_reference_numerals():
     """D34: "at temperatures exceeding 500" bound 500 as a part whose element phrase
     was "at temperatures exceeding". A part is never named "with" or "exceeding", so
     those join the function-word class that already blocks "at"/"of"/"between"."""
-    from attest.patents import reference_numerals
+    from cairn.patents import reference_numerals
     text = ("The reactor operates at temperatures exceeding 500 and with 150 "
             "at temperatures below 220.")
     assert reference_numerals(text) == []

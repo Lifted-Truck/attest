@@ -8,7 +8,7 @@ accuracy = 1.0 on unanswerable items, and no false abstentions.
 
 import json
 
-import attest_rig as rig
+import cairn_rig as rig
 import pytest
 
 

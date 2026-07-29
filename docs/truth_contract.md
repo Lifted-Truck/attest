@@ -1,4 +1,4 @@
-# ATTEST — the truth contract
+# CAIRN — the truth contract
 
 **Version: 1.2** · governed by [`ROADMAP.md`](../ROADMAP.md) decision **D21**.
 
@@ -8,7 +8,7 @@
 | 1.1 | 2026-06-30 | Outcome honesty refined (D22): **refuse-to-adjudicate** becomes a first-class fifth outcome, distinct from `abstain` — the evidence may be *present*; the legal conclusion is declined (UPL boundary). Scored separately at Layer-E (`refusal_accuracy`); rendered distinctly. | strengthening → minor |
 | 1.0 | 2026-06-29 | Initial declaration (D21). | — |
 
-This is the single, declared statement of what ATTEST guarantees about anything it
+This is the single, declared statement of what CAIRN guarantees about anything it
 asserts — and how each guarantee is enforced or measured. It exists so that
 **epistemic rigor can be raised over time without a rewrite and without silently
 breaking what past outputs promised.** When the guarantees change, *this document's
@@ -17,9 +17,9 @@ version changes*, and outputs are stamped with the version they were produced un
 
 ## The cardinal guarantee
 
-> **Ground or abstain — never invent.** Every load-bearing claim ATTEST presents is
+> **Ground or abstain — never invent.** Every load-bearing claim CAIRN presents is
 > bound to a verifiable source span, or it is not presented. When the evidence is
-> absent or doesn't answer the question, ATTEST **abstains, corrects, or partials**
+> absent or doesn't answer the question, CAIRN **abstains, corrects, or partials**
 > (D16) — it does not fabricate.
 
 Everything below is the machinery that makes that guarantee real and checkable.
@@ -83,7 +83,7 @@ harness; the harness decides what is real.
 | Component | Seam | Upgrades it absorbs |
 |---|---|---|
 | retrieval | `RetrievalBackend` Protocol | embeddings, rerankers, hybrid fusion |
-| support floor | `calibrate_threshold` (D20), `ATTEST_SUPPORT_THRESHOLD` | better calibration; per-corpus / per-engagement floors |
+| support floor | `calibrate_threshold` (D20), `CAIRN_SUPPORT_THRESHOLD` | better calibration; per-corpus / per-engagement floors |
 | verify math | the derived-op set (D18/D19) | new operations (kept pure, recompute-from-cited) |
 | entailment | the injected judge (`ask`) | better judges; later, a formal entailment provider |
 | corpus | the ingestion adapter (`edgar.py`, `patents.py`) | new corpora / domain packs |
@@ -97,7 +97,7 @@ versions**:
 - `check_support` / `check_claim` → `{contract, retrieval, threshold}`
 - `verify` → `{contract, verify_ops}`
 
-`contract` is the version of *this* document ([`attest.contract.CONTRACT_VERSION`](../src/attest/contract.py)).
+`contract` is the version of *this* document ([`cairn.contract.CONTRACT_VERSION`](../src/cairn/contract.py)).
 Replay reads the recorded floor (not the default), so a record made under a
 per-engagement threshold reproduces byte-identically (I6). The evidence view renders
 the line — e.g. *"truth-contract v1.0 · retrieval bm25 · floor 15 · verify-ops 1"*.

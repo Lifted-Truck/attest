@@ -1,11 +1,11 @@
-"""CLI mirror of the ATTEST tools (ROADMAP M4-T1).
+"""CLI mirror of the CAIRN tools (ROADMAP M4-T1).
 
-`python -m attest list` enumerates the tools; `python -m attest call <tool> <json>`
+`python -m cairn list` enumerates the tools; `python -m cairn call <tool> <json>`
 invokes one. Same registry as the MCP server, so the two interfaces can't drift.
 
-    python -m attest list
-    python -m attest call get_span '{"doc_id":"AAPL-10K-FY2024","start":139998,"end":140030}'
-    python -m attest call check_support '{"query":"How much term debt does Apple carry?"}'
+    python -m cairn list
+    python -m cairn call get_span '{"doc_id":"AAPL-10K-FY2024","start":139998,"end":140030}'
+    python -m cairn call check_support '{"query":"How much term debt does Apple carry?"}'
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from .tools import default_registry
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="attest", description="ATTEST grounded-retrieval tools")
+    p = argparse.ArgumentParser(prog="cairn", description="CAIRN grounded-retrieval tools")
     p.add_argument("--store", default="corpus/store", help="document store dir")
     p.add_argument("--audit", default=None, help="audit log path (enables get_audit_log)")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if ns.tool not in registry:
-        print(f"unknown tool: {ns.tool!r}; try `attest list`", file=sys.stderr)
+        print(f"unknown tool: {ns.tool!r}; try `cairn list`", file=sys.stderr)
         return 2
     result = registry[ns.tool].handler(json.loads(ns.args))
     print(json.dumps(result, indent=2, ensure_ascii=False))

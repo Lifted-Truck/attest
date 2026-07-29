@@ -1,11 +1,11 @@
 {
   "mcpServers": {
-    "attest": {
+    "cairn": {
       "command": ".venv/bin/python",
-      "args": ["-m", "attest.mcp_server"],
+      "args": ["-m", "cairn.mcp_server"],
       "env": {
-        "ATTEST_STORE": "corpus/store",
-        "ATTEST_AUDIT": "audit_log/agent.jsonl"
+        "CAIRN_STORE": "corpus/store",
+        "CAIRN_AUDIT": "audit_log/agent.jsonl"
       }
     }
   }

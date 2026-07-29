@@ -11,10 +11,10 @@ from pathlib import Path
 
 import pytest
 
-from attest.ingest import DocumentStore
-from attest.layer_e import expected_outcome
-from attest.retrieval import Retriever
-from attest.spans import SpanStore
+from cairn.ingest import DocumentStore
+from cairn.layer_e import expected_outcome
+from cairn.retrieval import Retriever
+from cairn.spans import SpanStore
 
 ROOT = Path(__file__).resolve().parent.parent
 GOLDEN = ROOT / "golden_patent.json"
@@ -63,7 +63,7 @@ def test_supporting_quotes_resolve(golden, store):
 
 def test_support_expectations_hold(golden, store):
     """PE-3 golden: each named claim limitation maps to the expected spec paragraph."""
-    from attest.patents import decompose_claim, map_claim_support, parse_claims, parse_paragraphs
+    from cairn.patents import decompose_claim, map_claim_support, parse_claims, parse_paragraphs
 
     text = store.get_document(DOC)
     claims = {c.number: c for c in parse_claims(text)}
@@ -85,7 +85,7 @@ def test_support_expectations_hold(golden, store):
 def test_calibrator_runs_on_the_patent_golden(golden, store):
     """D20 on the patent set: the calibrator fits a floor and reports the separation
     honestly (overlap allowed — that is a finding about BM25 here, not a failure)."""
-    from attest.support import calibrate_threshold
+    from cairn.support import calibrate_threshold
 
     c = calibrate_threshold(golden["items"], Retriever(store))
     assert 0.0 < c.threshold < 30.0
@@ -101,7 +101,7 @@ def test_ratified_labels_are_frozen(golden):
     manifest) does not. This runs in the Layer-0 CI gate (no store needed), so a
     silent oracle edit fails the build — you must re-ratify (new decision + re-stamp).
     """
-    from attest.layer_e import ratified_manifest_sha256
+    from cairn.layer_e import ratified_manifest_sha256
 
     r = golden.get("ratified")
     assert r, "golden_patent.json is ratified — a `ratified` block must be present"

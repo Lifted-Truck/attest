@@ -38,7 +38,7 @@ from ocr_patent_figures import (
     marker_band_rescue,
 )
 
-from attest.figures_map import load_manifest, merge_same_spot_numerals
+from cairn.figures_map import load_manifest, merge_same_spot_numerals
 
 # What counts as a candidate LABEL on a drawing: a reference numeral (digits + an
 # optional letter suffix), an acronym (STM/LTM/CPU/CL), or a lone view/section letter.

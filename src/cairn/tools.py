@@ -1,4 +1,4 @@
-"""ATTEST tool registry (ROADMAP M4-T1/M4-T2, brief §5).
+"""CAIRN tool registry (ROADMAP M4-T1/M4-T2, brief §5).
 
 The single source of truth for the tools Claude Code calls — shared by both the
 MCP server (`mcp_server.py`) and the CLI mirror (`cli.py`), so the two interfaces

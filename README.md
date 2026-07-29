@@ -1,8 +1,8 @@
-# ATTEST
+# CAIRN
 
 > *An AI agent that answers questions and runs tasks over your documents where every claim is traceable to its source, it refuses to answer when the evidence isn't there, and a test suite proves it.*
 
-ATTEST (*to bear witness; to certify as true*) is a grounded-retrieval system whose
+CAIRN (*to bear witness; to certify as true*) is a grounded-retrieval system whose
 cardinal rule is **ground or abstain — never invent.** Every assertion it makes is bound
 to a verifiable source span, or it is not made; where the evidence isn't there, it returns
 a structured refusal instead of a guess.
@@ -22,7 +22,7 @@ The honest, defensible claim — and it is deliberately precise:
 That is stronger in practice than a vague "no hallucinations," because it is a promise that
 can be kept and tested. The split between what is **guaranteed** and what is **measured**:
 
-| | Deterministic — ATTEST guarantees it at runtime | A model judgment — measured offline, not enforced at runtime in v1 |
+| | Deterministic — CAIRN guarantees it at runtime | A model judgment — measured offline, not enforced at runtime in v1 |
 |---|---|---|
 | **What** | Span resolution (quote exists verbatim, exactly once, hash-matched), retrieval, abstention *trigger* | **Entailment** — does the cited span actually *support* the claim? |
 | **How** | String + hash ops, seeded; CI-gated | Scored by the eval judge (LLM-as-judge); the v2/API design pulls it inline |
@@ -38,7 +38,7 @@ looked and where:
 
 ```bash
 python demo.py                       # narrated tour of seven representative questions
-python attest_rig.py                 # the full 20-item gate: precision, hallucination, abstention
+python cairn_rig.py                 # the full 20-item gate: precision, hallucination, abstention
 python scripts/build_evidence_view.py && open evidence_view.html   # the GUI
 ```
 
@@ -61,13 +61,13 @@ abstention guards are documented stand-ins for the agent's reasoning until then.
 
 ## Runtime model — v1 is a Claude Code tool, not an API service
 
-ATTEST ships as a set of **deterministic tools** (an MCP server + a CLI mirror) that
-**Claude Code invokes during a session**. The reasoner *is* the Claude Code agent; ATTEST
+CAIRN ships as a set of **deterministic tools** (an MCP server + a CLI mirror) that
+**Claude Code invokes during a session**. The reasoner *is* the Claude Code agent; CAIRN
 makes **no model calls of its own** at runtime. The agent composes prose from returned
-spans; ATTEST provides the deterministic machinery plus a mandatory **verify + log** step
+spans; CAIRN provides the deterministic machinery plus a mandatory **verify + log** step
 the agent is bound to call before presenting an answer.
 
-Because the agent sits *above* ATTEST and calls it, ATTEST cannot structurally intercept the
+Because the agent sits *above* CAIRN and calls it, CAIRN cannot structurally intercept the
 agent's free text (as the deferred v2/API design would). The guarantee instead comes from
 (a) deterministic tools and (b) the verify-and-log step — an honest weakening, and the
 reason the eval harness measures end-to-end compliance.
@@ -83,7 +83,7 @@ Non-negotiable; each maps to a test in the oracle. A PR that violates one does n
 - **I3 — Verified immutability of source.** Documents are content-hashed at ingest; spans reference immutable offsets; any drift is a hard failure.
 - **I4 — Read/write asymmetry.** The corpus is read-only to the agent. The only writable surface is the append-only audit log.
 - **I5 — Append-only audit log.** Every query, retrieval set, answer, citation set, abstention, and confidence is logged immutably and replayably.
-- **I6 — Deterministic evidence layer.** Same corpus + query → reproducible retrieval and span-mapping (seeded). ATTEST makes no runtime model calls, so every tool is a pure deterministic function.
+- **I6 — Deterministic evidence layer.** Same corpus + query → reproducible retrieval and span-mapping (seeded). CAIRN makes no runtime model calls, so every tool is a pure deterministic function.
 
 ## The MCP surface
 
@@ -125,11 +125,11 @@ audit panel showing retrieval + citations + confidence for the last answer.
 
 Single source of truth for status and sequencing is [`ROADMAP.md`](ROADMAP.md); the full
 architecture, invariants, and rationale live in
-[`ATTEST_build_brief.md`](ATTEST_build_brief.md).
+[`CAIRN_build_brief.md`](CAIRN_build_brief.md).
 
 Build order is **M0 → M5**, each milestone gated by the oracle:
 
-- **M0** — Audition rig: prove the risky core cheaply on the 20-item seed. ✅ *gate met — `python attest_rig.py`*
+- **M0** — Audition rig: prove the risky core cheaply on the 20-item seed. ✅ *gate met — `python cairn_rig.py`*
 - **M1** — Ingestion + retrieval + span store (immutable evidence layer). ✅ *I3 hashing, span store + resolution invariant, reproducible retrieval*
 - **M2** — Deterministic `verify` + `check_support`; Layer-0 gate live. ✅ *(Layer-E eval lands with M4)*
 - **M3** — Append-only audit log (replayable; write-asymmetry enforced). ✅
@@ -140,7 +140,7 @@ EDGAR is the architecture-proving **reference build**. The first client engageme
 retargets the system to a **patent refresh-and-update** — a specialization of the same
 corpus-agnostic engine (cardinal rule sharpened to *locate & evidence, never adjudicate*),
 tracked separately in [`ROADMAP.md`](ROADMAP.md) and
-[`ATTEST_Patent_Tailoring_Consideration.md`](ATTEST_Patent_Tailoring_Consideration.md).
+[`CAIRN_Patent_Tailoring_Consideration.md`](CAIRN_Patent_Tailoring_Consideration.md).
 
 **v2 (do not start):** API-wrapped service with inline entailment-gating, action-taking
 tools, multi-corpus, reranker upgrades, larger golden set.

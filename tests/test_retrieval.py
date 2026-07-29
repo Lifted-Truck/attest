@@ -12,9 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from attest.ingest import DocumentStore
-from attest.retrieval import Retriever
-from attest.spans import SpanStore
+from cairn.ingest import DocumentStore
+from cairn.retrieval import Retriever
+from cairn.spans import SpanStore
 
 ROOT = Path(__file__).resolve().parent.parent
 DOC_ID = "AAPL-10K-FY2024"

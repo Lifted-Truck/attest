@@ -1,6 +1,6 @@
 """Standing tests for question-frame constraint coverage (ROADMAP M2-T8, D13)."""
 
-from attest.frame import Constraint, CoverageResult, QuestionFrame, check_coverage
+from cairn.frame import Constraint, CoverageResult, QuestionFrame, check_coverage
 
 
 def _frame(*pairs):

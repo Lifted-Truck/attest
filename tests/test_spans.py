@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from attest.ingest import DocumentStore, HashMismatch
-from attest.ingest.document import Document
-from attest.spans import ResolutionError, SpanError, SpanStore, chunk_document
+from cairn.ingest import DocumentStore, HashMismatch
+from cairn.ingest.document import Document
+from cairn.spans import ResolutionError, SpanError, SpanStore, chunk_document
 
 ROOT = Path(__file__).resolve().parent.parent
 DOC_ID = "AAPL-10K-FY2024"

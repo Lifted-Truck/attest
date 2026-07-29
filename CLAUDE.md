@@ -4,21 +4,21 @@ Guidance for Claude Code working in this repository. Read this before starting a
 
 ## What this project is
 
-ATTEST is a grounded-retrieval system: **ground or abstain — never invent.** Every claim is
+CAIRN is a grounded-retrieval system: **ground or abstain — never invent.** Every claim is
 bound to a verifiable source span or it is not made. v1 ships as **deterministic tools** (an
-MCP server + CLI) that Claude Code invokes — ATTEST makes **no model calls of its own at
+MCP server + CLI) that Claude Code invokes — CAIRN makes **no model calls of its own at
 runtime**. See [`README.md`](README.md) for the value proposition and the precise guarantee,
-and [`ATTEST_build_brief.md`](ATTEST_build_brief.md) for full architecture and rationale.
+and [`CAIRN_build_brief.md`](CAIRN_build_brief.md) for full architecture and rationale.
 
 ## Source-of-truth hierarchy
 
-- [`ATTEST_build_brief.md`](ATTEST_build_brief.md) — architecture, invariants, rationale. **Wins on *design*.**
+- [`CAIRN_build_brief.md`](CAIRN_build_brief.md) — architecture, invariants, rationale. **Wins on *design*.**
 - [`ROADMAP.md`](ROADMAP.md) — status and sequencing. **Wins on *what to do next*.** When the two disagree, that split holds.
 - [`golden_seed.json`](golden_seed.json) — the ground-truth eval set (20 items, Apple FY2024 10-K).
-- [`ATTEST_Patent_Tailoring_Consideration.md`](ATTEST_Patent_Tailoring_Consideration.md) — patent-domain specialization for the **first client engagement**. Provisional; **subordinate to `ROADMAP.md`**. Wins on patent-domain design where it doesn't conflict.
-- [`ATTEST_Client_Intake_Questions.md`](ATTEST_Client_Intake_Questions.md) — the open client decisions. Treat its unresolved items as **DO NOT INVENT** (see ROADMAP D10/§10).
+- [`CAIRN_Patent_Tailoring_Consideration.md`](CAIRN_Patent_Tailoring_Consideration.md) — patent-domain specialization for the **first client engagement**. Provisional; **subordinate to `ROADMAP.md`**. Wins on patent-domain design where it doesn't conflict.
+- [`CAIRN_Client_Intake_Questions.md`](CAIRN_Client_Intake_Questions.md) — the open client decisions. Treat its unresolved items as **DO NOT INVENT** (see ROADMAP D10/§10).
 - [`docs/landscape_lessons.md`](docs/landscape_lessons.md) — external prior art (legal/finance AI failures + category winners) mapped onto our decisions. **Research input, subordinate to ROADMAP; authorizes no work.** Its **CONFIRMS** entries are guardrails — the market already validated those decisions, so don't "fix" them (especially: never soften `verified ≠ entailed`; never let answer-rates dominate the eval headline). Its **CANDIDATE** items go to human triage only.
-- [`docs/rag_extension_discussion.html`](docs/rag_extension_discussion.html) — design discussion (2026-07-22): extending ATTEST toward RAG (embeddings, chunking, contextual retrieval) for larger corpora. **Design input, authorizes no work.** Standing conclusion: the guarantee lives at `verify`/grounding (downstream of retrieval), so RAG is a retrieval-backend swap that doesn't touch the contract — EXCEPT it needs a ruling on I6's literal 'no runtime model calls' (query embedding). Awaits Julian's Decisions 1-3.
+- [`docs/rag_extension_discussion.html`](docs/rag_extension_discussion.html) — design discussion (2026-07-22): extending CAIRN toward RAG (embeddings, chunking, contextual retrieval) for larger corpora. **Design input, authorizes no work.** Standing conclusion: the guarantee lives at `verify`/grounding (downstream of retrieval), so RAG is a retrieval-backend swap that doesn't touch the contract — EXCEPT it needs a ruling on I6's literal 'no runtime model calls' (query embedding). Awaits Julian's Decisions 1-3.
 - [`docs/provability_research.md`](docs/provability_research.md) — the provability/veridicality swarm synthesis (2026-07-16): can refuted-in-context citations be caught deterministically? **Research input, same status as the landscape doc: subordinate to ROADMAP; authorizes no work.** Its candidate rows **D24–D27** await human triage. Standing conclusions once triaged: the assertion/denial distinction is pragmatic (cue-less refutation is permanently invisible to deterministic checks); Gödel–Löb and general FOL entailment are inapplicable — don't re-litigate them.
 
 ## Two corpora: EDGAR (reference) + patents (client)
@@ -53,9 +53,9 @@ or definitive claim construction (a patent professional is in the loop; UPL boun
 
 - **Dev install:** `pip install -e ".[dev]"` (ruff + pytest). Optional MCP server: `pip install -e ".[mcp]"`.
 - **The gate:** `pytest -m layer0` — the blocking Layer-0 deterministic evals ([`docs/layer0_gate.md`](docs/layer0_gate.md)); fast, seeded, **no model calls**. CI = `ruff check .` + this.
-- **Scripts** run with plain `python scripts/<x>.py` from the repo root (they bootstrap `src/`). The **CLI** needs the install: `attest list` / `attest call <tool> '<json>'`.
+- **Scripts** run with plain `python scripts/<x>.py` from the repo root (they bootstrap `src/`). The **CLI** needs the install: `cairn list` / `cairn call <tool> '<json>'`.
 - **Committed artifacts:** corpus at `corpus/store/` (regen: `python scripts/ingest_corpus.py`); golden quotes bound by `scripts/resolve_golden_quotes.py`; the review GUI via `python scripts/build_evidence_view.py` → `evidence_view.html`.
-- **Module map** (`src/attest/`): `ingest/` = Document + content-hash (I3), `DocumentStore`, **`edgar.py` (the only corpus-specific file)**; `spans.py` = char-offset spans + resolution invariant (D7); `retrieval.py` = BM25 (I6); `support.py` = `check_support` / abstention (I2, D12); `verify.py` = atom resolver (D9/I1); `frame.py` = question frame + coverage (D13); `audit.py` = append-only log (I5); `session.py` = record/replay; `tools.py`/`cli.py`/`mcp_server.py` = the MCP+CLI surface; `evidence_view.py` = the review GUI. `attest_rig.py` (M0 audition rig) lives at the repo root.
+- **Module map** (`src/cairn/`): `ingest/` = Document + content-hash (I3), `DocumentStore`, **`edgar.py` (the only corpus-specific file)**; `spans.py` = char-offset spans + resolution invariant (D7); `retrieval.py` = BM25 (I6); `support.py` = `check_support` / abstention (I2, D12); `verify.py` = atom resolver (D9/I1); `frame.py` = question frame + coverage (D13); `audit.py` = append-only log (I5); `session.py` = record/replay; `tools.py`/`cli.py`/`mcp_server.py` = the MCP+CLI surface; `evidence_view.py` = the review GUI. `cairn_rig.py` (M0 audition rig) lives at the repo root.
 
 ## Invariants — non-negotiable
 
@@ -75,13 +75,13 @@ Each maps to a standing test. A change that violates one does not merge.
 - **Determinism is law on the evidence path.** Anything touching retrieval, span-mapping, or verification runs seeded / temperature 0. Non-determinism there is a bug, not a tuning knob.
 - **The oracle is sacred.** Don't weaken a gate to make a PR pass. If a gate is genuinely wrong, change it in its own PR with rationale logged in the Decisions table.
 - **Invariant tests are CI, not afterthoughts.** I3/I4/I5/I6 each get a standing per-PR test from M1 onward.
-- **ATTEST composes nothing in v1.** The agent drafts prose; ATTEST tools are pure deterministic functions. No `answer_with_citations` tool.
+- **CAIRN composes nothing in v1.** The agent drafts prose; CAIRN tools are pure deterministic functions. No `answer_with_citations` tool.
 - **The corpus adapter is isolated.** All corpus-specific code lives in the ingestion module so a corpus swap touches one file.
 - **"Verified" ≠ "entailed."** `verify` confirms a cited span *exists and is real*; it does not confirm the span *supports* the claim. Never let docs or output overclaim — entailment is measured offline (Layer E), not enforced at runtime in v1.
 
 ## The trap (watch for it)
 
-The temptation will be to make ATTEST *cleverer* — esoteric retrieval, a richer ontology, a
+The temptation will be to make CAIRN *cleverer* — esoteric retrieval, a richer ontology, a
 more elegant abstraction — until it's a research project only its author can read. **Don't.**
 All architectural ambition goes into the **eval harness**, where depth is the selling point.
 Everywhere else, choose the boring, legible option. Legibility to a non-specialist is the
@@ -116,7 +116,7 @@ product.
 
 ## Stack (start boring on purpose)
 
-- **Python** for ATTEST tools (MCP server + CLI), the rig, and the current GUI (a deterministic, server-less static HTML **evidence view**, `evidence_view.py`).
+- **Python** for CAIRN tools (MCP server + CLI), the rig, and the current GUI (a deterministic, server-less static HTML **evidence view**, `evidence_view.py`).
 - **TypeScript/React** is the **M5** upgrade of that GUI (audit-log replay); not built yet — don't assume a React app exists.
 - **Retrieval v1:** BM25 + a single embedding model, hybrid. Storage: sqlite (+ vector ext) or in-memory. No managed vector DB until the eval says you need it.
 

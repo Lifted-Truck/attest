@@ -11,10 +11,10 @@ from pathlib import Path
 
 import pytest
 
-from attest.ingest import DocumentStore
-from attest.retrieval import Retriever
-from attest.spans import SpanStore
-from attest.support import check_support
+from cairn.ingest import DocumentStore
+from cairn.retrieval import Retriever
+from cairn.spans import SpanStore
+from cairn.support import check_support
 
 ROOT = Path(__file__).resolve().parent.parent
 DOC_ID = "AAPL-10K-FY2024"
@@ -109,19 +109,19 @@ def test_plural_items_surface_all_gold_spans_ranked(store, retriever, golden):
 
 
 def test_fit_floor_lands_in_the_clean_gap():
-    from attest.support import fit_floor
+    from cairn.support import fit_floor
     assert fit_floor([19, 20, 33], [6, 10, 11]) == 15.0   # midpoint of the 11→19 gap
 
 
 def test_fit_floor_handles_overlap_by_best_accuracy():
-    from attest.support import fit_floor
+    from cairn.support import fit_floor
     # 3/4 separable; the floor takes the max-margin cutoff among the best splits
     assert fit_floor([10, 12], [8, 11]) == 9.0
 
 
 def test_calibrate_rediscovers_the_edgar_floor(golden, retriever):
     """On EDGAR the fitted floor reproduces the hand-set ~15 — from labels, audibly."""
-    from attest.support import calibrate_threshold
+    from cairn.support import calibrate_threshold
     c = calibrate_threshold(golden, retriever)
     assert c.clean and c.gap > 0
     assert c.absent_max < c.threshold <= c.present_min   # floor sits in the separation

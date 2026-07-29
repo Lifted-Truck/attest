@@ -9,9 +9,9 @@ from pathlib import Path
 
 import pytest
 
-from attest.ingest import DocumentStore
-from attest.spans import SpanStore
-from attest.verify import Answer, AtomBinding, DerivedAtom, Sentence, verify
+from cairn.ingest import DocumentStore
+from cairn.spans import SpanStore
+from cairn.verify import Answer, AtomBinding, DerivedAtom, Sentence, verify
 
 ROOT = Path(__file__).resolve().parent.parent
 DOC_ID = "AAPL-10K-FY2024"
@@ -114,7 +114,7 @@ def test_wrong_derived_value_is_flagged(store):
 
 
 def test_equation_renders_the_derivation(store):
-    from attest.verify import DerivedAtom, equation
+    from cairn.verify import DerivedAtom, equation
     d = DerivedAtom("12,397", "subtract",
                     [bind(store, "364,980", TOTAL_ASSETS), bind(store, "352,583", TOTAL_ASSETS)])
     assert equation(d) == "364,980 − 352,583 = 12,397"
@@ -169,7 +169,7 @@ def test_ratio_recompute_respects_written_precision(store):
 
 
 def test_new_op_equations(store):
-    from attest.verify import equation
+    from cairn.verify import equation
     ops = [bind(store, "364,980", TOTAL_ASSETS), bind(store, "352,583", TOTAL_ASSETS)]
     assert equation(DerivedAtom("Z", "multiply", ops)) == "364,980 × 352,583 = Z"
     assert (equation(DerivedAtom("3.5%", "percent_change", ops))
@@ -197,7 +197,7 @@ def test_within_range_verifies_and_flags_wrong_boolean(store):
 
 
 def test_comparison_equations(store):
-    from attest.verify import equation
+    from cairn.verify import equation
     ab = [bind(store, "364,980", TOTAL_ASSETS), bind(store, "352,583", TOTAL_ASSETS)]
     assert equation(DerivedAtom("true", "gt", ab)) == "364,980 > 352,583 → true"
     vlh = [bind(store, "364,980", TOTAL_ASSETS), bind(store, "352,583", TOTAL_ASSETS),
@@ -213,9 +213,9 @@ def test_a_figure_asserted_twice_needs_two_bindings():
     unbound — the second assertion, about a different metric, was ungrounded prose that
     the first citation silently vouched for. Multiplicity is what makes N assertions
     require N bindings."""
-    from attest.ingest.document import make_document
-    from attest.spans import SpanStore
-    from attest.verify import Answer, AtomBinding, Sentence, verify
+    from cairn.ingest.document import make_document
+    from cairn.spans import SpanStore
+    from cairn.verify import Answer, AtomBinding, Sentence, verify
 
     text = "Total assets were 364,980 million as of year end."
     doc = make_document("D", text)

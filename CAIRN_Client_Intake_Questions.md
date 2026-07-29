@@ -1,4 +1,4 @@
-# ATTEST Patent Engagement — Client Intake Questions
+# CAIRN Patent Engagement — Client Intake Questions
 
 Each question is annotated with **→** the design decision it resolves, so you can see which build choices are still open. Grouped by theme; you don't need to ask them in order. Items marked **(blocking)** gate work that can't proceed until answered.
 

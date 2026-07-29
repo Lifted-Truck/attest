@@ -25,19 +25,19 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
-from attest.audit import AuditLog
-from attest.evidence_view import (
+from cairn.audit import AuditLog
+from cairn.evidence_view import (
     Interaction,
     interactions_from_audit,
     render_evidence_view,
     sessions_from_audit,
 )
-from attest.frame import Constraint, QuestionFrame
-from attest.ingest import DocumentStore
-from attest.retrieval import Retriever
-from attest.spans import SpanStore
-from attest.support import THRESHOLD, check_support
-from attest.verify import Answer, AtomBinding, DerivedAtom, Sentence, verify
+from cairn.frame import Constraint, QuestionFrame
+from cairn.ingest import DocumentStore
+from cairn.retrieval import Retriever
+from cairn.spans import SpanStore
+from cairn.support import THRESHOLD, check_support
+from cairn.verify import Answer, AtomBinding, DerivedAtom, Sentence, verify
 
 ROOT = Path(__file__).resolve().parent.parent
 DOC = "AAPL-10K-FY2024"
@@ -53,9 +53,9 @@ def _patent_figure_context(store: SpanStore, store_dir: Path):
     import base64
     import json
 
-    from attest.evidence_view import FigurePanel
-    from attest.figures_map import fig_to_sheets, load_manifest, numeral_sightings
-    from attest.patents import figure_references, parse_figures, reference_numerals
+    from cairn.evidence_view import FigurePanel
+    from cairn.figures_map import fig_to_sheets, load_manifest, numeral_sightings
+    from cairn.patents import figure_references, parse_figures, reference_numerals
 
     fig_dir = store_dir.parent / "figures"
     if not ((fig_dir / "ocr_manifest.json").exists()
@@ -92,7 +92,7 @@ def _patent_figure_context(store: SpanStore, store_dir: Path):
 def _attach_figures(interactions, store: SpanStore, ctx) -> None:
     """Set each interaction's `.figures` from the figures its cited spans point at
     (RT-4). Display-only (D21): nothing here is verified; a spurious panel is a glance."""
-    from attest.figures_map import relevant_figures
+    from cairn.figures_map import relevant_figures
     for inter in interactions:
         if inter.answer is None:
             continue
@@ -133,7 +133,7 @@ def build_from_audit(audit_path: Path, out: Path, last: int = 0,
             print(f"error: session {session} out of range (1–{len(groups)})")
             return 1
         g = groups[idx]
-        title = f"ATTEST — session: {g['label']}" + (f" · {g['ts']}" if g["ts"] else "")
+        title = f"CAIRN — session: {g['label']}" + (f" · {g['ts']}" if g["ts"] else "")
         if fig_ctx:
             _attach_figures(g["interactions"], store, fig_ctx)
         out.write_text(render_evidence_view(g["interactions"], store, title=title,
@@ -165,7 +165,7 @@ TERM_NON = "Term debt 85,750 95,281"
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Build the ATTEST evidence-view GUI")
+    ap = argparse.ArgumentParser(description="Build the CAIRN evidence-view GUI")
     ap.add_argument("--from-audit", nargs="?", const=str(AUDIT), default=None,
                     metavar="PATH", help="rebuild from a live session's audit log")
     ap.add_argument("--last", type=int, default=0, metavar="N",

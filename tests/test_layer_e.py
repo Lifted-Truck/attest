@@ -4,7 +4,7 @@ Scores agent sessions from synthetic audit-log segments — no model needed, so 
 scoring itself is gate-checkable even though the live agent run is not.
 """
 
-from attest.layer_e import (
+from cairn.layer_e import (
     aggregate,
     brier_score,
     claims_and_spans,
@@ -178,9 +178,9 @@ def test_evidence_scoring_catches_a_right_answer_from_the_wrong_span():
     actual claim. This is FEVER's label-only-accuracy illusion (50.91% → 31.87% when
     evidence is scored conjunctively), and for a provenance system it is the whole
     ballgame."""
-    from attest.ingest.document import make_document
-    from attest.layer_e import score_item
-    from attest.spans import SpanStore
+    from cairn.ingest.document import make_document
+    from cairn.layer_e import score_item
+    from cairn.spans import SpanStore
 
     text = "Total assets $ 364,980 and elsewhere the same 364,980 appears again."
     store = SpanStore([make_document("D", text)])
@@ -204,7 +204,7 @@ def test_evidence_scoring_catches_a_right_answer_from_the_wrong_span():
 def test_evidence_is_unscored_rather_than_assumed_passing():
     """RT-8: a metric that cannot be computed must read as 'not measured', never as 0%
     and never as clean. Omitting the store leaves it None and the aggregate says so."""
-    from attest.layer_e import aggregate, score_item
+    from cairn.layer_e import aggregate, score_item
     s = score_item({"id": "X2", "answerable": True}, _seg([]))
     assert s.evidence_correct is None
     agg = aggregate([s])
@@ -215,7 +215,7 @@ def test_evidence_is_unscored_rather_than_assumed_passing():
 def test_aggregate_publishes_the_decision_minus_evidence_gap():
     """RT-8: the gap is the honest headline — a decision score that outruns its
     evidence score is measuring the verdict, not the provenance."""
-    from attest.layer_e import ANSWER, ItemScore, aggregate
+    from cairn.layer_e import ANSWER, ItemScore, aggregate
     scores = [
         ItemScore("a", ANSWER, True, True, 0, evidence_correct=True),
         ItemScore("b", ANSWER, True, True, 0, evidence_correct=False),

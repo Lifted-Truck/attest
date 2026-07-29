@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from attest.audit import GENESIS, AuditLog, TamperError, entry_hash
+from cairn.audit import GENESIS, AuditLog, TamperError, entry_hash
 
 
 def test_append_builds_a_verifying_chain(tmp_path):

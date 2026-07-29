@@ -2,9 +2,9 @@
 """Build the M0 toy corpus (ROADMAP M0-T2) from a single SEC EDGAR filing.
 
 Scope (brief §2): a tiny doc set of 5-10 verbatim excerpts that the audition rig
-(`attest_rig.py`) runs over. This is an M0 fixture builder; the durable evidence
+(`cairn_rig.py`) runs over. This is an M0 fixture builder; the durable evidence
 layer is M1. To honor "corpus-specific code lives in one file" (brief §8), the
-fetch + normalization now come from the M1 EDGAR adapter (`attest.ingest.edgar`);
+fetch + normalization now come from the M1 EDGAR adapter (`cairn.ingest.edgar`);
 this script only slices the normalized text into the rig's excerpts.
 
 Deterministic and offline-after-first-run: the raw filing is cached under
@@ -24,7 +24,7 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
-from attest.ingest.edgar import FILINGS, fetch_html, normalize
+from cairn.ingest.edgar import FILINGS, fetch_html, normalize
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW_DIR = ROOT / "data" / "raw"
@@ -156,7 +156,7 @@ def main() -> int:
     manifest = {
         "_note": (
             "M0 toy corpus (ROADMAP M0-T2). Verbatim excerpts from a single EDGAR filing, "
-            "sliced from the M1 adapter's canonical normalization (attest.ingest.edgar). "
+            "sliced from the M1 adapter's canonical normalization (cairn.ingest.edgar). "
             "Rebuild: python scripts/build_toy_corpus.py"
         ),
         "schema_version": "0.1.0",

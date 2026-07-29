@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from attest.ingest import Document, DocumentStore, HashMismatch, content_hash, verify_document
-from attest.ingest.edgar import FILINGS, normalize
+from cairn.ingest import Document, DocumentStore, HashMismatch, content_hash, verify_document
+from cairn.ingest.edgar import FILINGS, normalize
 
 ROOT = Path(__file__).resolve().parent.parent
 STORE = DocumentStore(ROOT / "corpus" / "store")
@@ -85,7 +85,7 @@ def test_doc_id_cannot_escape_the_corpus_root(tmp_path):
     is what makes encoded and symlinked variants fail too."""
     import pytest
 
-    from attest.ingest.store import DocIdError, DocumentStore
+    from cairn.ingest.store import DocIdError, DocumentStore
     store = DocumentStore(tmp_path / "corpus")
     (tmp_path / "corpus").mkdir()
 

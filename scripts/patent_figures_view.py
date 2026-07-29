@@ -32,7 +32,7 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
-from attest.figures_map import (
+from cairn.figures_map import (
     fig_to_sheets,
     is_locatable,
     load_manifest,
@@ -42,8 +42,8 @@ from attest.figures_map import (
     sub_figure_parent,
     view_marker_letters,
 )
-from attest.ingest import DocumentStore
-from attest.patents import (
+from cairn.ingest import DocumentStore
+from cairn.patents import (
     Numeral,
     acronym_labels,
     dimension_labels,
@@ -51,7 +51,7 @@ from attest.patents import (
     parse_figures,
     reference_numerals,
 )
-from attest.spans import SpanStore
+from cairn.spans import SpanStore
 
 _NEAR = 500          # a numeral is "discussed with" the nearest FIG ref within this
 
@@ -137,7 +137,7 @@ border-radius:8px;padding:11px 13px;font-size:12.5px;min-height:20px;color:var(-
 #ctx b{{color:var(--tx);background:#243; padding:0 2px;border-radius:3px}}
 .note{{color:var(--mut);font-size:11.5px;margin:14px 0 0;line-height:1.5}}
 /* The OCR caveat leads the page on purpose: this is the least reliable step in
-   ATTEST, and a caveat discovered at the bottom is a caveat that did not work. */
+   CAIRN, and a caveat discovered at the bottom is a caveat that did not work. */
 .alarm{{border:1px solid #f85149;border-left:5px solid #f85149;background:#2a1416;
   border-radius:8px;padding:13px 16px;margin:0 0 16px;font-size:12.5px;line-height:1.55}}
 .alarm h2{{margin:0 0 7px;font-size:14px;color:#ff9a92;letter-spacing:.02em}}
@@ -403,7 +403,7 @@ def main() -> int:
             '<div class="alarm" role="alert">'
             '<h2>⚠ Numeral locations on this page are OCR-derived — the weakest link</h2>'
             'Every box drawn on a drawing is a <b>machine reading of pixels</b>, not a '
-            'transcription guarantee and not a citation. This is the one step in ATTEST '
+            'transcription guarantee and not a citation. This is the one step in CAIRN '
             'that is neither grounded nor abstained: it is <i>judged</i>. Treat it as a '
             'reviewer&rsquo;s aid to be confirmed by eye, never as a settled fact.'
             '<ul class="tally">'

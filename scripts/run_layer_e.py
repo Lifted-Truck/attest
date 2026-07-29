@@ -2,9 +2,9 @@
 """Layer-E runner — drive the real Claude Code agent over the golden set (M2-T6).
 
 For each golden item it (optionally) invokes **headless Claude Code** with the
-ATTEST MCP server (`.mcp.json`), so the agent answers through the tools and its
+CAIRN MCP server (`.mcp.json`), so the agent answers through the tools and its
 calls are logged (I5). It then scores each item's log segment with the
-deterministic Layer-E scorer (`attest.layer_e`) and writes a results-trend line.
+deterministic Layer-E scorer (`cairn.layer_e`) and writes a results-trend line.
 
 Layer-E is **periodic, not a blocking gate** (brief §3), and the live run is
 **billed + non-deterministic**, so it is opt-in:
@@ -29,9 +29,9 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
-from attest.audit import AuditLog
-from attest.ingest import DocumentStore
-from attest.layer_e import (
+from cairn.audit import AuditLog
+from cairn.ingest import DocumentStore
+from cairn.layer_e import (
     CORRECTION,
     aggregate,
     brier_score,
@@ -42,8 +42,8 @@ from attest.layer_e import (
     reliability,
     score_item,
 )
-from attest.session import session_start_record
-from attest.spans import SpanStore
+from cairn.session import session_start_record
+from cairn.spans import SpanStore
 
 _CONF = re.compile(r"confidence[:\s]+(0?\.\d+|1(?:\.0+)?|0)", re.IGNORECASE)
 
@@ -57,11 +57,11 @@ ROOT = Path(__file__).resolve().parent.parent
 # Headless agent invocation. `--bare` forces ANTHROPIC_API_KEY auth (never the
 # keychain/OAuth) so a CI/eval env authenticates by key; it also skips CLAUDE.md
 # auto-discovery, so we re-add the repo (--add-dir, loads the loop) and a compact
-# system prompt. The agent reaches ATTEST via a PER-RUN mcp config (written next
+# system prompt. The agent reaches CAIRN via a PER-RUN mcp config (written next
 # to the audit log) whose env points at the requested store/threshold, so any
 # engagement corpus can be evaluated — not just the default EDGAR store.
 AGENT_SYSTEM = (
-    "Answer the question ONLY using the attest MCP tools. Loop: search_corpus / "
+    "Answer the question ONLY using the cairn MCP tools. Loop: search_corpus / "
     "check_support to locate; get_span / get_document to read; draft, binding every "
     "load-bearing figure to its exact span. Decompose the question into a typed "
     "frame (constraints with role entity/metric/attribute/subject/period/unit/scope; "
@@ -88,19 +88,19 @@ def claude_flags(mcp_config: Path) -> list[str]:
         "--mcp-config", str(mcp_config),
         "--permission-mode", "bypassPermissions",
         "--append-system-prompt", AGENT_SYSTEM,
-        "--allowedTools", "mcp__attest__search_corpus,mcp__attest__get_span,"
-        "mcp__attest__get_document,mcp__attest__check_support,mcp__attest__verify,"
-        "mcp__attest__check_claim",
+        "--allowedTools", "mcp__cairn__search_corpus,mcp__cairn__get_span,"
+        "mcp__cairn__get_document,mcp__cairn__check_support,mcp__cairn__verify,"
+        "mcp__cairn__check_claim",
     ]
 
 
 def write_mcp_config(path: Path, store: str, audit: Path, threshold: float | None) -> None:
-    env = {"ATTEST_STORE": str(store), "ATTEST_AUDIT": str(audit)}
+    env = {"CAIRN_STORE": str(store), "CAIRN_AUDIT": str(audit)}
     if threshold is not None:
-        env["ATTEST_SUPPORT_THRESHOLD"] = str(threshold)
-    path.write_text(json.dumps({"mcpServers": {"attest": {
+        env["CAIRN_SUPPORT_THRESHOLD"] = str(threshold)
+    path.write_text(json.dumps({"mcpServers": {"cairn": {
         "command": str(ROOT / ".venv" / "bin" / "python"),
-        "args": ["-m", "attest.mcp_server"], "env": env,
+        "args": ["-m", "cairn.mcp_server"], "env": env,
     }}}, indent=2), encoding="utf-8")
 
 
@@ -126,7 +126,7 @@ def main() -> int:
     ap.add_argument("--golden", default=str(ROOT / "golden_seed.json"))
     ap.add_argument("--store", default=str(ROOT / "corpus" / "store"))
     ap.add_argument("--threshold", type=float, default=None,
-                    help="ATTEST_SUPPORT_THRESHOLD for the run (per-engagement floor, D20)")
+                    help="CAIRN_SUPPORT_THRESHOLD for the run (per-engagement floor, D20)")
     ap.add_argument("--audit-dir", default=str(ROOT / "audit_log"),
                     help="where the run's agent log, mcp config, and trend line go")
     ns = ap.parse_args()
@@ -206,7 +206,7 @@ def main() -> int:
         print("\nNo items scored — the agent produced no tool calls on any item.")
         print("Check headless Claude Code: a 401 means the spawned `claude -p` is not")
         print("authenticated (set ANTHROPIC_API_KEY or run in an authenticated env), and")
-        print("confirm the ATTEST MCP server starts (.venv has attest + mcp installed).")
+        print("confirm the CAIRN MCP server starts (.venv has cairn + mcp installed).")
         return 1
 
     summary = {

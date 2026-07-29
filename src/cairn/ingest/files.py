@@ -8,7 +8,7 @@ own adapter (e.g. the patent domain pack, PE-1), not this generic loader.
 
 The deterministic spine is unchanged: `make_document` hashes the canonical text,
 `DocumentStore.write` persists it; retrieval / spans / tools read it like any
-other doc. Point `ATTEST_STORE` at the target store to use it.
+other doc. Point `CAIRN_STORE` at the target store to use it.
 """
 
 from __future__ import annotations

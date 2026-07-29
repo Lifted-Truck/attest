@@ -12,11 +12,11 @@ from pathlib import Path
 
 import pytest
 
-from attest.audit import AuditLog
-from attest.ingest import DocumentStore
-from attest.retrieval import Retriever
-from attest.spans import SpanStore
-from attest.support import check_support
+from cairn.audit import AuditLog
+from cairn.ingest import DocumentStore
+from cairn.retrieval import Retriever
+from cairn.spans import SpanStore
+from cairn.support import check_support
 
 ROOT = Path(__file__).resolve().parent.parent
 STORE_DIR = ROOT / "corpus" / "store"

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ATTEST — how the system works</title>
+<title>CAIRN — how the system works</title>
 <style>
   :root{
     --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --bd:#30363d; --tx:#c9d1d9;
@@ -53,7 +53,7 @@
 </style>
 </head>
 <body>
-<h2 class="sr-only">An illustrated explainer of how ATTEST works: the AI/deterministic split, the data model, the runtime loop, the five outcomes, verification, the audit log, and the two evaluation layers.</h2>
+<h2 class="sr-only">An illustrated explainer of how CAIRN works: the AI/deterministic split, the data model, the runtime loop, the five outcomes, verification, the audit log, and the two evaluation layers.</h2>
 <div class="wrap">
 <nav>
   <h4>Foundations</h4>
@@ -80,21 +80,21 @@
 </nav>
 <main>
 
-<h1>ATTEST — how it actually works</h1>
+<h1>CAIRN — how it actually works</h1>
 <p class="lede">An illustrated tour of the mechanisms: what enforces the guarantee, what merely
 measures it, and exactly where the line between the two sits.</p>
 
 <div class="card key">
-<b>The one sentence.</b> ATTEST is a <b>grounded-retrieval system</b>: every claim it presents is
+<b>The one sentence.</b> CAIRN is a <b>grounded-retrieval system</b>: every claim it presents is
 bound to a verifiable source span, or it is not presented — <b>ground or abstain, never invent</b>.
-It ships as <b>deterministic tools</b> that Claude calls. <b>ATTEST itself makes zero model calls at
+It ships as <b>deterministic tools</b> that Claude calls. <b>CAIRN itself makes zero model calls at
 runtime.</b>
 </div>
 
 <!-- ─────────────── 1 ─────────────── -->
 <h2 id="promise">1 · The promise — and its honest limit</h2>
 <p>The failure this exists to kill: a model that invents a citation, or cites a real document for a
-claim it doesn't make. ATTEST attacks that by refusing to let a claim out the door unless a
+claim it doesn't make. CAIRN attacks that by refusing to let a claim out the door unless a
 deterministic checker can resolve it to a real span.</p>
 
 <div class="card warn">
@@ -115,7 +115,7 @@ evidence answer <i>this</i> question" from opinion into a runtime flag — but n
 deciding whether a claim is grounded. Deterministic code decides.</p>
 
 <div class="fig">
-<svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram: Claude drafts prose and proposes bindings; ATTEST's deterministic tools resolve, check and decide; the audit log records.">
+<svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram: Claude drafts prose and proposes bindings; CAIRN's deterministic tools resolve, check and decide; the audit log records.">
   <rect x="8" y="14" width="352" height="176" rx="10" fill="#1a1430" stroke="#a371f7" stroke-width="1.5"/>
   <text x="22" y="36" fill="#a371f7" font-size="12" font-weight="700" font-family="ui-monospace,monospace">CLAUDE (the agent) — judgment</text>
   <text x="22" y="60" fill="#c9d1d9" font-size="12.5">· reads the corpus freely</text>
@@ -126,7 +126,7 @@ deciding whether a claim is grounded. Deterministic code decides.</p>
   <text x="22" y="170" fill="#8b949e" font-size="11" font-style="italic">non-deterministic · measured at Layer-E</text>
 
   <rect x="400" y="14" width="352" height="176" rx="10" fill="#0f2417" stroke="#3fb950" stroke-width="1.5"/>
-  <text x="414" y="36" fill="#3fb950" font-size="12" font-weight="700" font-family="ui-monospace,monospace">ATTEST (the tools) — decision</text>
+  <text x="414" y="36" fill="#3fb950" font-size="12" font-weight="700" font-family="ui-monospace,monospace">CAIRN (the tools) — decision</text>
   <text x="414" y="60" fill="#c9d1d9" font-size="12.5">· resolves each atom at its offset</text>
   <text x="414" y="80" fill="#c9d1d9" font-size="12.5">· re-checks the content hash</text>
   <text x="414" y="100" fill="#c9d1d9" font-size="12.5">· re-extracts figures independently</text>
@@ -201,7 +201,7 @@ still hashes to what it hashed at ingest."</p>
 <p class="cap"><b>The derived-atom idea is worth internalising:</b> if an answer says "assets rose by
 $12,397M", that number appears nowhere in the document. Rather than let the model cite something for
 it, the model must declare <i>“this = 364,980 − 352,583”</i>, each operand bound to a real span — and
-ATTEST does the arithmetic itself. A wrong sum fails; an invented sum has nothing to bind to.</p>
+CAIRN does the arithmetic itself. A wrong sum fails; an invented sum has nothing to bind to.</p>
 </div>
 
 <!-- ─────────────── 4 ─────────────── -->
@@ -569,7 +569,7 @@ Public, committed, the shared engine's proving ground.</span>
 </div>
 <div class="card warn">
 <b>The patent cardinal rule — sharper than “ground or abstain”:</b><br>
-<b>Locate &amp; evidence, never adjudicate.</b> ATTEST never concludes on novelty, obviousness,
+<b>Locate &amp; evidence, never adjudicate.</b> CAIRN never concludes on novelty, obviousness,
 validity, infringement, freedom-to-operate, or definitive claim construction. A patent professional
 is in the loop; this is the unauthorised-practice-of-law boundary. It is expressed in the engine as
 the first-class <span class="pill" style="color:var(--refuse)">refuse</span> outcome — and it held
@@ -640,13 +640,13 @@ a lawsuit.</p>
 </table>
 
 <div class="card key">
-<b>The trap the project explicitly guards against.</b> The temptation is to make ATTEST <i>cleverer</i> —
+<b>The trap the project explicitly guards against.</b> The temptation is to make CAIRN <i>cleverer</i> —
 exotic retrieval, a richer ontology — until it's a research project only its author can read.
 All architectural ambition goes into the <b>eval harness</b>, where depth is the selling point.
 Everywhere else: choose the boring, legible option. <b>Legibility to a non-specialist is the product.</b>
 </div>
 
-<p class="foot">Generated for the ATTEST engagement · reflects <code>main</code> @ truth-contract <b>v1.2</b>,
+<p class="foot">Generated for the CAIRN engagement · reflects <code>main</code> @ truth-contract <b>v1.2</b>,
 23 logged decisions, 163 Layer-0 tests green · <b>last verified 2026-07-08</b>.
 This file is documentation — if it disagrees with <code>ROADMAP.md</code>, the roadmap wins.</p>
 

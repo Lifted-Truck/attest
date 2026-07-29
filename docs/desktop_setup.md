@@ -1,15 +1,15 @@
-# Using ATTEST in Claude Code (Desktop)
+# Using CAIRN in Claude Code (Desktop)
 
-Desktop is the primary working surface for engagements. ATTEST runs there as a set
+Desktop is the primary working surface for engagements. CAIRN runs there as a set
 of **deterministic MCP tools** the agent calls — it makes **no model calls of its
 own** (the agent is the only model). This is the day-to-day workflow.
 
-## 1. Connect the ATTEST tools
+## 1. Connect the CAIRN tools
 
 The repo ships a project-scoped [`.mcp.json`](../.mcp.json) that registers the
-ATTEST server (`python -m attest.mcp_server`). "Open the project" just means
+CAIRN server (`python -m cairn.mcp_server`). "Open the project" just means
 **Claude Code Desktop's working folder is this repo** — there's no separate action.
-Desktop reads `.mcp.json` **when a session starts** and **approve the `attest`
+Desktop reads `.mcp.json` **when a session starts** and **approve the `cairn`
 server** if prompted; so if you ever edit `.mcp.json` (or the tools don't appear),
 **start a fresh session in the repo** to re-read it. A different engagement is its
 own folder with its own `.mcp.json` + corpus — that's when "open the project"
@@ -25,7 +25,7 @@ pip install -e ".[dev,mcp]"          # the package + the MCP server dep
 python scripts/ingest_corpus.py      # builds corpus/store (content-hashed, I3)
 ```
 
-Verify the tools are live — ask Desktop *"list your attest tools"*; you should see
+Verify the tools are live — ask Desktop *"list your cairn tools"*; you should see
 **7**: `search_corpus`, `get_span`, `get_document`, `check_support`, `check_claim`,
 `verify`, `get_audit_log`. The server logs every interaction to
 `audit_log/agent.jsonl` (I5) — that log is the bridge to the review GUI below.
@@ -33,11 +33,11 @@ Verify the tools are live — ask Desktop *"list your attest tools"*; you should
 ### Iterating on the tools — when a refresh is needed (and when it isn't)
 
 The MCP server is a **long-lived subprocess** that loads the tool code once at
-startup, so changes to the **tool code or schema** (`src/attest/tools.py`,
+startup, so changes to the **tool code or schema** (`src/cairn/tools.py`,
 `mcp_server.py`, `session.py`, `verify.py`, etc.) **don't take effect until the
 server is refreshed**. To refresh, cheapest first:
 
-1. **`/mcp` panel → reconnect the `attest` server** — no app restart, no new thread.
+1. **`/mcp` panel → reconnect the `cairn` server** — no app restart, no new thread.
 2. **Quit and reopen Desktop** — the guaranteed reset (also required after editing
    `.mcp.json` itself, which is read only at session startup).
 
@@ -47,17 +47,17 @@ parent's server connection (same old code) and can't invoke slash commands.
 
 **Most edits need no refresh at all** — `CLAUDE.md`, the `/ground` command, the
 `evidence_view` renderer, and anything under `scripts/` are read fresh every time.
-Only the live MCP tool surface caches. (Dev tip: run `python -m attest.mcp_server`
+Only the live MCP tool surface caches. (Dev tip: run `python -m cairn.mcp_server`
 in a terminal to watch its logs while iterating.)
 
 **Smoke-test a tool change *without* restarting.** The MCP server is just one
-surface over the same `attest.tools` registry, so you can confirm a change works on
+surface over the same `cairn.tools` registry, so you can confirm a change works on
 the **CLI** (or in Python) before bothering with any Desktop refresh — same code,
 no stale process:
 
 ```
-attest call verify '{"answer": {...}, "outcome": "correction"}'   # exercises the new path
-attest list                                                        # current tool set
+cairn call verify '{"answer": {...}, "outcome": "correction"}'   # exercises the new path
+cairn list                                                        # current tool set
 ```
 
 If the CLI shows the new behaviour, the code is correct; the Desktop refresh is then
@@ -65,7 +65,7 @@ only about making it usable interactively in chat — not a correctness gate.
 
 ## 2. Auth — no API key needed here
 
-In Desktop you're already signed in, and the ATTEST tools are deterministic, so the
+In Desktop you're already signed in, and the CAIRN tools are deterministic, so the
 loop just works. **The `ANTHROPIC_API_KEY` / `.env.local` is only for the headless
 Layer-E eval** (`scripts/run_layer_e.py --live`), which spawns its own `claude -p`
 subprocesses — see [`layer_e_baseline.md`](layer_e_baseline.md). Nothing in normal
@@ -100,9 +100,9 @@ claim? — is the un-gated, human step (entailment).
 Each corpus (e.g. a patent matter) gets its **own** ingested store, and the MCP
 server is pointed at it via three env vars (in `.mcp.json` or the shell):
 
-- `ATTEST_STORE` — the store dir (`python scripts/ingest_files.py … --store <dir>`)
-- `ATTEST_AUDIT` — that engagement's audit log
-- `ATTEST_SUPPORT_THRESHOLD` — the `check_support` floor. **Per-corpus calibration
+- `CAIRN_STORE` — the store dir (`python scripts/ingest_files.py … --store <dir>`)
+- `CAIRN_AUDIT` — that engagement's audit log
+- `CAIRN_SUPPORT_THRESHOLD` — the `check_support` floor. **Per-corpus calibration
   (D12):** the default `15.0` is tuned for EDGAR; other corpora score differently
   (a patent's relevant spans run ~5–14), so set a lower floor or `check_support`
   over-abstains. Calibrate from the engagement's golden items (PE-5).

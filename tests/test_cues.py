@@ -9,7 +9,7 @@ missed — documented as the ceiling, so a future "improvement" that appears to 
 it is scrutinized as a possible over-trigger, not celebrated.
 """
 
-from attest.cues import CUE_WINDOW, DENIAL_CUES, denial_cue_hits
+from cairn.cues import CUE_WINDOW, DENIAL_CUES, denial_cue_hits
 
 # Julian's synthetic refutation case — the positive control. The figure atom sits at
 # the offset of "2,000,000"; "incorrect" is ~40 chars downstream.

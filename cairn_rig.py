@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""attest_rig.py — the M0 audition rig (ROADMAP M0-T4, brief §2).
+"""cairn_rig.py — the M0 audition rig (ROADMAP M0-T4, brief §2).
 
 Proves the risky core cheaply *before* any real subsystem is built: grounded
 retrieval + span-level citation + verify + abstention, scored inline against the
@@ -21,7 +21,7 @@ small, legible guards so the rig can abstain correctly on the traps):
   - entity-scope: a question comparing to a non-Apple company → partial-abstain.
   - false-premise: "why did X decline" when the figures show X rose → reject.
 
-Run:  python attest_rig.py
+Run:  python cairn_rig.py
 Exit code 0 iff the M0 gate passes. A standing test (tests/test_rig.py) asserts
 the same gate so CI keeps it green.
 """

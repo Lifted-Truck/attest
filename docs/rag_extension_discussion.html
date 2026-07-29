@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ATTEST → RAG — a design discussion</title>
+<title>CAIRN → RAG — a design discussion</title>
 <style>
   :root{
     --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --bd:#30363d; --tx:#c9d1d9;
@@ -42,15 +42,15 @@
 </style>
 </head>
 <body>
-<h2 class="sr-only">A design discussion on extending ATTEST toward retrieval-augmented generation: why the truth contract is unaffected, what is already built, what full RAG adds, the one real decision about runtime model calls, and the recommendation.</h2>
+<h2 class="sr-only">A design discussion on extending CAIRN toward retrieval-augmented generation: why the truth contract is unaffected, what is already built, what full RAG adds, the one real decision about runtime model calls, and the recommendation.</h2>
 <div class="wrap">
 
-<h1>Extending ATTEST toward RAG — a design discussion</h1>
+<h1>Extending CAIRN toward RAG — a design discussion</h1>
 <p class="lede">For larger corpora and reference pools. This is a discussion, not a build — it lays out
 what's already in place, the one real decision, and a recommendation for you to rule on.</p>
 
 <div class="card key">
-<b>The load-bearing insight, up front.</b> ATTEST's guarantee does not live in retrieval — it lives in
+<b>The load-bearing insight, up front.</b> CAIRN's guarantee does not live in retrieval — it lives in
 <code>verify</code>, coverage, and the atom resolver, which sit <b>downstream</b> of retrieval. Retrieval
 only decides <i>which candidate spans the agent looks at</i>; grounding decides <i>what may be presented</i>.
 So swapping BM25 for embeddings + chunking + contextual retrieval is a <b>retrieval-backend change that
@@ -81,7 +81,7 @@ rather than a rewrite.
   <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#8b949e"/></marker></defs>
 </svg>
 <p class="cap">A better retriever surfaces better candidates — it can improve answer <i>rate</i> and reduce
-missed evidence. It cannot make ATTEST present an ungrounded claim, because the grounding core doesn't
+missed evidence. It cannot make CAIRN present an ungrounded claim, because the grounding core doesn't
 trust it. This is exactly why the brief could say "dead-simple retrieval" without weakening the pitch.</p>
 </div>
 
@@ -131,8 +131,8 @@ plug-in <i>contract</i> and a reference embedding backend — not an architectur
 <div class="card new">
 <b>The one subtlety worth naming: index-text ≠ cited-text.</b> <b>Contextual retrieval</b> (the Anthropic
 technique) prepends a short chunk-situating context to each chunk <i>before embedding</i>, which sharply
-improves recall on large corpora. But ATTEST must still cite the <b>original</b> span at its real offsets —
-so the added context is indexed, never cited. ATTEST already separates these cleanly (a span is an offset
+improves recall on large corpora. But CAIRN must still cite the <b>original</b> span at its real offsets —
+so the added context is indexed, never cited. CAIRN already separates these cleanly (a span is an offset
 range into canonical text; the index is a separate featurization), so this fits without contortion — the
 contextualized text lives in the frozen index, the citation resolves against the untouched document.
 </div>
@@ -140,7 +140,7 @@ contextualized text lives in the frozen index, the citation resolves against the
 <!-- 4 -->
 <h2>4 · The one real decision: I6's "no runtime model calls"</h2>
 <div class="card warn">
-<b>The honest tension.</b> I6 today reads, literally, "in v1 ATTEST makes <b>no model calls at all</b> at
+<b>The honest tension.</b> I6 today reads, literally, "in v1 CAIRN makes <b>no model calls at all</b> at
 runtime." Embedding the <i>query</i> at runtime is a model call. So RAG cannot ship under I6 as currently
 worded — this needs your ruling, and it is the <b>only</b> part of this that touches the contract.
 </div>
