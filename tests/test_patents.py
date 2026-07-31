@@ -517,3 +517,27 @@ def test_acronym_labels_over_generate_without_drawing_evidence():
 
     located = {"CZ"}                                  # what OCR actually found on a sheet
     assert [a for a in candidates if a in located] == ["CZ"]
+
+
+def test_kind_code_is_stripped_for_any_form():
+    """D45: `doc.rstrip("AB")` was fitted to US5447630A and silently does NOTHING to
+    US8046721B2 — "B2" ends with a digit. The stem stayed "US8046721B2", every drawing
+    URL missed, and the fetch reported "no drawing sheets found" as if the patent had
+    none. A kind code is a letter optionally followed by a digit."""
+    import re
+    strip = lambda d: re.sub(r"[A-Z]\d?$", "", d)      # noqa: E731 — mirrors the fetcher
+    assert strip("US5447630A") == "US5447630"
+    assert strip("US8046721B2") == "US8046721"
+    assert strip("US20050020A1") == "US20050020"
+    assert strip("US1234567") == "US1234567"           # no kind code: unchanged
+
+
+def test_figure_and_fig_are_the_same_caption():
+    """D45: US5447630A abbreviates "FIG. 2"; US8046721B2 spells out "Figure 2", and the
+    abbreviation-only pattern found NO caption on any of its 16 sheets."""
+    import re
+    pat = re.compile(r"\bFIG(?:URE)?S?\.?\s*(\d+[A-Z]?)", re.IGNORECASE)
+    for s, want in (("FIG. 2", "2"), ("Figure 2", "2"), ("FIGS. 3A", "3A"),
+                    ("Figures 4A", "4A"), ("FIG.6", "6")):
+        m = pat.search(s)
+        assert m and m.group(1).upper() == want, s

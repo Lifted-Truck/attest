@@ -47,17 +47,69 @@ def drawing_urls(html: str, doc: str) -> dict[int, list[str]]:
     storage paths — an 82×120 thumbnail and the full-resolution scan — under the same
     `…-drawings-page-N.png` name; both are returned so the caller can pick the
     full-res one (the larger download)."""
-    stem = doc.rstrip("AB")                                # US5447630A → US5447630
-    pat = re.compile(
-        rf"https://patentimages\.storage\.googleapis\.com/[^\"']+?"
-        rf"{re.escape(stem)}-drawings-page-(\d+)\.png"
-    )
+    # Strip the KIND CODE, which is a letter optionally followed by a digit: A, A1, B2…
+    # `doc.rstrip("AB")` was fitted to US5447630A and silently does nothing to
+    # US8046721B2, because "B2" ends with a digit — so the stem stayed "US8046721B2",
+    # every URL pattern missed, and the fetch reported "no drawing sheets found" as if
+    # the patent had none (RT-6 corpus 2).
+    stem = re.sub(r"[A-Z]\d?$", "", doc)                  # US5447630A → US5447630
+    host = r"https://patentimages\.storage\.googleapis\.com/[^\"']+?"
+    # TWO naming schemes, and only knowing one of them is why this returned nothing for
+    # US8046721B2 (RT-6's second corpus). Google Patents serves older grants as
+    # `US5447630-drawings-page-2.png` and newer ones as
+    # `US08046721-20111025-D00009.png` — an 8-digit ZERO-PADDED number, the grant date,
+    # and a D-number. The zero-padding is the trap: a naive stem never matches.
+    padded = f"US{int(stem.lstrip('US')):08d}" if stem.lstrip("US").isdigit() else stem
+    patterns = [
+        re.compile(rf"{host}{re.escape(stem)}-drawings-page-(\d+)\.png"),
+        re.compile(rf"{host}{re.escape(padded)}-\d{{8}}-D(\d+)\.png"),
+    ]
     by_page: dict[int, list[str]] = {}
-    for m in pat.finditer(html):
-        by_page.setdefault(int(m.group(1)), [])
-        if m.group(0) not in by_page[int(m.group(1))]:
-            by_page[int(m.group(1))].append(m.group(0))
+    for pat in patterns:
+        for m in pat.finditer(html):
+            n = int(m.group(1))
+            by_page.setdefault(n, [])
+            if m.group(0) not in by_page[n]:
+                by_page[n].append(m.group(0))
+        if by_page:                    # first scheme that matches wins; never mix them
+            break
     return dict(sorted(by_page.items()))
+
+
+def geometry_report(out_dir: Path, sheets: list) -> list[str]:
+    """Flag sheets whose pixel geometry disagrees with their siblings (D45).
+
+    Self-calibrating, with no magic threshold: sheets of ONE grant are scanned together,
+    so a sheet that differs materially from the median is a different RENDITION, not a
+    different drawing. That is the signature of the substitution class — the 82x120
+    thumbnail served under the full-res name (L0003), and here a 1497x1536 sheet among
+    2112x3286 siblings on US8046721B2. Every downstream coordinate is a NORMALIZED
+    fraction, so a rendition swap is invisible in the manifest by construction; this is
+    the only place it can be seen.
+
+    Reports rather than refuses: a genuinely odd sheet (a landscape fold-out) is legal,
+    and this cannot tell the two apart. A human can.
+    """
+    from PIL import Image
+    dims = []
+    for s in sheets:
+        f = out_dir / s["file"] if isinstance(s, dict) else out_dir / str(s)
+        if not f.exists():
+            continue
+        with Image.open(f) as im:
+            dims.append((f.name, im.size[0], im.size[1]))
+    if len(dims) < 3:
+        return []
+    widths = sorted(d[1] for d in dims)
+    heights = sorted(d[2] for d in dims)
+    mw, mh = widths[len(widths) // 2], heights[len(heights) // 2]
+    out = []
+    for name, w, h in dims:
+        if abs(w - mw) / mw > 0.15 or abs(h - mh) / mh > 0.15:
+            out.append(f"  \u26a0 {name}: {w}x{h} vs median {mw}x{mh} — a different "
+                       f"RENDITION, not a different drawing. Small isolated labels may "
+                       f"be unreadable at this scale; re-fetch before trusting it.")
+    return out
 
 
 def main() -> int:
@@ -108,6 +160,8 @@ def main() -> int:
     manifest.write_text(json.dumps(
         {"doc": ns.doc, "source_url": src_url, "sheets": sheets}, indent=2) + "\n",
         encoding="utf-8")
+    for line in geometry_report(out_dir, sheets):
+        print(line)
     print(f"\nOK — {len(sheets)} sheet(s) + manifest under {out_dir} (local-only; gitignored)")
     return 0
 

@@ -127,3 +127,130 @@ validated, and calling it validated is how a fitted value quietly becomes a law.
 - **Two of three failures were not fixable by changing a number.** Both needed a mechanism
   (per-corpus calibration; refusing to consume an unadjudicated label set). A protocol that
   only re-tunes constants would have declared success and shipped a false abstention.
+
+
+---
+
+# Part 2 — the drawings (2026-07-28)
+
+Part 1 was text-only and named that as its largest gap. This closes it: 16 sheets fetched
+and OCR'd. **Four more fitted assumptions failed, three of them before a single numeral
+was read.** The pattern is now unmistakable — the failures cluster in *ingestion*, not in
+the evidence layer.
+
+## 6. The fetcher could not fetch (two independent bugs, D45)
+
+`fetch_patent_figures.py` reported **"no drawing sheets found for US8046721B2 — is the id
+right?"** The id was right. Two fitted assumptions, stacked:
+
+- **`doc.rstrip("AB")`** was fitted to `US5447630A`. `US8046721B2` ends with a *digit*, so
+  `rstrip("AB")` strips nothing and the stem stayed `US8046721B2`. Now
+  `re.sub(r"[A-Z]\d?$", "", doc)`.
+- **Google Patents uses two naming schemes.** Older grants:
+  `US5447630-drawings-page-2.png`. Newer: `US08046721-20111025-D00009.png` — an 8-digit
+  **zero-padded** number, the grant date, and a D-number. Only the first was known.
+
+Worth naming the failure *mode*: the script reported a confident, plausible, wrong
+diagnosis — "is the id right?" — for a condition it had never been taught to distinguish
+from a bad id. A guess dressed as a finding is worse than an error.
+
+## 7. `HEADER_BAND = 0.88` deleted 13 real numerals — the most severe finding
+
+The band discards the top 12% of a sheet as running-header furniture. Corpus 2 has **no
+running header on any of its 16 sheets**, so the guard fired where its precondition did
+not hold and silently removed spec-recited numerals sitting near the top of the drawings:
+
+```
+100  102  132  200  300  400  408  600  706  714  900  1002  1014
+```
+
+Exactly the registry's falsifier (*"a non-USPTO drawing set with no header band at all —
+the guard then silently discards real labels"*). Fixed by making the band conditional on
+**per-sheet evidence** (`sheet_has_header`), recorded per page in the manifest so the
+decision is auditable rather than assumed.
+
+| | before | after |
+|---|---|---|
+| corpus 2 numerals located | 188 | **206** |
+| corpus 1 numerals located | 145 | **145 — byte-identical** |
+
+## 8. `_FIG_LABEL` — "Figure 2" is not "FIG. 2"
+
+Corpus 1 abbreviates; corpus 2 spells it out. The abbreviation-only pattern found **zero**
+FIG labels across all 16 sheets, so every sheet was unattributable to a figure. One
+alternation fixed it.
+
+## 9. The merge radius — the "sharpest untested constant" — transfers
+
+The constant the OCR swarm called the riskiest in the repo, never measured on a second
+corpus until now:
+
+| corpus | closest same-label pair kept apart | headroom over the 0.02 radius |
+|---|---|---|
+| US5447630A | 0.0202 | **+0.0002** (~0.7 px) |
+| US8046721B2 | 0.0272 | +0.0072 |
+
+It transfers, with **36× more headroom** on corpus 2. Corpus 1 remains the tight case, so
+the risk is real but is a property of *that* corpus rather than of the value. This is the
+first evidence either way.
+
+Recall also improved: **63/66** spec-recited numerals located on corpus 2, against 59/64
+on corpus 1.
+
+## 10. Open defect — a native crash, unguarded
+
+`--confirm` dies with **SIGBUS (exit 138)** on `drawings-page-12.png`, reproducibly, inside
+`tiled_search`. Not diagnosed to an engine. The first pass is unaffected, so the manifest
+above was produced without the confirmation pass.
+
+Two things make this worse than a crash:
+
+1. **It produces no error and no output.** Python block-buffers stdout when redirected, so
+   a SIGBUS loses the buffer entirely — the first attempt looked like a *successful* no-op
+   because the previous manifest was still on disk and unchanged. I initially misread it
+   as "the fix recovered nothing." Piping through `head` had masked the exit code the same
+   way. (The repo's own rule — never mask an exit code — earning itself again.)
+2. **The likely root cause is §11**, which means ingestion can be crashed by a bad input it
+   already had the information to reject.
+
+## 11. Cross-sheet geometry disagreement (the swarm's B1 check, now built)
+
+`drawings-page-12.png` is **1497×1536** among siblings at 2112×3286. Two others differ too:
+
+```
+⚠ drawings-page-0.png : 1369x1259 vs median 2067x2966
+⚠ drawings-page-7.png : 1511x2008 vs median 2067x2966
+⚠ drawings-page-12.png: 1497x1536 vs median 2067x2966   <- the crasher
+```
+
+This is the substitution class the OCR swarm ranked #6 and L0003 recorded: a lower-
+resolution *rendition* served under the right name. Every downstream coordinate is a
+**normalized fraction**, so a rendition swap is invisible in the manifest **by
+construction** — this check is the only place it can be seen.
+
+Implemented as `geometry_report`: self-calibrating against the median of the grant's own
+sheets, no magic threshold. It **reports rather than refuses**, because a genuine
+landscape fold-out is legal and this cannot tell the two apart. Corpus 1: clean, all 8
+sheets agree.
+
+## Revised scorecard
+
+| Constant / assumption | Verdict |
+|---|---|
+| `NUMERAL_DIGITS = 4` | **transfers** (13 four-digit numerals recovered) |
+| `_CAPTION_GAP = 400` | transfers, once D43 fixed the regex beneath it |
+| merge radius `0.02` | **transfers** (+0.0072 headroom vs +0.0002 on corpus 1) |
+| `MIN_LOCATABLE_NUMERAL = 10` | **inert both times — still untested** |
+| `support.THRESHOLD` | **does not transfer** (false abstention) → D44 |
+| `acronym_labels` blocklist | **does not transfer** → contract documented |
+| `_FIG_CAPTION` | bug → D43 |
+| `HEADER_BAND` precondition | **bug, 13 numerals deleted** → D45 |
+| `_FIG_LABEL` "Figure" | bug → D45 |
+| kind-code stripping | bug → D45 |
+| drawing-URL scheme | bug → D45 |
+| cross-sheet geometry | unchecked → now checked |
+| `tiled_search` on odd geometry | **open: SIGBUS, undiagnosed** |
+
+**Eight defects across two runs of the protocol, on a system that passed 249 tests.** None
+was found by a test; all were found by pointing the thing at a corpus it had not been
+fitted to. That is the argument for RT-6 existing, and the argument for a third corpus.

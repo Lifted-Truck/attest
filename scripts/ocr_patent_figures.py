@@ -76,7 +76,10 @@ def _pkg_version(name: str) -> str | None:
     except Exception:
         return None
 
-_FIG_LABEL = re.compile(r"FIGS?\.?\s*(\d+[A-Z]?)", re.IGNORECASE)
+# "FIG. 2" and "Figure 2" are the same caption. US5447630A abbreviates; US8046721B2
+# spells it out, and the abbreviation-only pattern found NO caption on any of its 16
+# sheets (RT-6 corpus 2, D45).
+_FIG_LABEL = re.compile(r"\bFIG(?:URE)?S?\.?\s*(\d+[A-Z]?)", re.IGNORECASE)
 # A caption read GARBLED still isn't a numeral: tesseract renders "FIG.6" as
 # "FICG.6" and "FIG.3A" as bare "3", leaking 6/3 into the numeral set. This
 # tolerant form ("F" + optional junk + "G") guards the digit extraction.
@@ -360,10 +363,26 @@ def tiled_search(path: Path, targets: set[str], *, rows: int = 4, cols: int = 2,
     return sorted(found, key=lambda d: (d["numeral"], -d["y"]))
 
 
+def sheet_has_header(observations: list[dict]) -> bool:
+    """Does this sheet actually carry a USPTO running header (D45)?
+
+    `HEADER_BAND` discards everything in the top 12% of a sheet as header furniture —
+    patent number, date, "Sheet N of M". That is right when a header is THERE and
+    destructive when it is not: US8046721B2 has no running header on any of its 16
+    sheets, and the band silently deleted 13 spec-recited numerals sitting near the top
+    of the drawings (100, 200, 300, 400, 1002, …). Corpus 1 has a header on 8/8 sheets
+    and loses nothing. So the guard is applied on PER-SHEET EVIDENCE rather than
+    assumed — a fitted guard must not fire where its precondition does not hold.
+    """
+    return any(_SHEET_ID.search(o["text"]) or _FURNITURE.search(o["text"])
+               for o in observations)
+
+
 def derive(observations: list[dict], recited: set[str] | None = None) -> dict:
     """Deterministic extraction over raw observations: FIG labels, sheet self-id,
     numeral candidates (digit runs outside the header band, with provenance)."""
     figs, sheet_id, numerals = [], None, []
+    has_header = sheet_has_header(observations)
     for o in observations:
         m = _SHEET_ID.search(o["text"])
         if m:
@@ -371,7 +390,7 @@ def derive(observations: list[dict], recited: set[str] | None = None) -> dict:
         for m in _FIG_LABEL.finditer(o["text"]):
             figs.append({"fig": m.group(1).upper(), "confidence": o["confidence"],
                          "x": o["x"], "y": o["y"]})
-        if o["y"] >= _HEADER_BAND:               # header: patent no., date — not numerals
+        if has_header and o["y"] >= _HEADER_BAND:   # header: patent no., date (D45)
             continue
         if _FIG_LABEL.search(o["text"]) or _FIG_FUZZY.search(o["text"]):
             continue                             # a FIG caption's digits ≠ numerals
@@ -412,6 +431,7 @@ def derive(observations: list[dict], recited: set[str] | None = None) -> dict:
     upright = [n for n in merged if 0 in n.get("angles", [0])]
     return {"fig_labels": sorted(best_fig.values(), key=lambda f: f["fig"]),
             "sheet_id": sheet_id,
+            "has_header": has_header,   # whether the band was applied — auditable (D45)
             "numerals": gate_rotated_numerals(
                 drop_strobogrammatic_twins(merged, upright), recited or set())}
 

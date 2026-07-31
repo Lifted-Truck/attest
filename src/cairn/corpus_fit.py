@@ -78,7 +78,10 @@ FITTED: list[FittedConstant] = [
         "USPTO sheets carry a running header (patent number, date, 'Sheet N of M') whose "
         "digits are not reference numerals. 0.88 clears it on all 8 sheets of US5447630A.",
         "A sheet whose drawing extends into the top 12%, or a non-USPTO drawing set with "
-        "no header band at all (the guard then silently discards real labels).",
+        "no header band at all (the guard then silently discards real labels). CONFIRMED "
+        "on US8046721B2 (D45): 0/16 sheets carry a running header, and the band deleted 13 "
+        "spec-recited numerals (100, 200, 300, 400, 1002, …). The band is now applied only "
+        "where a header is DETECTED per sheet, so it cannot fire without its precondition.",
     ),
     FittedConstant(
         "figures_map.FIGURE_CONTEXT_WINDOW", 2000, CORPUS,
@@ -122,7 +125,10 @@ FITTED: list[FittedConstant] = [
         "headroom above this value, which was never measured when it was chosen.",
         "Any denser sheet. Two real marks closer than 0.02 apart silently merge into "
         "one, and the survivor keeps only the higher confidence — the miss is invisible. "
-        "The swarm flagged this as the sharpest untested constant in the repo.",
+        "The swarm flagged this as the sharpest untested constant in the repo. TESTED on "
+        "US8046721B2 (D45): closest same-label pair 0.0272, i.e. +0.0072 headroom vs "
+        "corpus 1's +0.0002. Transfers — the tightness is a property of corpus 1, not of "
+        "the value. Still the constant to re-measure first on any denser sheet.",
     ),
     FittedConstant(
         "figures_map.is_fragment(radius=)", 0.025, CORPUS,
