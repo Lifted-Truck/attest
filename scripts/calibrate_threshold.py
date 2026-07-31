@@ -20,6 +20,8 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
+from cairn.calibration import CalibrationRecord, corpus_hash
+from cairn.calibration import write as write_calibration
 from cairn.ingest import DocumentStore
 from cairn.retrieval import Retriever
 from cairn.spans import SpanStore
@@ -32,10 +34,15 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Fit the check_support floor from a golden set")
     ap.add_argument("--golden", default=str(ROOT / "golden_seed.json"))
     ap.add_argument("--store", default=str(ROOT / "corpus" / "store"))
+    ap.add_argument("--write", metavar="YYYY-MM-DD",
+                    help="write calibration.json into the store, dated (RT-9). Without "
+                         "this the fit is only printed and the store stays UNCALIBRATED, "
+                         "which every check_support result then says out loud.")
     ns = ap.parse_args()
 
     items = json.loads(Path(ns.golden).read_text(encoding="utf-8"))["items"]
-    retriever = Retriever(SpanStore.from_store(DocumentStore(ns.store)))
+    doc_store = DocumentStore(ns.store)
+    retriever = Retriever(SpanStore.from_store(doc_store))
     c = calibrate_threshold(items, retriever)
 
     sep = "clean separation" if c.clean else "OVERLAP — not separable by a single floor"
@@ -43,6 +50,21 @@ def main() -> int:
     print(f"  answerable (n={c.n_present}): top scores ≥ {c.present_min}")
     print(f"  content-absent (n={c.n_absent}): top scores ≤ {c.absent_max}")
     print(f"  gap = {c.gap}  ({sep});  {c.excluded} trap items excluded (handled by reasoning)")
+
+    if ns.write:
+        # The date is supplied, never read from the clock: cores stay clock-free so a
+        # calibration record replays identically (I6).
+        ids = doc_store.list_docs()
+        rec = CalibrationRecord(
+            threshold=c.threshold, corpus_id=Path(ns.store).parent.name, doc_ids=ids,
+            corpus_hash=corpus_hash(ids, [doc_store.load(d).content_hash for d in ids]),
+            calibrated_on=ns.write, method="golden-gap",
+            n_present=c.n_present, n_absent=c.n_absent)
+        print(f"\nwrote {write_calibration(ns.store, rec)}")
+        print(f"  corpus_hash = {rec.corpus_hash[:16]}…  "
+              f"(a doc added/removed/edited after this makes the record STALE)")
+    else:
+        print("\n  not written — re-run with --write YYYY-MM-DD to record it in the store.")
     return 0
 
 

@@ -1,0 +1,12 @@
+{
+  "calibrated_on": "2026-07-28",
+  "corpus_hash": "96d72806e89cea1b16c8e0e1bba24f937b0c0e6a42216ac46158dda6c7f71748",
+  "corpus_id": "corpus",
+  "doc_ids": [
+    "AAPL-10K-FY2024"
+  ],
+  "method": "golden-gap",
+  "n_absent": 3,
+  "n_present": 13,
+  "threshold": 15.1
+}

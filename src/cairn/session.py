@@ -28,6 +28,7 @@ def _hits(hits) -> list[dict]:
 def support_record(
     query: str, result: SupportResult, kind: str = "check_support", *,
     threshold: float = THRESHOLD, retrieval: str = "bm25",
+    calibration_warning: str | None = None,
 ) -> dict:
     """Canonical, loggable record of a check_support / check_claim interaction.
 
@@ -37,7 +38,7 @@ def support_record(
     the contract version, the retrieval method, and the support floor used — so it
     stays interpretable after an upgrade and replays deterministically (I6).
     """
-    return {
+    rec = {
         "kind": kind,
         "query": query,
         "status": result.status,
@@ -47,6 +48,14 @@ def support_record(
             "contract": CONTRACT_VERSION, "retrieval": retrieval, "threshold": threshold,
         },
     }
+    if calibration_warning:
+        # RT-9: an abstention taken under a foreign or stale support floor is not a
+        # trustworthy abstention, and this is the record a reviewer reads months later.
+        # It rides at the TOP level, not inside provenance, because it qualifies the
+        # RESULT rather than describing the machinery — and because a reader skimming
+        # for problems must not have to open a nested block to find one.
+        rec["calibration_warning"] = calibration_warning
+    return rec
 
 
 def replay_support(payload: dict, retriever: Retriever) -> dict:
@@ -61,8 +70,13 @@ def replay_support(payload: dict, retriever: Retriever) -> dict:
     prov = payload.get("provenance", {})
     threshold = prov.get("threshold", THRESHOLD)
     result = check_support(payload["query"], retriever, threshold=threshold)
+    # The calibration warning describes the store's state at WRITE time and is not
+    # re-derivable from the query, so it is preserved verbatim — the same rule the
+    # provenance stamp follows below. A record that abstained under an uncalibrated
+    # floor must keep saying so on replay, or the replay launders the caveat away.
     rec = support_record(payload["query"], result, kind,
-                         threshold=threshold, retrieval=retriever.method)
+                         threshold=threshold, retrieval=retriever.method,
+                         calibration_warning=payload.get("calibration_warning"))
     if "provenance" in payload:
         rec["provenance"] = payload["provenance"]
     else:                                   # pre-provenance record stays pre-provenance

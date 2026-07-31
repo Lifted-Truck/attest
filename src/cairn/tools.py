@@ -24,6 +24,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .audit import AuditLog
+from .calibration import ThresholdChoice
+from .calibration import resolve as resolve_threshold
 from .frame import ROLES, coverage_for_answer, coverage_to_json, frame_from_json
 from .ingest import DocumentStore
 from .retrieval import Hit, Retriever
@@ -180,10 +182,29 @@ def _hit(h: Hit) -> dict:
 
 def default_registry(
     store_dir: Path | str, audit_path: Path | str | None = None,
-    *, support_threshold: float = SUPPORT_THRESHOLD,
+    # None = resolve from the store's calibration record (RT-9). An explicit float is
+    # an operator override and WINS: silently overriding a caller's stated intent is the
+    # same class of defect this whole mechanism exists to remove.
+    *, support_threshold: float | None = None,
 ) -> dict[str, Tool]:
-    span_store = SpanStore.from_store(DocumentStore(store_dir))
+    doc_store = DocumentStore(store_dir)
+    span_store = SpanStore.from_store(doc_store)
     retriever = Retriever(span_store)
+    # RT-9: the support floor is a BM25 score, which does not transfer between corpora.
+    # Resolve it from THIS store's calibration record and carry the provenance forward,
+    # so an uncalibrated or stale floor is visible in every result and every log entry
+    # instead of silently producing false abstentions.
+    if support_threshold is not None:
+        _choice = ThresholdChoice(
+            support_threshold, False,
+            f"EXPLICIT OVERRIDE: the support floor {support_threshold} was supplied by "
+            f"the caller, not read from this store's calibration record.")
+    else:
+        _ids = doc_store.list_docs()
+        _choice = resolve_threshold(
+            store_dir, SUPPORT_THRESHOLD, _ids,
+            [doc_store.load(d).content_hash for d in _ids])
+    support_threshold = _choice.threshold
     # The audit log is the single writable surface (I4); it is the *only* thing the
     # write tools below close over. The read tools never receive it, so the
     # read/write asymmetry is structural — a read handler cannot append even by
@@ -237,14 +258,16 @@ def default_registry(
     def _check_support(a: dict) -> dict:
         rec = support_record(
             a["query"], check_support(a["query"], retriever, threshold=support_threshold),
-            threshold=support_threshold, retrieval=retriever.method)
+            threshold=support_threshold, retrieval=retriever.method,
+            calibration_warning=_choice.warning)
         _append(rec)
         return rec
 
     def _check_claim(a: dict) -> dict:
         rec = support_record(
             a["claim"], check_support(a["claim"], retriever, threshold=support_threshold),
-            kind="check_claim", threshold=support_threshold, retrieval=retriever.method)
+            kind="check_claim", threshold=support_threshold, retrieval=retriever.method,
+            calibration_warning=_choice.warning)
         _append(rec)
         return rec
 

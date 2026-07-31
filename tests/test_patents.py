@@ -494,3 +494,26 @@ def test_range_captions_are_matched_so_the_caption_run_survives_them():
     assert "6" in got, "a plain caption after a range caption must survive"
     assert "4A" in got and "4B" in got
     assert got.index("1") < got.index("4A") < got.index("6")
+
+
+def test_acronym_labels_over_generate_without_drawing_evidence():
+    """RT-9: an executable statement of the contract, not a bug report.
+
+    `acronym_labels` has no frequency floor ON PURPOSE (a real one-off like CZ or CL
+    would be deleted by one), which makes the DRAWINGS the filter. Where no OCR'd sheets
+    exist there is no filter at all. Measured on US8046721B2: 34 candidates including
+    CDMA/GSM/CPU/IEEE and the section headings BRIEF and FIELD. This test pins that the
+    output is candidates — so a future caller cannot mistake it for an assertion — and
+    that intersecting with located sightings is what makes it safe."""
+    from cairn.patents import acronym_labels
+    spec = ("FIELD OF THE INVENTION. The device uses a CPU and a GSM radio with CDMA "
+            "fallback, and the GUI is drawn by the CMOS controller. The cooling zone CZ "
+            "is shown shaded.")
+    candidates = acronym_labels(spec)
+    assert "CZ" in candidates, "a genuine one-off label must survive (no frequency floor)"
+    assert {"CPU", "GSM", "CDMA", "CMOS"} <= set(candidates), (
+        "technology acronyms are NOT filtered out — that is the documented contract, "
+        "and why the caller must adjudicate against the drawings")
+
+    located = {"CZ"}                                  # what OCR actually found on a sheet
+    assert [a for a in candidates if a in located] == ["CZ"]

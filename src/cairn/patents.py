@@ -516,6 +516,19 @@ def acronym_labels(text: str) -> list[str]:
 
     Locate-only (D10): these are candidates to LOOK FOR on the drawings, never an
     assertion that they are labels.
+
+    **THIS OUTPUT IS UNADJUDICATED AND MUST NOT BE DISPLAYED AS-IS (RT-9).** The absent
+    frequency floor is deliberate, but it means the drawings are load-bearing: where no
+    OCR'd sheets exist, nothing filters the candidates and this function over-generates
+    without limit. Measured on US8046721B2 (2026-07-28), an electronics patent: it
+    returned **34** candidates including CDMA, GSM, CMOS, CPU, GPS, IEEE, CODEC — and
+    the section headings BRIEF and FIELD. The corpus-1 exclusion list (`CFM RPM PSI
+    GPM`) does not generalise, and the fix is NOT a longer blocklist — that is the
+    whack-a-mole L0006 warns about, and it would need a new list per corpus.
+
+    Every caller must intersect this with what OCR actually located on a sheet (all
+    three current ones do, via `a in sightings_by_num`). A caller that cannot adjudicate
+    must present the output as candidates, explicitly unconfirmed — never as labels.
     """
     cm = _CLAIMS_MARKER.search(text)
     region = text[:cm.start()] if cm else text          # specification only
