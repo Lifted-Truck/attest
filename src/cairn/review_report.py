@@ -1,0 +1,272 @@
+"""review_report — the signable record of the inquiry (RT-5).
+
+**What is being sold here.** Not the answer. Under 37 CFR 11.18(b) a practitioner's
+certification is **non-delegable**, so the artifact a professional can actually buy is the
+*record of the inquiry* — what was searched, what was found, what was rejected, what was
+declined, and under exactly what declared limits. The landscape survey found this is what
+the one commercially successful comparable monetises, and that Cairn already holds the
+substrate no surveyed competitor matches: a hash-chained log, byte-identical replay,
+contract-stamped provenance.
+
+**Two wording rules, load-bearing rather than stylistic.** This document must say it
+*evidences*, *documents* and *supports* an inquiry — never that it *satisfies*, *ensures*
+or *completes* one. A record that implies search breadth it does not have is a liability
+artifact, not an asset; retrieval here is a ranked BM25 slice, not an exhaustive search,
+and the report says so where a reader cannot miss it. Everything the tool declines to
+conclude stays declined (D10: locate & evidence, never adjudicate).
+
+**Structure follows D33's discipline:** the limits arrive *before* the findings. A caveat
+a reader meets at the end is a caveat that did not work.
+
+Open intake questions this builds against (stated, not assumed away):
+  · **Q13** — which analysis the client wants. This module is deliberately orthogonal:
+    it wraps whatever interactions the audit log holds, so answering Q13 changes the
+    *content* of a report and not its shape.
+  · **Q16** — delivery form. Defaulted to a self-contained HTML page: no server, emailable,
+    prints to PDF for signature, and matches every other surface in the repo.
+"""
+
+from __future__ import annotations
+
+import html
+import json
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from .calibration import load as load_calibration
+from .contract import CONTRACT_VERSION
+
+
+@dataclass
+class CorpusIdentity:
+    """What was searched, pinned so the reader can verify it independently."""
+
+    doc_ids: list[str]
+    hashes: dict[str, str]
+    calibration: str            # human-readable calibration state (D44)
+    calibrated: bool
+
+
+@dataclass
+class ReportData:
+    engagement: str
+    corpus: CorpusIdentity
+    interactions: list           # evidence_view.Interaction
+    entries: list[dict] = field(default_factory=list)   # raw audit payloads
+    generated_on: str = ""       # supplied by the caller — cores stay clock-free (I6)
+
+
+def corpus_identity(store_dir: str | Path, doc_store) -> CorpusIdentity:
+    ids = doc_store.list_docs()
+    hashes = {d: doc_store.load(d).content_hash for d in ids}
+    rec = load_calibration(store_dir)
+    if rec is None:
+        note = ("NOT CALIBRATED to this corpus — the relevance floor used was fitted to a "
+                "different document set. Abstentions in this report are therefore less "
+                "reliable than answers, and skew toward refusing questions the corpus can "
+                "in fact answer.")
+    else:
+        note = (f"Calibrated {rec.calibrated_on} against this corpus "
+                f"({rec.corpus_hash[:12]}…), method {rec.method}, "
+                f"floor {rec.threshold} fitted on {rec.n_present} answerable / "
+                f"{rec.n_absent} content-absent items.")
+    return CorpusIdentity(ids, hashes, note, rec is not None)
+
+
+# --- the declared limits ------------------------------------------------------------
+# Each is a limit a professional must know to rely on this record correctly. They are
+# listed FIRST in the rendered page, and they are phrased as facts about the method
+# rather than as disclaimers about liability — a disclaimer invites being read past.
+
+LIMITS: list[tuple[str, str]] = [
+    ("This records an inquiry; it does not complete one",
+     "The certification under 37 CFR 11.18(b) is non-delegable. This document evidences "
+     "and supports the reviewer's inquiry — it does not satisfy, ensure or discharge it."),
+    ("Retrieval is a ranked slice, not an exhaustive search",
+     "Candidate passages are ranked by BM25 over the listed documents and the top matches "
+     "are returned. Nothing here establishes that no other relevant passage exists, in "
+     "these documents or outside them."),
+    ("A verified citation is real, not necessarily supporting",
+     "Verification confirms that each cited span EXISTS at the recorded offsets and that "
+     "the document still hashes as it did at ingest. It does not confirm that the span "
+     "entails the claim made from it. That judgment remains the reviewer's."),
+    ("Nothing here is a legal conclusion",
+     "The tool locates and evidences. It does not conclude on novelty, obviousness, "
+     "validity, infringement, freedom to operate, or claim construction, and a refusal "
+     "to do so is recorded as an outcome in its own right rather than as a failure."),
+    ("Drawing locations are OCR-derived",
+     "Where a reference numeral is shown located on a drawing sheet, that location is a "
+     "machine reading of pixels, frozen at ingestion. It is a reviewer's aid to be "
+     "confirmed by eye, never a citation."),
+    ("Absence of a flag is not evidence of correctness",
+     "The consistency checks compare the drawings against the specification. Anything "
+     "absent from both is invisible to all of them. Flag counts are a floor on the "
+     "discrepancies present, never a ceiling."),
+]
+
+
+def outcome_counts(interactions: list) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for i in interactions:
+        counts[i.kind] = counts.get(i.kind, 0) + 1
+    return counts
+
+
+def rejected_candidates(entries: list[dict]) -> list[dict]:
+    """Passages retrieval surfaced that were NOT carried into an answer.
+
+    Deliberately included. A record showing only what was used invites the reading that
+    nothing else was seen; showing what was surfaced and set aside is what makes the
+    inquiry's *shape* auditable, and it is the half a reviewer needs in order to disagree
+    with it. `closest` spans on an abstention are the same evidence in the other
+    direction — proof that the tool looked, and where.
+    """
+    out = []
+    for e in entries:
+        if e.get("kind") not in ("check_support", "check_claim"):
+            continue
+        for h in e.get("closest", []):
+            out.append({"query": e.get("query", ""), "status": e.get("status", ""),
+                        "span": h, "warning": e.get("calibration_warning")})
+    return out
+
+
+def _esc(s: object) -> str:
+    return html.escape(str(s), quote=True)
+
+
+def render(data: ReportData) -> str:
+    """The self-contained HTML report (Q16 default; see module docstring)."""
+    c = data.corpus
+    counts = outcome_counts(data.interactions)
+    rejected = rejected_candidates(data.entries)
+    cal_class = "ok" if c.calibrated else "warn"
+
+    limits = "".join(
+        f"<li><b>{_esc(t)}.</b> {_esc(body)}</li>" for t, body in LIMITS)
+
+    docs = "".join(
+        f"<tr><td class='mono'>{_esc(d)}</td>"
+        f"<td class='mono hash'>{_esc(c.hashes[d])}</td></tr>" for d in c.doc_ids)
+
+    order = ["answer", "correction", "partial", "abstain", "refuse"]
+    chips = "".join(
+        f"<span class='chip {k}'>{counts.get(k, 0)} {k}</span>"
+        for k in order if counts.get(k))
+
+    rows = []
+    for n, i in enumerate(data.interactions, 1):
+        cited = []
+        if i.verify is not None:
+            for s in i.verify.sentences:
+                for a in s.atom_verdicts:
+                    b = a.binding
+                    cited.append(f"{b.doc_id} [{b.char_start}–{b.char_end}] "
+                                 f"“{b.text}” · {a.status}")
+        body = "<br>".join(_esc(x) for x in cited) or "<i>no citation presented</i>"
+        ok = "—" if i.verify is None else ("verified" if i.verify.ok else "NOT verified")
+        rows.append(
+            f"<tr><td>{n}</td><td>{_esc(i.question)}</td>"
+            f"<td><span class='chip {_esc(i.kind)}'>{_esc(i.kind)}</span></td>"
+            f"<td class='mono sm'>{body}</td><td>{_esc(ok)}</td></tr>")
+    interactions_html = "".join(rows) or (
+        "<tr><td colspan='5'><i>No interactions recorded in this segment.</i></td></tr>")
+
+    rej = "".join(
+        f"<tr><td>{_esc(r['query'])}</td><td>{_esc(r['status'])}</td>"
+        f"<td class='mono sm'>{_esc(json.dumps(r['span'])[:160])}</td></tr>"
+        for r in rejected[:60])
+    rej_html = rej or "<tr><td colspan='3'><i>None recorded.</i></td></tr>"
+
+    return _PAGE.format(
+        engagement=_esc(data.engagement), generated=_esc(data.generated_on or "—"),
+        contract=_esc(CONTRACT_VERSION), limits=limits, docs=docs,
+        cal_class=cal_class, calibration=_esc(c.calibration),
+        chips=chips or "<span class='chip'>no interactions</span>",
+        interactions=interactions_html, rejected=rej_html,
+        n_rejected=len(rejected), n_docs=len(c.doc_ids),
+        n_interactions=len(data.interactions))
+
+
+_PAGE = """<meta charset="utf-8"><title>Record of inquiry — {engagement}</title>
+<style>
+:root{{--ink:#12161f;--mut:#5b6577;--rule:#d8dae1;--bg:#fbfbfc;--warn:#a8322c;
+ --warnbg:#fdf3f2;--ok:#2f6b4f;--okbg:#eff6f2;--accent:#2f4f8f}}
+*{{box-sizing:border-box}}
+body{{margin:0;background:var(--bg);color:var(--ink);
+ font:15px/1.6 Georgia,"Iowan Old Style",serif}}
+main{{max-width:920px;margin:0 auto;padding:0 28px 80px}}
+h1{{font:600 30px/1.2 ui-sans-serif,system-ui,sans-serif;margin:44px 0 4px}}
+h2{{font:600 17px/1.3 ui-sans-serif,system-ui,sans-serif;margin:38px 0 10px;
+ padding-bottom:6px;border-bottom:1px solid var(--rule)}}
+.sub{{color:var(--mut);font:13px/1.5 ui-sans-serif,system-ui,sans-serif;margin:0 0 8px}}
+.limits{{border:1px solid var(--warn);border-left:5px solid var(--warn);
+ background:var(--warnbg);border-radius:6px;padding:16px 20px;margin:22px 0}}
+.limits h2{{border:0;margin:0 0 8px;padding:0;color:var(--warn);font-size:15px;
+ text-transform:uppercase;letter-spacing:.05em}}
+.limits ul{{margin:0;padding-left:20px}}
+.limits li{{margin:9px 0;font-size:14px}}
+table{{border-collapse:collapse;width:100%;font:13.5px/1.5 ui-sans-serif,system-ui,sans-serif}}
+th,td{{text-align:left;padding:8px 12px 8px 0;border-bottom:1px solid var(--rule);
+ vertical-align:top}}
+th{{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}}
+.mono{{font-family:ui-monospace,"SF Mono",Menlo,monospace}}
+.sm{{font-size:12px}} .hash{{font-size:11px;color:var(--mut);word-break:break-all}}
+.chip{{display:inline-block;padding:2px 9px;border-radius:11px;font:600 11.5px/1.7
+ ui-sans-serif,system-ui,sans-serif;background:#e9ecf3;color:#33405c;margin-right:5px}}
+.chip.answer{{background:#e6efe9;color:var(--ok)}}
+.chip.correction{{background:#fdf3e6;color:#8a5a12}}
+.chip.partial{{background:#eef0f6;color:#3f4a63}}
+.chip.abstain{{background:#eceef2;color:#5b6577}}
+.chip.refuse{{background:var(--warnbg);color:var(--warn)}}
+.state{{border-radius:6px;padding:11px 15px;margin:12px 0;font-size:13.5px;
+ font-family:ui-sans-serif,system-ui,sans-serif}}
+.state.ok{{background:var(--okbg);border:1px solid #bcd8c8}}
+.state.warn{{background:var(--warnbg);border:1px solid #e6b3ae;color:var(--warn)}}
+.sign{{margin-top:44px;border-top:2px solid var(--ink);padding-top:16px;
+ font:13.5px/1.9 ui-sans-serif,system-ui,sans-serif}}
+.sign .line{{display:inline-block;border-bottom:1px solid var(--ink);
+ min-width:290px;margin:0 12px}}
+</style>
+<main>
+<h1>Record of inquiry</h1>
+<p class="sub">{engagement} · generated {generated} · truth contract v{contract} ·
+ {n_docs} document(s) · {n_interactions} interaction(s)</p>
+
+<div class="limits">
+  <h2>Read before relying on this record</h2>
+  <ul>{limits}</ul>
+</div>
+
+<h2>What was searched</h2>
+<p class="sub">Content hashes are recorded at ingest. Re-hashing a document and comparing
+ it against the value below verifies, independently of this tool, that the text examined
+ is the text you hold.</p>
+<table><thead><tr><th>Document</th><th>SHA-256 at ingest</th></tr></thead>
+<tbody>{docs}</tbody></table>
+<div class="state {cal_class}">{calibration}</div>
+
+<h2>Outcomes</h2>
+<p class="sub">Every interaction resolves to one of five recorded outcomes. A refusal to
+ reach a legal conclusion, and an abstention for want of evidence, are outcomes in their
+ own right — not failures, and not silence.</p>
+<p>{chips}</p>
+<table><thead><tr><th>#</th><th>Question</th><th>Outcome</th>
+ <th>Citations (document, offsets, literal, status)</th><th>Verification</th></tr></thead>
+<tbody>{interactions}</tbody></table>
+
+<h2>Surfaced and set aside ({n_rejected})</h2>
+<p class="sub">Passages retrieval returned that were not carried into an answer, and the
+ nearest passages found where the tool abstained. Included so the shape of the inquiry is
+ auditable — and so a reviewer has what they need in order to disagree with it.</p>
+<table><thead><tr><th>Query</th><th>Status</th><th>Passage</th></tr></thead>
+<tbody>{rejected}</tbody></table>
+
+<div class="sign">
+  <p>The reviewer below has examined this record and the sources it cites. The
+  certification required by 37 CFR 11.18(b) rests with that reviewer; this document
+  evidences the inquiry undertaken and does not discharge it.</p>
+  <p>Reviewer <span class="line"></span> Date <span class="line"></span></p>
+</div>
+</main>
+"""
