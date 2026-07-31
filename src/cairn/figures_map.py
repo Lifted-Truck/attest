@@ -410,27 +410,67 @@ def verify_raster_binding(manifest: dict, fig_dir: str | Path) -> None:
 
 
 def load_manifest(store_dir: str | Path) -> dict:
-    """The frozen OCR manifest, plus any MANUAL annotations from the sidecar
-    `figures/manual_annotations.json` — reviewer/visually-confirmed marks the OCR
-    engine is blind to (a lone view-marker glyph reads as line art to Vision, every
-    API, at every scale). Each carries `method: "human"` and a `by`/`note`
-    provenance string: a human confirmation is an EVIDENCE SOURCE with its own
-    provenance, never conflated with an OCR read (D28's honesty model extended —
-    this is the adjudication-record shape RT-5 anticipates)."""
+    """The frozen OCR manifest, merged with the reviewer's ADJUDICATIONS (D47).
+
+    A human confirmation is an EVIDENCE SOURCE with its own provenance, never conflated
+    with an OCR read: merged marks carry `method: "human"` plus who recorded them and
+    when. They are the marks OCR cannot see at all — a lone view-marker glyph reads as
+    line art to every engine, at every scale.
+
+    Judgments come from the append-only, hash-chained `figures/adjudications.jsonl`
+    (RT-7a). The previous home was a mutable JSON array, and it failed as that design
+    must: a reviewer's confirmation of FIG. 2's "A" was replaced by a machine read and is
+    unrecoverable. The legacy file is still read when the log is absent, so an
+    un-migrated engagement keeps working — but it is read, never written.
+
+    `refute` withdraws an OCR-located mark the reviewer says is not there. That is the
+    only way anything is removed from the manifest view, and it takes a named human
+    saying so on a dated record."""
     fig_dir = Path(store_dir).parent / "figures"
     manifest = json.loads((fig_dir / "ocr_manifest.json").read_text(encoding="utf-8"))
     verify_raster_binding(manifest, fig_dir)
-    sidecar = fig_dir / "manual_annotations.json"
-    if sidecar.exists():
-        by_page = {p["page"]: p for p in manifest["pages"]}
-        for a in json.loads(sidecar.read_text(encoding="utf-8")):
-            page = by_page.get(a["page"])
-            if page is not None:
-                page["numerals"].append({
-                    "numeral": a["numeral"], "source_text": a.get("note", "manual"),
-                    "confidence": 1.0, "method": "human",
-                    "x": a["x"], "y": a["y"], "w": a.get("w", 0.02), "h": a.get("h", 0.02),
-                })
+    apply_adjudications(manifest, fig_dir)
+    return manifest
+
+
+def apply_adjudications(manifest: dict, fig_dir: str | Path) -> dict:
+    """Fold the reviewer's effective judgments into the manifest view (D47)."""
+    from .adjudication import CONFIRM, CORRECT, REFUTE, AdjudicationLog
+    from .adjudication import import_legacy_sidecar as _legacy
+
+    fig_dir = Path(fig_dir)
+    log = AdjudicationLog(fig_dir / "adjudications.jsonl")
+    if log.path.exists():
+        log.verify_chain()          # a doctored record fails loudly, never reads clean
+        judgments = log.effective()
+    else:                            # un-migrated engagement: read the legacy file
+        judgments = _legacy(fig_dir / "manual_annotations.json",
+                            by="(unknown — pre-D47 record)", on="(undated)")
+
+    by_page = {p["page"]: p for p in manifest["pages"]}
+    for a in judgments:
+        page = by_page.get(a.target.get("page"))
+        if page is None:
+            continue
+        if a.kind == REFUTE:
+            # The reviewer says the tool located something that is not on the sheet.
+            page["numerals"] = [
+                n for n in page["numerals"]
+                if not (str(n["numeral"]) == str(a.target.get("numeral"))
+                        and abs(n["x"] - a.target.get("x", -9)) < 0.02
+                        and abs(n["y"] - a.target.get("y", -9)) < 0.02)]
+            continue
+        if a.kind not in (CONFIRM, CORRECT):
+            continue                 # a note asserts nothing about the marks
+        src = a.value if a.kind == CORRECT else a.target
+        page["numerals"].append({
+            "numeral": src.get("numeral", a.target.get("numeral")),
+            "source_text": a.note or "reviewer-confirmed",
+            "confidence": 1.0, "method": "human",
+            "adjudication": a.adj_id, "by": a.by, "on": a.on,
+            "x": src.get("x", a.target.get("x")), "y": src.get("y", a.target.get("y")),
+            "w": src.get("w", 0.02), "h": src.get("h", 0.02),
+        })
     return manifest
 
 
