@@ -1,0 +1,286 @@
+<title>What OCR Actually Sees — ATTEST revisions D32–D34</title>
+<style>
+:root{
+  --ink:#1a2438; --ink-soft:#48566f; --ink-faint:#7b87a0;
+  --sheet:#f7f4ec; --sheet-edge:#e2dccd; --rule:#cfc7b4;
+  --blue:#2f4f8f; --blue-soft:#e8edf7;
+  --red:#a8322c; --red-soft:#f6e7e5;
+  --green:#3c6b52; --green-soft:#e6efe9;
+  --serif:Georgia,"Iowan Old Style","Times New Roman",serif;
+  --sans:ui-sans-serif,system-ui,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --ink:#e6e3da; --ink-soft:#a9b2c4; --ink-faint:#78829a;
+  --sheet:#141821; --sheet-edge:#242b39; --rule:#2f3849;
+  --blue:#8fb0ee; --blue-soft:#1a2438;
+  --red:#e8817a; --red-soft:#2a1a1c;
+  --green:#7fc39c; --green-soft:#16241d;
+}}
+:root[data-theme="dark"]{
+  --ink:#e6e3da; --ink-soft:#a9b2c4; --ink-faint:#78829a;
+  --sheet:#141821; --sheet-edge:#242b39; --rule:#2f3849;
+  --blue:#8fb0ee; --blue-soft:#1a2438;
+  --red:#e8817a; --red-soft:#2a1a1c;
+  --green:#7fc39c; --green-soft:#16241d;
+}
+:root[data-theme="light"]{
+  --ink:#1a2438; --ink-soft:#48566f; --ink-faint:#7b87a0;
+  --sheet:#f7f4ec; --sheet-edge:#e2dccd; --rule:#cfc7b4;
+  --blue:#2f4f8f; --blue-soft:#e8edf7;
+  --red:#a8322c; --red-soft:#f6e7e5;
+  --green:#3c6b52; --green-soft:#e6efe9;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--sheet);color:var(--ink);
+  font:16px/1.65 var(--serif);-webkit-font-smoothing:antialiased}
+.sheet{max-width:860px;margin:0 auto;padding:0 24px 96px}
+
+/* Title block — patent sheets carry one, so the page does too. */
+.block{border-bottom:2px solid var(--ink);padding:56px 0 14px;margin-bottom:44px;
+  display:flex;flex-wrap:wrap;align-items:flex-end;gap:20px}
+.block h1{font:600 clamp(28px,5vw,44px)/1.05 var(--sans);letter-spacing:-.02em;
+  margin:0;flex:1 1 340px;text-wrap:balance}
+.block .meta{font:11px/1.7 var(--mono);color:var(--ink-faint);text-align:right;
+  text-transform:uppercase;letter-spacing:.09em;white-space:nowrap}
+.lede{font-size:19px;line-height:1.6;color:var(--ink-soft);margin:0 0 12px;max-width:64ch}
+
+/* Revisions are a real sequence: D32 changed the data, D33 the presentation,
+   D34 the integrity. Numbering encodes that order, not decoration. */
+section{margin:56px 0 0;scroll-margin-top:20px}
+.rev{display:flex;align-items:baseline;gap:14px;margin:0 0 6px}
+.rev .tag{font:600 11px/1 var(--mono);letter-spacing:.12em;color:var(--sheet);
+  background:var(--ink);padding:6px 9px;border-radius:3px;white-space:nowrap}
+.rev h2{font:600 25px/1.2 var(--sans);letter-spacing:-.015em;margin:0;text-wrap:balance}
+.sub{font:12px/1.6 var(--mono);color:var(--ink-faint);text-transform:uppercase;
+  letter-spacing:.08em;margin:0 0 20px}
+p{max-width:66ch;margin:0 0 17px}
+strong{font-weight:600}
+em{font-style:italic;color:var(--ink)}
+code{font:.86em var(--mono);background:var(--blue-soft);color:var(--blue);
+  padding:1px 5px;border-radius:3px}
+
+figure{margin:26px 0;padding:0}
+figure svg{display:block;width:100%;height:auto;
+  border:1px solid var(--sheet-edge);border-radius:4px;background:var(--sheet)}
+figcaption{font:12.5px/1.55 var(--sans);color:var(--ink-faint);margin-top:9px;max-width:62ch}
+
+.finding{border-left:3px solid var(--red);background:var(--red-soft);
+  padding:15px 19px;margin:22px 0;border-radius:0 4px 4px 0}
+.finding.fixed{border-left-color:var(--green);background:var(--green-soft)}
+.finding h3{font:600 13px/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase;
+  margin:0 0 7px;color:var(--red)}
+.finding.fixed h3{color:var(--green)}
+.finding p{margin:0 0 10px;font-size:15px}
+.finding p:last-child{margin:0}
+
+.wrap{overflow-x:auto;margin:24px 0}
+table{border-collapse:collapse;width:100%;font:13.5px/1.5 var(--sans);min-width:520px}
+th,td{text-align:left;padding:9px 13px 9px 0;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+th{font:600 11px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.08em;
+  color:var(--ink-faint);border-bottom-color:var(--ink)}
+td.n{font:13px var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.yes{color:var(--green);font-weight:600}
+.no{color:var(--red);font-weight:600}
+
+hr{border:0;border-top:1px solid var(--rule);margin:52px 0 0}
+.foot{font:13px/1.7 var(--sans);color:var(--ink-faint);margin-top:22px;max-width:64ch}
+a{color:var(--blue)}
+:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+@media (prefers-reduced-motion:no-preference){
+  section{animation:rise .5s ease-out both}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+}
+</style>
+
+<div class="sheet">
+
+<div class="block">
+  <h1>What OCR actually sees</h1>
+  <div class="meta">ATTEST · RT-4<br>Revisions D32–D34<br>2026-07-26</div>
+</div>
+
+<p class="lede">Three revisions, all from one question you asked: <em>is 0/90/270 enough?</em>
+It wasn't — and chasing the answer turned up a wrong-citation bug on the grounding path
+that had nothing to do with rotation.</p>
+
+<section>
+  <div class="rev"><span class="tag">D32</span><h2>Rotation is a property of glyphs, not pages</h2></div>
+  <p class="sub">The measurement that broke the old design</p>
+
+  <p>D31 assumed each sheet has one orientation and picked it by counting label-shaped
+  tokens. To test whether that held, I ran the running header — <code>Sheet 1 of 8</code> —
+  through all four angles on all eight sheets.</p>
+
+  <p>It parsed <strong>every time</strong>. That single result reframes the problem: the
+  engines already cope with rotated text when it's a confident <em>line</em>. A long string
+  carries enough context to be found however it lies. An isolated <code>33</code> on a
+  leader line carries none, so it only reads when it happens to be upright in the raster.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 200" role="img" aria-label="At every rotation the header line is read, while an isolated numeral is read only when upright.">
+      <g font-family="ui-monospace,monospace" font-size="10">
+        <g fill="var(--ink-faint)" text-anchor="middle">
+          <text x="115" y="22">0°</text><text x="285" y="22">90°</text>
+          <text x="455" y="22">180°</text><text x="625" y="22">270°</text>
+        </g>
+        <g>
+          <!-- header row -->
+          <text x="8" y="70" fill="var(--ink-faint)" font-size="9">HEADER LINE</text>
+          <g fill="var(--green)" text-anchor="middle" font-size="18">
+            <text x="115" y="76">✓</text><text x="285" y="76">✓</text>
+            <text x="455" y="76">✓</text><text x="625" y="76">✓</text>
+          </g>
+          <g fill="var(--ink-soft)" text-anchor="middle" font-size="8.5">
+            <text x="115" y="94">read</text><text x="285" y="94">read</text>
+            <text x="455" y="94">read</text><text x="625" y="94">read</text>
+          </g>
+        </g>
+        <line x1="8" y1="112" x2="692" y2="112" stroke="var(--rule)"/>
+        <g>
+          <!-- isolated numeral row -->
+          <text x="8" y="150" fill="var(--ink-faint)" font-size="9">LONE NUMERAL</text>
+          <text x="115" y="156" fill="var(--green)" text-anchor="middle" font-size="18">✓</text>
+          <g fill="var(--red)" text-anchor="middle" font-size="18">
+            <text x="285" y="156">✗</text><text x="455" y="156">✗</text>
+            <text x="625" y="156">✗</text>
+          </g>
+          <g fill="var(--ink-soft)" text-anchor="middle" font-size="8.5">
+            <text x="115" y="174">read</text><text x="285" y="174">missed</text>
+            <text x="455" y="174">missed</text><text x="625" y="174">missed</text>
+          </g>
+        </g>
+      </g>
+    </svg>
+    <figcaption>Measured across all eight sheets. Because the two rows disagree, a sheet
+    with an upright header over a sideways drawing has no single correct angle — and
+    picking one lost labels on seven of the eight.</figcaption>
+  </figure>
+
+  <div class="finding">
+    <h3>The chooser also picked wrong</h3>
+    <p>On FIG 1 — the one sheet with ground truth, because you confirmed its numerals by
+    eye — token count selected <strong>90°</strong>. The truth is <strong>270°</strong>.
+    Upside-down digits still look like digits, so counting them can't tell the two apart.</p>
+  </div>
+
+  <p>So the fix isn't a better guess at the angle. It's to stop guessing: read at all four,
+  map every box back into page coordinates, and take the union. That raises recall and
+  invites phantoms, so admission is decided by <strong>corroboration</strong> — a label seen
+  only on a rotated pass needs the specification to recite it, or two engines to agree on
+  the same spot.</p>
+
+  <div class="finding">
+    <h3>Why 180° is held to a stricter bar</h3>
+    <p>Turn a sheet upside down and <code>6</code> becomes <code>9</code>. FIG 4's real
+    <code>86</code> manufactured a phantom <code>98</code>; FIG 5's real <code>98</code>
+    manufactured a phantom <code>86</code>.</p>
+    <p>Spec recital <em>cannot</em> filter those, because both members of a 6/9 pair are
+    usually recited. That's the generalisable point: against a 68-numeral specification,
+    recital is <strong>necessary but weak</strong> — it corroborates almost any plausible
+    two-digit artifact. No printed sheet is inverted anyway, so 180° now requires
+    cross-engine agreement.</p>
+  </div>
+
+  <div class="wrap"><table>
+    <thead><tr><th>Sheet</th><th>Under D31</th><th>Under D32</th><th>Phantoms admitted</th></tr></thead>
+    <tbody>
+      <tr><td class="n">FIG 1</td><td class="n">27</td><td class="n">29</td><td class="yes">none</td></tr>
+      <tr><td class="n">FIG 4</td><td class="n">—</td><td class="n">10</td><td class="yes">98 rejected</td></tr>
+      <tr><td class="n">FIG 5</td><td class="n">—</td><td class="n">16</td><td class="yes">86 · 95 rejected</td></tr>
+      <tr><td class="n">FIG 6</td><td class="n">—</td><td class="n">12</td><td class="yes">901 ← 106 rejected</td></tr>
+    </tbody>
+  </table></div>
+
+  <p><strong>Still open, and rotation doesn't touch it:</strong> skew. A sheet 1–5° off-axis
+  is fixed by no quarter-turn set. Deskew is a separate lever, noted but not built.</p>
+</section>
+
+<section>
+  <div class="rev"><span class="tag">D33</span><h2>The caveat has to arrive before the evidence</h2></div>
+  <p class="sub">Where the discrepancies sit in a report</p>
+
+  <p>Your framing was that this honours the tool's whole premise, and I think that's exactly
+  right: a system whose claim is <em>ground or abstain</em> can't bury the one step that is
+  neither. OCR is <em>judged</em>. So the discrepancy tally and the caveat now open the
+  report rather than closing it — a caveat found at the bottom is a caveat that didn't work.</p>
+
+  <p>One place I deliberately didn't use your wording. "OCR is nondeterministic" is wrong in
+  both directions, and the distinction is worth holding onto:</p>
+
+  <div class="wrap"><table>
+    <thead><tr><th>Property</th><th>Status</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Everything downstream of the reading</td><td class="yes">reproducible</td>
+        <td>frozen into a hashed manifest at ingestion; sheets are never re-OCR'd at answer time</td></tr>
+      <tr><td>The reading itself</td><td class="no">not guaranteed</td>
+        <td>a different engine version, OS, or machine can resolve the same pixels differently</td></tr>
+      <tr><td>Absence of a flag</td><td class="no">not evidence</td>
+        <td>checks compare drawings against the spec — a numeral OCR missed <em>and</em> the spec never recites is invisible to all of them</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>That last row is the one I'd want a reviewer to internalise. The counts on the banner
+  are a <strong>floor</strong> on the discrepancies, not a ceiling.</p>
+</section>
+
+<section>
+  <div class="rev"><span class="tag">D34</span><h2>What the swarm found in our own code</h2></div>
+  <p class="sub">72 agents · 9 lenses · 62 candidates · 43 survived hostile review</p>
+
+  <p>The swarm was pointed at anticipating OCR failures. It spent most of its effort reading
+  this repository instead, and the most serious thing it returned wasn't about OCR at all.
+  I reproduced each claim before acting on it.</p>
+
+  <div class="finding">
+    <h3>A distinct part was being asserted as its base numeral</h3>
+    <p>The numeral pattern accepted <code>\d{1,3}[a-z]?</code>. A patent reciting
+    <code>12A</code> and <code>12</code> as different parts had the uppercase suffix fall
+    straight through — <code>12A</code> matched as bare <strong>12</strong>.</p>
+    <p>This is not an OCR-aid problem. Text is where grounding binds, so that is a
+    <strong>wrong citation</strong>: a claim about part 12A pointed at part 12's span. It is
+    the one class of defect ATTEST exists to make impossible.</p>
+  </div>
+
+  <p>The three-digit cap had a quieter failure mode alongside it. The figure-keyed
+  1000-series (FIG. 10 → 1000, 1010, 1020) is standard in post-2000 software and electronics
+  patents, and none of it was expressible. On such a patent <em>both</em> sides of the
+  drawing/spec reconciliation come back empty — and a coverage report reads perfectly clean
+  over an empty map.</p>
+
+  <div class="finding fixed">
+    <h3>Fixed, and verified as a no-op here</h3>
+    <p>Widened to <code>\d{1,4}[a-zA-Z]?</code>. On US5447630A the recited set went 68 → 68:
+    nothing added, nothing removed. The fix changes what <em>can</em> be expressed without
+    disturbing what already was.</p>
+  </div>
+
+  <p>Two integrity holes came with it. <code>image_sha256</code> was written into every
+  manifest and had <strong>exactly one consumer in the whole tree: the line that wrote
+  it.</strong> Since every box is stored as a normalised fraction, a re-fetched or re-cropped
+  sheet would still resolve every box — silently, onto a different raster. A confident box
+  over the wrong mark.</p>
+
+  <p>And the Tesseract calls never checked <code>returncode</code> or <code>stderr</code>.
+  That one stings: it is lesson <strong>L0009</strong>, written four milestones ago after a
+  dead engine was mistaken for an engine blind to this corpus — recorded as prose, never
+  installed as code, and rediscovered by a research swarm.</p>
+
+  <div class="finding fixed">
+    <h3>The lesson that generalises</h3>
+    <p>A lesson written down but not enforced by a check gets paid for twice. Two rules now
+    in the library: when writing a lesson, ask what line of code would have caught it and
+    write that in the same change — if the answer is "none", it's an observation, not a
+    mitigation. And a field whose only consumer is its own write site is decoration, not a
+    guarantee.</p>
+  </div>
+</section>
+
+<hr>
+<p class="foot">Gate green at 223 Layer-0 tests across all three revisions. Full swarm
+synthesis — including the Tier-A manifest audits that fire today, a merge radius sitting
+0.7 px inside its safe window, and the corpus needed to test any of this on a second
+patent — is at <code>docs/ocr_failure_modes.md</code>, untriaged and authorizing no work.</p>
+
+</div>

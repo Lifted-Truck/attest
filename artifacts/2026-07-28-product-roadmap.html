@@ -1,0 +1,374 @@
+<title>Cairn — the road to one tool</title>
+<style>
+:root{
+  --paper:#f7f3ea; --ink:#1b2330; --ink2:#4a5567; --faint:#8b93a2;
+  --rule:#ded6c6; --line:#c9bda6;
+  --done:#3f6b52; --done-bg:#e8f0ea;
+  --part:#a8762a; --part-bg:#faf0dd;
+  --none:#a63d2f; --none-bg:#fbeae7;
+  --blue:#2f5075; --blue-bg:#e8eef5;
+  --sans:ui-sans-serif,system-ui,"Segoe UI",Helvetica,Arial,sans-serif;
+  --serif:Georgia,"Iowan Old Style",serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#12161d; --ink:#e8e4da; --ink2:#a8b1c0; --faint:#727c8c;
+  --rule:#2a313d; --line:#3a4351;
+  --done:#7fc39c; --done-bg:#17251d;
+  --part:#dfae62; --part-bg:#251d10;
+  --none:#e8837a; --none-bg:#271518;
+  --blue:#8fb3dd; --blue-bg:#141d28;
+}}
+:root[data-theme="dark"]{
+  --paper:#12161d; --ink:#e8e4da; --ink2:#a8b1c0; --faint:#727c8c;
+  --rule:#2a313d; --line:#3a4351;
+  --done:#7fc39c; --done-bg:#17251d;
+  --part:#dfae62; --part-bg:#251d10;
+  --none:#e8837a; --none-bg:#271518;
+  --blue:#8fb3dd; --blue-bg:#141d28;
+}
+:root[data-theme="light"]{
+  --paper:#f7f3ea; --ink:#1b2330; --ink2:#4a5567; --faint:#8b93a2;
+  --rule:#ded6c6; --line:#c9bda6;
+  --done:#3f6b52; --done-bg:#e8f0ea;
+  --part:#a8762a; --part-bg:#faf0dd;
+  --none:#a63d2f; --none-bg:#fbeae7;
+  --blue:#2f5075; --blue-bg:#e8eef5;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15.5px/1.62 var(--serif)}
+.wrap{max-width:1000px;margin:0 auto;padding:0 26px 100px}
+
+header{padding:60px 0 18px;border-bottom:2px solid var(--ink);margin-bottom:8px}
+h1{font:600 clamp(30px,5vw,46px)/1.04 var(--sans);letter-spacing:-.025em;margin:0 0 10px;
+  text-wrap:balance}
+.tag{font:600 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--faint);margin:0 0 14px}
+.lede{font-size:18px;color:var(--ink2);max-width:66ch;margin:0}
+
+.scores{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0 0}
+.score{flex:1 1 150px;border:1px solid var(--rule);border-radius:7px;padding:11px 14px;
+  background:var(--paper)}
+.score b{display:block;font:700 27px/1.1 var(--sans);font-variant-numeric:tabular-nums}
+.score span{font:11.5px/1.5 var(--sans);color:var(--faint);text-transform:uppercase;
+  letter-spacing:.07em}
+.score.d b{color:var(--done)} .score.p b{color:var(--part)} .score.n b{color:var(--none)}
+
+h2{font:600 24px/1.2 var(--sans);letter-spacing:-.015em;margin:56px 0 6px;text-wrap:balance}
+h3{font:600 15.5px/1.3 var(--sans);margin:26px 0 6px}
+.sub{color:var(--faint);font:13px/1.55 var(--sans);margin:0 0 16px;max-width:70ch}
+p{max-width:70ch;margin:0 0 15px}
+code{font:.85em var(--mono);background:var(--blue-bg);color:var(--blue);
+  padding:1px 5px;border-radius:3px}
+strong{font-weight:600}
+
+figure{margin:22px 0}
+figure svg{display:block;width:100%;height:auto;border:1px solid var(--rule);
+  border-radius:8px;background:var(--paper)}
+figcaption{font:12.5px/1.5 var(--sans);color:var(--faint);margin-top:8px;max-width:66ch}
+
+/* stage cards */
+.stage{border:1px solid var(--rule);border-radius:9px;margin:16px 0;overflow:hidden}
+.stage>h3{margin:0;padding:12px 16px;background:var(--blue-bg);border-bottom:1px solid var(--rule);
+  font:600 14px/1.3 var(--sans);display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.stage>h3 .n{font:700 11px/1 var(--mono);color:var(--faint);letter-spacing:.1em}
+.stage>h3 .what{font-weight:400;color:var(--ink2);font-size:13px}
+.caps{list-style:none;margin:0;padding:6px 0}
+.caps li{display:flex;gap:11px;align-items:baseline;padding:7px 16px;
+  border-bottom:1px solid var(--rule);font:13.5px/1.5 var(--sans)}
+.caps li:last-child{border-bottom:0}
+.pill{flex:0 0 auto;font:600 10.5px/1.7 var(--sans);letter-spacing:.05em;
+  text-transform:uppercase;padding:1px 8px;border-radius:10px;min-width:74px;text-align:center}
+.pill.d{background:var(--done-bg);color:var(--done)}
+.pill.p{background:var(--part-bg);color:var(--part)}
+.pill.n{background:var(--none-bg);color:var(--none)}
+.caps .id{flex:0 0 auto;font:11.5px var(--mono);color:var(--faint);min-width:58px}
+.caps .txt{flex:1 1 auto}
+.caps .txt em{color:var(--ink2);font-style:italic}
+
+.flag{border-left:4px solid var(--none);background:var(--none-bg);border-radius:0 7px 7px 0;
+  padding:14px 18px;margin:22px 0}
+.flag h3{margin:0 0 6px;color:var(--none);font-size:14px;text-transform:uppercase;
+  letter-spacing:.05em}
+.flag p{margin:0 0 9px;font-size:14.5px} .flag p:last-child{margin:0}
+
+.phase{display:flex;gap:14px;margin:0 0 4px;padding:14px 0;border-top:1px solid var(--rule)}
+.phase .when{flex:0 0 118px;font:600 12px/1.5 var(--sans);color:var(--faint);
+  text-transform:uppercase;letter-spacing:.06em}
+.phase .body{flex:1 1 auto}
+.phase h3{margin:0 0 4px}
+.phase p{margin:0;font-size:14.5px;color:var(--ink2)}
+
+.you{border:1px solid var(--line);border-radius:9px;padding:4px 18px;margin:18px 0;
+  background:var(--blue-bg)}
+.you li{margin:11px 0;font:14px/1.55 var(--sans)}
+.you li b{font-weight:600}
+
+hr{border:0;border-top:1px solid var(--rule);margin:50px 0 0}
+.foot{font:13px/1.7 var(--sans);color:var(--faint);margin-top:20px;max-width:68ch}
+:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="tag">Cairn · product roadmap · 2026-07-28</p>
+  <h1>From an engine to a tool</h1>
+  <p class="lede">What exists, what doesn't, and the shape of the single interface that
+  would hold all of it. Status is read from the roadmap, not estimated.</p>
+  <div class="scores">
+    <div class="score d"><b>29</b><span>Built &amp; gated</span></div>
+    <div class="score p"><b>9</b><span>Partial</span></div>
+    <div class="score n"><b>10</b><span>Not started</span></div>
+    <div class="score"><b>260</b><span>Layer-0 tests</span></div>
+    <div class="score"><b>46</b><span>Decisions logged</span></div>
+  </div>
+</header>
+
+<h2>The actual problem</h2>
+<p>The engine is the strong part: retrieval, span binding, verification, the audit chain,
+replay. All of that is built and gated. What's missing isn't capability — it's
+<strong>cohesion</strong>. Today Cairn is 16 scripts and five separate HTML pages that
+never link to each other, plus a CLI and an MCP server.</p>
+
+<figure>
+  <svg viewBox="0 0 940 250" role="img" aria-label="Today: five disconnected HTML artifacts produced by separate scripts, with no shared navigation.">
+    <g font-family="ui-sans-serif,system-ui,sans-serif">
+      <text x="14" y="24" font-size="12" font-weight="600" fill="var(--faint)">TODAY — five artifacts, no shared shell</text>
+      <rect x="14" y="42" width="150" height="52" rx="6" fill="var(--blue-bg)" stroke="var(--line)"/>
+      <text x="89" y="66" font-size="12.5" text-anchor="middle" fill="var(--ink)">Corpus store</text>
+      <text x="89" y="82" font-size="10.5" text-anchor="middle" fill="var(--faint)">16 CLI scripts</text>
+      <g stroke="var(--line)" stroke-width="1.4" fill="none">
+        <path d="M164 68 H210"/><path d="M210 68 V38 H250"/><path d="M210 68 V98 H250"/>
+        <path d="M210 68 V148 H250"/><path d="M210 68 V198 H250"/><path d="M210 68 H250"/>
+      </g>
+      <g font-size="11.5">
+        <rect x="250" y="20" width="185" height="34" rx="5" fill="var(--paper)" stroke="var(--line)"/>
+        <text x="262" y="42" fill="var(--ink)">evidence_view.html</text>
+        <rect x="250" y="80" width="185" height="34" rx="5" fill="var(--paper)" stroke="var(--line)"/>
+        <text x="262" y="102" fill="var(--ink)">figures_view.html</text>
+        <rect x="250" y="130" width="185" height="34" rx="5" fill="var(--paper)" stroke="var(--line)"/>
+        <text x="262" y="152" fill="var(--ink)">patent_support.html</text>
+        <rect x="250" y="180" width="185" height="34" rx="5" fill="var(--paper)" stroke="var(--line)"/>
+        <text x="262" y="202" fill="var(--ink)">record_of_inquiry.html</text>
+        <rect x="250" y="228" width="185" height="14" rx="4" fill="none" stroke="none"/>
+        <text x="262" y="239" fill="var(--faint)" font-size="10.5">+ CLI, + MCP server</text>
+      </g>
+      <text x="470" y="120" font-size="34" fill="var(--none)">✕</text>
+      <text x="505" y="112" font-size="12.5" fill="var(--none)" font-weight="600">no shared navigation</text>
+      <text x="505" y="130" font-size="11.5" fill="var(--faint)">each page is a dead end; the reviewer re-orients every time</text>
+      <text x="505" y="152" font-size="11.5" fill="var(--faint)">and cannot get their judgment back into the system at all</text>
+    </g>
+  </svg>
+  <figcaption>Every page is generated, opened, read, and closed. Nothing carries a reviewer
+  from one to the next, and nothing carries their conclusions back.</figcaption>
+</figure>
+
+<h2>The shape it wants to be</h2>
+<p class="sub">One console, five panes, following the work rather than the code.</p>
+
+<figure>
+  <svg viewBox="0 0 940 300" role="img" aria-label="Target: a single Cairn console with five panes following the workflow from corpus through delivery, with adjudication feeding back.">
+    <g font-family="ui-sans-serif,system-ui,sans-serif">
+      <rect x="12" y="14" width="916" height="238" rx="10" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.6"/>
+      <rect x="12" y="14" width="916" height="34" rx="10" fill="var(--blue-bg)" stroke="none"/>
+      <rect x="12" y="40" width="916" height="8" fill="var(--blue-bg)" stroke="none"/>
+      <line x1="12" y1="48" x2="928" y2="48" stroke="var(--ink)" stroke-width="1.2"/>
+      <text x="28" y="37" font-size="13" font-weight="700" fill="var(--ink)">Cairn</text>
+      <text x="86" y="37" font-size="11.5" fill="var(--faint)">US5447630A · 8 sheets · calibrated · contract v1.2</text>
+      <g font-size="12">
+        <g>
+          <rect x="30" y="70" width="164" height="160" rx="7" fill="var(--done-bg)" stroke="var(--done)"/>
+          <text x="112" y="94" text-anchor="middle" font-weight="600" fill="var(--done)">1 · Corpus</text>
+          <text x="112" y="116" text-anchor="middle" font-size="10.5" fill="var(--ink2)">documents · hashes</text>
+          <text x="112" y="133" text-anchor="middle" font-size="10.5" fill="var(--ink2)">calibration state</text>
+          <text x="112" y="150" text-anchor="middle" font-size="10.5" fill="var(--ink2)">fitted constants</text>
+          <text x="112" y="176" text-anchor="middle" font-size="10" fill="var(--faint)">engine: built</text>
+          <text x="112" y="192" text-anchor="middle" font-size="10" fill="var(--part)">shell: partial</text>
+        </g>
+        <g>
+          <rect x="206" y="70" width="164" height="160" rx="7" fill="var(--done-bg)" stroke="var(--done)"/>
+          <text x="288" y="94" text-anchor="middle" font-weight="600" fill="var(--done)">2 · Locate</text>
+          <text x="288" y="116" text-anchor="middle" font-size="10.5" fill="var(--ink2)">ask · search</text>
+          <text x="288" y="133" text-anchor="middle" font-size="10.5" fill="var(--ink2)">support floor</text>
+          <text x="288" y="150" text-anchor="middle" font-size="10.5" fill="var(--ink2)">read freely</text>
+          <text x="288" y="176" text-anchor="middle" font-size="10" fill="var(--faint)">engine: built</text>
+          <text x="288" y="192" text-anchor="middle" font-size="10" fill="var(--none)">shell: none</text>
+        </g>
+        <g>
+          <rect x="382" y="70" width="164" height="160" rx="7" fill="var(--done-bg)" stroke="var(--done)"/>
+          <text x="464" y="94" text-anchor="middle" font-weight="600" fill="var(--done)">3 · Evidence</text>
+          <text x="464" y="116" text-anchor="middle" font-size="10.5" fill="var(--ink2)">spans · coverage</text>
+          <text x="464" y="133" text-anchor="middle" font-size="10.5" fill="var(--ink2)">drawings · numerals</text>
+          <text x="464" y="150" text-anchor="middle" font-size="10.5" fill="var(--ink2)">discrepancies</text>
+          <text x="464" y="176" text-anchor="middle" font-size="10" fill="var(--faint)">engine: built</text>
+          <text x="464" y="192" text-anchor="middle" font-size="10" fill="var(--part)">shell: 3 pages</text>
+        </g>
+        <g>
+          <rect x="558" y="70" width="164" height="160" rx="7" fill="var(--none-bg)" stroke="var(--none)" stroke-width="1.8"/>
+          <text x="640" y="94" text-anchor="middle" font-weight="600" fill="var(--none)">4 · Adjudicate</text>
+          <text x="640" y="116" text-anchor="middle" font-size="10.5" fill="var(--ink2)">confirm · correct</text>
+          <text x="640" y="133" text-anchor="middle" font-size="10.5" fill="var(--ink2)">draw a box</text>
+          <text x="640" y="150" text-anchor="middle" font-size="10.5" fill="var(--ink2)">reviewer notes</text>
+          <text x="640" y="176" text-anchor="middle" font-size="10" fill="var(--none)">engine: none</text>
+          <text x="640" y="192" text-anchor="middle" font-size="10" fill="var(--none)">shell: none</text>
+        </g>
+        <g>
+          <rect x="734" y="70" width="164" height="160" rx="7" fill="var(--part-bg)" stroke="var(--part)"/>
+          <text x="816" y="94" text-anchor="middle" font-weight="600" fill="var(--part)">5 · Deliver</text>
+          <text x="816" y="116" text-anchor="middle" font-size="10.5" fill="var(--ink2)">record of inquiry</text>
+          <text x="816" y="133" text-anchor="middle" font-size="10.5" fill="var(--ink2)">replay · sessions</text>
+          <text x="816" y="150" text-anchor="middle" font-size="10.5" fill="var(--ink2)">signature</text>
+          <text x="816" y="176" text-anchor="middle" font-size="10" fill="var(--part)">engine: partial</text>
+          <text x="816" y="192" text-anchor="middle" font-size="10" fill="var(--part)">shell: 1 page</text>
+        </g>
+      </g>
+      <g stroke="var(--line)" stroke-width="1.6" fill="none" marker-end="url(#a)">
+        <path d="M194 150 H204"/><path d="M370 150 H380"/><path d="M546 150 H556"/><path d="M722 150 H732"/>
+      </g>
+      <path d="M640 236 V268 H288 V236" stroke="var(--none)" stroke-width="1.8" fill="none"
+        stroke-dasharray="5 4"/>
+      <text x="464" y="284" font-size="11.5" text-anchor="middle" fill="var(--none)" font-weight="600">
+        the missing return path — a reviewer's judgment re-enters the evidence</text>
+      <defs><marker id="a" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+        <path d="M0 0 L7 3.5 L0 7 z" fill="var(--line)"/></marker></defs>
+    </g>
+  </svg>
+  <figcaption>Stage 4 is the hole. Everything else flows one way — corpus to evidence to
+  report — and the professional can read but never write.</figcaption>
+</figure>
+
+<div class="flag">
+  <h3>The one structural gap</h3>
+  <p><strong>Cairn has no input channel for the expert whose judgment it exists to
+  support.</strong> There is exactly one way for a human conclusion to enter the system
+  today: hand-editing a JSON sidecar. That sidecar is <em>not append-only</em>, and it has
+  already lost a confirmation you gave — your FIG-2 "A" was overwritten by a
+  single-engine machine read and is unrecoverable.</p>
+  <p>This is also what blocks the deliverable from being complete. A record of inquiry
+  without the reviewer's adjudications documents the machine's half of the work only.</p>
+</div>
+
+<h2>Capability inventory</h2>
+<p class="sub">Every tracked item, placed in the stage where it surfaces. <em>Engine</em>
+means the deterministic capability exists and is gated; <em>shell</em> means a person can
+reach it without a terminal.</p>
+
+<div class="stage">
+  <h3><span class="n">STAGE 1</span> Corpus <span class="what">— what are we searching, and is it fit for this?</span></h3>
+  <ul class="caps">
+    <li><span class="pill d">built</span><span class="id">M1</span><span class="txt">Ingest, normalize, content-hash at ingest (I3); span store</span></li>
+    <li><span class="pill d">built</span><span class="id">RT-9</span><span class="txt">Per-corpus calibration record — floor + corpus hash + date; reports <em>calibrated / stale / uncalibrated</em></span></li>
+    <li><span class="pill d">built</span><span class="id">RT-6</span><span class="txt">Corpus-fitting protocol + registry of 17 fitted constants with falsifiers, gate-enforced</span></li>
+    <li><span class="pill p">partial</span><span class="id">RT-2</span><span class="txt">Corpus-management GUI — list, add, remove, switch engagement. <em>Currently 16 CLI scripts.</em></span></li>
+    <li><span class="pill n">not built</span><span class="id">PE-0</span><span class="txt">Intake capture — record the client's answers as structured data rather than prose</span></li>
+  </ul>
+</div>
+
+<div class="stage">
+  <h3><span class="n">STAGE 2</span> Locate <span class="what">— find it, or say plainly that you can't</span></h3>
+  <ul class="caps">
+    <li><span class="pill d">built</span><span class="id">M2</span><span class="txt">Retrieval, support floor, abstention (I2); read-freely document access (D11)</span></li>
+    <li><span class="pill d">built</span><span class="id">M4</span><span class="txt">MCP server + CLI — 6 tools, metadata hashed, inputs bounded (D41)</span></li>
+    <li><span class="pill d">built</span><span class="id">D16/D22</span><span class="txt">Five outcomes: answer · abstain · correction · partial · refuse-to-adjudicate</span></li>
+    <li><span class="pill n">not built</span><span class="id">—</span><span class="txt">Any way to ask a question without a terminal. <em>This is the console's front door.</em></span></li>
+  </ul>
+</div>
+
+<div class="stage">
+  <h3><span class="n">STAGE 3</span> Evidence <span class="what">— show the work, and its limits</span></h3>
+  <ul class="caps">
+    <li><span class="pill d">built</span><span class="id">M2-T8</span><span class="txt">Verify + constraint coverage — present only if <code>ok AND coverage.complete</code></span></li>
+    <li><span class="pill d">built</span><span class="id">RT-4</span><span class="txt">Drawings: multi-engine OCR, rotation union, phantom rejection, discrepancy tally first (D32–D36)</span></li>
+    <li><span class="pill d">built</span><span class="id">RT-3</span><span class="txt">Corrections and partials render distinctly from answers</span></li>
+    <li><span class="pill p">partial</span><span class="id">PE-1/2/3</span><span class="txt">Patent domain: claim→spec support map built; the four structural §112 checks unfinished</span></li>
+    <li><span class="pill p">partial</span><span class="id">VER-1</span><span class="txt">Verifiable computations — arithmetic and relations; more operations pending</span></li>
+    <li><span class="pill n">not built</span><span class="id">—</span><span class="txt">One evidence surface. <em>Three pages exist and none links to another.</em></span></li>
+  </ul>
+</div>
+
+<div class="stage">
+  <h3><span class="n">STAGE 4</span> Adjudicate <span class="what">— the professional's judgment enters the record</span></h3>
+  <ul class="caps">
+    <li><span class="pill n">not built</span><span class="id">RT-7a</span><span class="txt"><strong>Append-only adjudication store</strong> — prerequisite for everything below; a confirmation has already been lost</span></li>
+    <li><span class="pill n">not built</span><span class="id">RT-7b</span><span class="txt">Draw a box on a sheet to assert a missed numeral, or correct a misread one</span></li>
+    <li><span class="pill n">not built</span><span class="id">RT-7c</span><span class="txt">Guided re-search from a reviewer's mark — the human supplies the prediction</span></li>
+    <li><span class="pill n">not built</span><span class="id">—</span><span class="txt">Accept / reject / annotate a finding, with the reason recorded</span></li>
+    <li><span class="pill n">not built</span><span class="id">—</span><span class="txt">Review queue — what still needs a human, ranked by consequence</span></li>
+  </ul>
+</div>
+
+<div class="stage">
+  <h3><span class="n">STAGE 5</span> Deliver <span class="what">— the artifact the client actually buys</span></h3>
+  <ul class="caps">
+    <li><span class="pill p">partial</span><span class="id">RT-5</span><span class="txt">Record of inquiry — limits first, corpus hashes, outcomes, set-aside candidates, signature block. <em>Missing: adjudications (blocked on stage 4)</em></span></li>
+    <li><span class="pill p">partial</span><span class="id">RT-1</span><span class="txt">Session history — logging and grouping done; in-page navigation not</span></li>
+    <li><span class="pill d">built</span><span class="id">M3</span><span class="txt">Append-only hash-chained audit log with byte-identical replay (I5/I6)</span></li>
+    <li><span class="pill n">not built</span><span class="id">M5</span><span class="txt">Replay UI — step through a past session against the archived corpus hash</span></li>
+    <li><span class="pill p">partial</span><span class="id">M2-T6</span><span class="txt">Layer-E behavioural evals; now grades the citation, not just the verdict (RT-8). Needs a billed run</span></li>
+  </ul>
+</div>
+
+<h2>Sequence</h2>
+<p class="sub">Ordered by what unblocks what, not by size.</p>
+
+<div class="phase">
+  <div class="when">Next</div>
+  <div class="body">
+    <h3>Close stage 4's foundation — append-only adjudication</h3>
+    <p>Small, and everything downstream waits on it. It fixes a live defect (a lost
+    confirmation), unblocks the deliverable's missing section, and is the prerequisite for
+    the drawing-correction feature. Nothing else should go first.</p>
+  </div>
+</div>
+<div class="phase">
+  <div class="when">Then</div>
+  <div class="body">
+    <h3>The console shell — one page, five panes</h3>
+    <p>Not a rewrite. The four existing HTML generators already produce the content; this
+    gives them a shared frame, persistent corpus context in the header, and navigation
+    between them. The single highest-leverage change to how the tool <em>feels</em>.</p>
+  </div>
+</div>
+<div class="phase">
+  <div class="when">Then</div>
+  <div class="body">
+    <h3>Ask-in-the-console, and the review queue</h3>
+    <p>The front door: pose a question, watch the outcome resolve, see its evidence, accept
+    or annotate it. This is the point where Cairn stops being a set of generators and starts
+    being a tool a professional sits inside.</p>
+  </div>
+</div>
+<div class="phase">
+  <div class="when">Then</div>
+  <div class="body">
+    <h3>Finish the patent pack — PE-2's §112 checks, VER-1's operations</h3>
+    <p>Domain depth for the live engagement, once the surface can display it.</p>
+  </div>
+</div>
+<div class="phase">
+  <div class="when">Later</div>
+  <div class="body">
+    <h3>Replay UI (M5), third corpus, Layer-E cadence</h3>
+    <p>Replay is the demo no competitor can give — re-derive a dated answer against an
+    archived hash, live. Worth building when there is someone to show it to.</p>
+  </div>
+</div>
+
+<h2>Waiting on you</h2>
+<div class="you">
+  <ul>
+    <li><b>Trademark clearance on <em>Cairn</em></b> — the packet is written; it needs an attorney, not me.</li>
+    <li><b>Intake Q13 / Q16</b> — which deliverable, in what form. The report is built content-agnostic so your answer refines it rather than invalidating it.</li>
+    <li><b>One hour of blind annotation</b> — the only honest recall measure, and it expires per sheet the moment you view an overlay. Worth doing right after the append-only store lands.</li>
+    <li><b>~$4 Layer-E run</b> — the first that would report the decision-versus-evidence gap.</li>
+  </ul>
+</div>
+
+<hr>
+<p class="foot">Counts read from <code>ROADMAP.md</code> on 2026-07-28: 29 built, 9 partial,
+10 not started, across 46 logged decisions and 260 Layer-0 tests. "Built" means gated by a
+standing test, not merely written. The console described here is a proposal — no interface
+work has begun, and nothing above is an estimate of effort.</p>
+
+</div>

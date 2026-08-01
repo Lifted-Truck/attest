@@ -2,12 +2,14 @@
 
 > *An AI agent that answers questions and runs tasks over your documents where every claim is traceable to its source, it refuses to answer when the evidence isn't there, and a test suite proves it.*
 
-CAIRN (*to bear witness; to certify as true*) is a grounded-retrieval system whose
+Cairn — *a marker built so a place can be found again by someone who wasn't there* — is a
+grounded-retrieval system whose
 cardinal rule is **ground or abstain — never invent.** Every assertion it makes is bound
 to a verifiable source span, or it is not made; where the evidence isn't there, it returns
 a structured refusal instead of a guess.
 
 > **New here? Start with the illustrated tour:** [`docs/system_overview.html`](docs/system_overview.html)
+> — and see [`artifacts/`](artifacts/) for the product roadmap and a sample deliverable.
 > — how the mechanisms actually work (the AI/deterministic split, the data model, the loop,
 > the five outcomes, what `verify` does, the audit chain, and the two eval layers), diagram-first
 > and readable without touching the code.
@@ -89,23 +91,88 @@ Non-negotiable; each maps to a test in the oracle. A PR that violates one does n
 
 The MCP server (and a CLI mirror) is the **only** interface in v1. There is no
 `answer_with_citations` tool — composition is the agent's job — so the tools decompose into
-*retrieve → (agent drafts) → verify → log*. Read/write asymmetry (I4) is enforced here.
+*retrieve → (agent drafts) → verify → log*. Read/write asymmetry (I4) is enforced here: the read tools hold no reference to a log, so
+a read handler cannot append even by mistake.
+
+Tool **metadata is a trust surface, not documentation** — an agent reads descriptions and
+acts on them — so the whole advertised surface (names, descriptions, schemas) is hashed and
+pinned by a standing test, descriptions are linted for instruction-like language, and every
+input is bounded rather than merely typed (D41).
 
 | Tool | Purpose | Side effects |
 |---|---|---|
 | `search_corpus(query)` | Ranked candidate spans | none (read) |
 | `get_span(doc_id, start, end)` | Fetch + hash-verify a span | none (read) |
+| `get_document(doc_id)` | Full hash-verified text — read freely (D11) | none (read) |
 | `check_support(question)` | Supporting spans or `insufficient` — the abstention decision | append to log |
 | `verify(answer_with_tags)` | Confirms every cited span resolves + hash-matches; flags unbound claims | append to log |
 | `check_claim(claim)` | Resolve a *user-supplied* claim to supporting spans (or none) | append to log |
-| `get_audit_log(filter)` | Replay past interactions | none (read) |
+
+## Working with a corpus it was not fitted to
+
+Every extraction constant in Cairn was fitted to **one** corpus, and each was found the
+same way: a human noticed a miss. Two capabilities exist because pretending otherwise is
+the failure mode.
+
+**The support floor travels with its corpus.** `check_support`'s threshold is a BM25 score,
+which does not transfer between corpora — it scales with document length and term
+distribution — and it fails toward **false abstention**, the direction that looks like
+diligence. Measured: a question that was the entire subject of a second patent scored 4.56
+against a floor of 15.0 fitted on EDGAR, so the system refused an answerable question. A
+store now carries a calibration record, and every result reports whether the floor is
+*calibrated*, *stale*, *uncalibrated*, or an *explicit override* — including on the
+client-facing report.
+
+**Fitted constants carry their own falsifiers.** `src/cairn/corpus_fit.py` registers each
+one with the evidence that set it and the observation that would show it does not transfer;
+a standing test fails if a value is retuned without updating its provenance, or if a new
+tunable appears unregistered. The procedure for pointing Cairn at a new corpus is
+[`docs/corpus_fitting.md`](docs/corpus_fitting.md), and the first end-to-end run of it is
+written up in [`docs/corpus_fit_record_US8046721B2.md`](docs/corpus_fit_record_US8046721B2.md)
+— eight defects found on a system passing its whole gate, all of them in *ingestion*.
+
+## The reviewer writes back
+
+Cairn supports a professional's judgment, so that judgment has to be able to enter the
+record — and survive. Reviewers **confirm**, **refute**, **correct** or **note**, and each
+judgment is appended to a hash-chained log with who and when. There is no update and no
+delete: a revision appends and names what it supersedes, and the earlier call stays
+legible. A machine writer **cannot** displace a human judgment; it may only record a
+disagreement, which is itself evidence.
+
+```bash
+python scripts/adjudicate.py --store <store> --id fig2-A --confirm \
+    --page 3 --numeral A --x 0.84 --y 0.19 --by "A. Reviewer" --on 2026-07-28
+python scripts/adjudicate.py --store <store> --list      # incl. superseded entries
+```
+
+This exists because the previous design — a mutable JSON array — lost one. A reviewer's
+confirmation was overwritten by a machine read and is unrecoverable.
+
+## The deliverable
+
+What a client buys is not the answer. Under 37 CFR 11.18(b) a practitioner's certification
+is **non-delegable**, so the sellable artifact is the **record of the inquiry**: what was
+searched (with hashes anyone can re-verify), what each question resolved to, what was cited
+at which offsets, **what was surfaced and set aside**, and under exactly what declared
+limits — which are printed before any finding.
+
+```bash
+python scripts/build_review_report.py --store <store> --audit <log> \
+    --on YYYY-MM-DD --out record.html
+```
+
+A sample is in [`artifacts/`](artifacts/). Its wording is tested as behaviour: the report
+says it *evidences* and *supports* an inquiry and never that it *satisfies* or *discharges*
+one, and it states plainly that retrieval is a ranked slice rather than an exhaustive
+search.
 
 ## The eval harness (the hero)
 
 The oracle splits along the runtime boundary:
 
-- **Layer 0 — deterministic component evals** (block every push; fast, stable — 39 evals in <1s, no model calls). Span resolution 1:1, citation integrity (I3), retrieval recall + reproducibility (I6), abstention trigger on content-absent items, `verify` rejects planted ungrounded claims, plural-and-ranked. The gate table is [`docs/layer0_gate.md`](docs/layer0_gate.md); run it with `pytest -m layer0`.
-- **Layer E — agent end-to-end evals** (periodic, via headless Claude Code; non-blocking). Hallucination/entailment via LLM-as-judge, citation precision/recall, answer correctness, abstention correctness, and abstention **calibration** (Brier + reliability curve) — the metric almost no one measures, foregrounded here.
+- **Layer 0 — deterministic component evals** (block every push; fast, stable — 271 tests in ~3s, no model calls). Span resolution 1:1, citation integrity (I3), retrieval recall + reproducibility (I6), abstention trigger on content-absent items, `verify` rejects planted ungrounded claims, plural-and-ranked, the golden-set freeze, the corpus-fit registry, the tool-manifest hash, and the append-only adjudication chain. The gate table is [`docs/layer0_gate.md`](docs/layer0_gate.md); run it with `pytest -m layer0`.
+- **Layer E — agent end-to-end evals** (periodic, via headless Claude Code; non-blocking). Hallucination/entailment via LLM-as-judge, citation precision/recall, answer correctness, abstention correctness, and abstention **calibration** (Brier + reliability curve). It also grades the **citation, not just the verdict**: a scorer that only checks whether the system presented is measuring the verdict and not the provenance, so `evidence_accuracy` is reported alongside `decision_accuracy` and the **gap between them is published rather than smoothed** (RT-8).
 
 ## Corpus
 
@@ -114,12 +181,19 @@ demo). The seed golden set ([`golden_seed.json`](golden_seed.json)) ships 20 han
 items grounded in Apple's FY2024 10-K, with a deliberate unanswerable fraction. The
 corpus-specific adapter is isolated to the ingestion module — a corpus swap touches one file.
 
-## Demo UI
+## Surfaces
 
-A clean React/TS surface that **replays from the audit log** (no API backend in v1). Three
-flows, nothing more: (1) answer with each sentence highlighting back to its source span,
-(2) a pre-loaded unanswerable question that visibly shows the system refusing, and (3) an
-audit panel showing retrieval + citations + confidence for the last answer.
+There is no single application yet — today Cairn is a CLI, an MCP server, and a set of
+self-contained HTML pages, each generated by a script and opened directly:
+
+| Page | What it shows |
+|---|---|
+| `evidence_view.html` | The full document with cited ranges highlighted in place, beside the interactions |
+| `figures_view.html` | Drawing sheets with located reference numerals, discrepancies **first** |
+| `record.html` | The record of inquiry — the signable deliverable |
+
+The planned **console** that would hold all of these in one frame, with the current status
+of every capability, is in [`artifacts/2026-07-28-product-roadmap.html`](artifacts/2026-07-28-product-roadmap.html).
 
 ## Status & roadmap
 
@@ -133,8 +207,12 @@ Build order is **M0 → M5**, each milestone gated by the oracle:
 - **M1** — Ingestion + retrieval + span store (immutable evidence layer). ✅ *I3 hashing, span store + resolution invariant, reproducible retrieval*
 - **M2** — Deterministic `verify` + `check_support`; Layer-0 gate live. ✅ *(Layer-E eval lands with M4)*
 - **M3** — Append-only audit log (replayable; write-asymmetry enforced). ✅
-- **M4** — MCP server + CLI (the primary v1 interface). *(current)*
-- **M5** — Demo UI (replays from the audit log).
+- **M4** — MCP server + CLI (the primary v1 interface). ✅ *hardened: manifest hash, bounded inputs, path containment (D35/D41)*
+- **M5** — Replay UI (replays from the audit log). *not started — the current surfaces are self-contained HTML pages*
+
+Beyond the milestones, the **RT** track carries the review surfaces and the **PE** track the
+patent engagement; both are sequenced in [`ROADMAP.md`](ROADMAP.md). 47 design decisions are
+logged there, append-only.
 
 EDGAR is the architecture-proving **reference build**. The first client engagement
 retargets the system to a **patent refresh-and-update** — a specialization of the same
@@ -148,3 +226,8 @@ tools, multi-corpus, reranker upgrades, larger golden set.
 ## License
 
 TBD.
+
+---
+
+*Last verified against the code on **2026-07-28** — 271 Layer-0 tests, 47 logged decisions,
+6 MCP tools. Where this README and [`ROADMAP.md`](ROADMAP.md) disagree, the roadmap wins.*
