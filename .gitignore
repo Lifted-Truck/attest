@@ -52,3 +52,10 @@ corpus/engagements/
 # EXCEPTION: the EDGAR reference-build Layer-E trend is the public eval record
 # (landscape lessons §4 — published trend files are the credibility posture).
 !audit_log/layer_e_results.jsonl
+
+# Local-only working material. `private/` holds documents that are deliberately NOT in a
+# public repo — currently the IP/trademark landscape survey, whose §5 enumerates specific
+# third-party patent filings and drafts an FTO brief. That is counsel's material to
+# control, not ours to publish. Removing it going forward does not undo prior exposure:
+# it was public from 2026-07-28 (D38) until now, and git history retains the blob.
+/private/
