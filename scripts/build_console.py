@@ -22,13 +22,37 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
+from cairn.adjudicate_pane import render as adjudicate_pane
 from cairn.calibration import load as load_calibration
 from cairn.console import ConsoleState, Pane, render
 from cairn.contract import CONTRACT_VERSION
 from cairn.ingest import DocumentStore
 from cairn.locate_pane import render as locate_pane
+from cairn.review_queue import build as build_queue
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def _queue_for(store_dir: Path, doc_id: str, adjudicated: set[str]) -> list:
+    """The outstanding worklist, from the same reconciliation the Drawings pane shows."""
+    from cairn.figures_map import (
+        fig_to_sheets,
+        load_manifest,
+        numeral_coverage,
+        numeral_sightings,
+    )
+    from cairn.patents import figure_references, parse_figures, reference_numerals
+    from cairn.spans import SpanStore
+
+    store = SpanStore.from_store(DocumentStore(store_dir))
+    text = store.get_document(doc_id)
+    manifest = load_manifest(store_dir)
+    sightings = numeral_sightings(manifest)
+    figs = parse_figures(text)
+    assignments = fig_to_sheets(manifest, [f.number for f in figs])
+    cov = numeral_coverage(reference_numerals(text), text, figure_references(text),
+                           assignments, sightings)
+    return build_queue(cov, sightings, adjudicated=adjudicated)
 
 
 def _run(script: str, args: list[str]) -> bool:
@@ -80,13 +104,26 @@ def main() -> int:
                            "--out", str(out / "figures.html")])
 
     # Adjudications and outstanding flags ride in the header, so they cannot scroll away.
-    adjudications = 0
+    adjudications, adj_ids = 0, set()
     adj_path = fig_dir / "adjudications.jsonl"
     if adj_path.exists():
         from cairn.adjudication import AdjudicationLog
         log = AdjudicationLog(adj_path)
         log.verify_chain()
-        adjudications = len(log.effective())
+        effective = log.effective()
+        adjudications = len(effective)
+        # A judged item leaves the QUEUE but never the record — the id is the queue's
+        # item_id, which is stable across rebuilds so a judgment keeps pointing at it.
+        adj_ids = {a.adj_id.split("::")[0] for a in effective}
+
+    # The queue is derived from the same reconciliation the Drawings pane reports, so a
+    # tally there and a worklist here can never disagree.
+    queue = []
+    if ok_figures:
+        try:
+            queue = _queue_for(store_dir, ns.doc, adj_ids)
+        except Exception as e:                    # noqa: BLE001 — reported, not fatal
+            print(f"  ✗ review queue: {type(e).__name__}: {e}")
 
     rec = load_calibration(store_dir)
     calibration = (
@@ -113,11 +150,11 @@ def main() -> int:
              "No OCR manifest for this store, so there are no drawing sheets to show. "
              "Run scripts/fetch_patent_figures.py then scripts/ocr_patent_figures.py, and "
              "pass --doc." if not ok_figures else ""),
-        Pane("adjudicate", "Adjudicate", "the reviewer writes back", None,
-             f"{adjudications} judgment(s) are on record and already folded into the "
-             "Drawings pane. Recording them from inside the console — drawing a box on a "
-             "sheet, correcting a reading — is RT-7b/c and not built; use "
-             "scripts/adjudicate.py for now."),
+        Pane("adjudicate", f"Adjudicate{f' ({len(queue)})' if queue else ''}",
+             "the reviewer writes back", "adjudicate.html" if ok_figures else None,
+             "The review queue is built from the drawings reconciliation, and this store "
+             "has no OCR manifest. Judgments can still be recorded with "
+             "scripts/adjudicate.py."),
         Pane("record", "Record", "the signable deliverable",
              "record.html" if ok_record else None,
              "The record of inquiry could not be generated for this store."),
@@ -133,6 +170,9 @@ def main() -> int:
     # scripts/serve_console.py running, and says so itself when it cannot reach one.
     (out / "locate.html").write_text(
         locate_pane(calibrated=rec is not None, calibration=calibration), encoding="utf-8")
+    if ok_figures:
+        (out / "adjudicate.html").write_text(
+            adjudicate_pane(queue, reviewer=None, on=None), encoding="utf-8")
     (out / "index.html").write_text(render(state), encoding="utf-8")
     built = [p.label for p in panes if p.page]
     print(f"\nOK — {out / 'index.html'}")

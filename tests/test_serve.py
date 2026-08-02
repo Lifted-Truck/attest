@@ -55,3 +55,27 @@ def test_the_server_exposes_no_tool_the_mcp_surface_lacks():
     src = inspect.getsource(serve_mod)
     assert "tools.get(name)" in src, "handlers must come from the passed registry"
     assert "default_registry" not in src, "the module must not build its own tool set"
+
+
+def test_adjudication_is_not_reachable_as_a_tool():
+    """A machine must not be able to manufacture human judgments. Every other endpoint
+    dispatches into the MCP registry; this one deliberately does not, so the agent — which
+    can call any tool — has no route to writing a reviewer's judgment (D47's guard, at the
+    transport)."""
+    import inspect
+
+    from cairn import serve as serve_mod
+    src = inspect.getsource(serve_mod)
+    assert '"/adjudicate"' in src, "the write path is its own endpoint"
+    handler_src = src[src.index("def _adjudicate"):src.index("def do_POST")]
+    assert "tools" not in handler_src, "it must not dispatch through the tool registry"
+
+
+def test_recording_needs_a_named_reviewer_and_a_date():
+    """A judgment with no author and no date is not evidence, so the endpoint refuses
+    rather than recording one anonymously."""
+    import inspect
+
+    from cairn import serve as serve_mod
+    src = inspect.getsource(serve_mod)
+    assert "if adj_log is None or not reviewer or not on:" in src

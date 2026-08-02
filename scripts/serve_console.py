@@ -28,12 +28,24 @@ def main() -> int:
     ap.add_argument("--dir", default="console", help="console directory to serve")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--reviewer", help="who is recording judgments — enables /adjudicate")
+    ap.add_argument("--on", metavar="YYYY-MM-DD", help="date for recorded judgments")
+    ap.add_argument("--adjudications", help="path to the append-only judgment log")
     ap.add_argument("--open", action="store_true", help="open a browser at the console")
     ns = ap.parse_args()
 
     tools = default_registry(ns.store, ns.audit)
+    adj_log = None
+    if ns.reviewer and ns.on:
+        from cairn.adjudication import AdjudicationLog
+        adj_path = Path(ns.adjudications or (Path(ns.store).parent / "figures" /
+                                             "adjudications.jsonl"))
+        adj_log = AdjudicationLog(adj_path)
+        if adj_log.path.exists():
+            adj_log.verify_chain()
     try:
-        httpd = serve(tools, Path(ns.dir), host=ns.host, port=ns.port)
+        httpd = serve(tools, Path(ns.dir), host=ns.host, port=ns.port,
+                      reviewer=ns.reviewer, on=ns.on, adj_log=adj_log)
     except NotLoopback as e:
         print(f"refused: {e}")
         return 1
@@ -42,6 +54,9 @@ def main() -> int:
     print(f"Cairn console → {url}")
     print(f"  tools: {', '.join(sorted(tools))}")
     print(f"  audit: {ns.audit}  (every locate is recorded, I5)")
+    judging = (f"as {ns.reviewer} on {ns.on}" if adj_log
+               else "DISABLED (pass --reviewer and --on to enable)")
+    print(f"  judgments: {judging}")
     print("  loopback only; cross-origin requests are refused. Ctrl-C to stop.")
     if ns.open:
         webbrowser.open(url)
