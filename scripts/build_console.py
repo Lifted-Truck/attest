@@ -26,6 +26,7 @@ from cairn.calibration import load as load_calibration
 from cairn.console import ConsoleState, Pane, render
 from cairn.contract import CONTRACT_VERSION
 from cairn.ingest import DocumentStore
+from cairn.locate_pane import render as locate_pane
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -102,10 +103,8 @@ def main() -> int:
              "Corpus management has no page yet (RT-2). Documents, hashes and calibration "
              "state are summarised in the header above; adding and removing documents is "
              "still done with scripts/ingest_files.py."),
-        Pane("locate", "Locate", "ask, and find or abstain", None,
-             "Asking a question inside the console is not built. Today the agent calls the "
-             "MCP tools during a session, and what it did appears under Evidence and "
-             "Record. This is the console's intended front door."),
+        Pane("locate", "Locate", "ask, and find or abstain", "locate.html",
+             ""),
         Pane("evidence", "Evidence", "show the work and its limits",
              "evidence.html" if ok_evidence else None,
              "The evidence view could not be generated for this store."),
@@ -130,6 +129,10 @@ def main() -> int:
         contract=CONTRACT_VERSION, adjudications=adjudications,
         generated_on=ns.on, panes=panes)
 
+    # The Locate pane is static HTML that CALLS the real tools; it needs
+    # scripts/serve_console.py running, and says so itself when it cannot reach one.
+    (out / "locate.html").write_text(
+        locate_pane(calibrated=rec is not None, calibration=calibration), encoding="utf-8")
     (out / "index.html").write_text(render(state), encoding="utf-8")
     built = [p.label for p in panes if p.page]
     print(f"\nOK — {out / 'index.html'}")

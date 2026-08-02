@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+"""Serve the console with live tools (RT-10b, D49).
+
+Loopback only. The Locate pane needs the real retrieval implementation — a second one in
+JavaScript could drift from it, and Cairn's central claim is that the same corpus and
+query give the same result.
+
+    python scripts/serve_console.py --store corpus/store \\
+        --audit audit_log/agent.jsonl --dir console
+"""
+
+from __future__ import annotations
+
+import argparse
+import webbrowser
+from pathlib import Path
+
+import _bootstrap  # noqa: F401  (puts src/ on sys.path)
+
+from cairn.serve import NotLoopback, serve
+from cairn.tools import default_registry
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Serve the Cairn console (loopback only)")
+    ap.add_argument("--store", required=True)
+    ap.add_argument("--audit", required=True, help="write tools append here (I5)")
+    ap.add_argument("--dir", default="console", help="console directory to serve")
+    ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--open", action="store_true", help="open a browser at the console")
+    ns = ap.parse_args()
+
+    tools = default_registry(ns.store, ns.audit)
+    try:
+        httpd = serve(tools, Path(ns.dir), host=ns.host, port=ns.port)
+    except NotLoopback as e:
+        print(f"refused: {e}")
+        return 1
+
+    url = f"http://{ns.host}:{ns.port}/index.html"
+    print(f"Cairn console → {url}")
+    print(f"  tools: {', '.join(sorted(tools))}")
+    print(f"  audit: {ns.audit}  (every locate is recorded, I5)")
+    print("  loopback only; cross-origin requests are refused. Ctrl-C to stop.")
+    if ns.open:
+        webbrowser.open(url)
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("\nstopped")
+    finally:
+        httpd.server_close()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

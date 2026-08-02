@@ -69,3 +69,31 @@ def test_engagement_text_is_escaped():
     page = render(_state(engagement="<script>alert(1)</script>"))
     assert "<script>alert(1)</script>" not in page.replace("&lt;script&gt;", "")
     assert "&lt;script&gt;" in page
+
+
+def test_the_locate_pane_says_it_does_not_answer():
+    """The pane runs the LOCATE step and shows evidence. It cannot compose an answer —
+    Cairn makes no model calls — and saying so plainly is the design, not a disclaimer."""
+    from cairn.locate_pane import render as locate
+    page = locate(calibrated=True, calibration="Floor 15.1, calibrated.")
+    text = _text(page)
+    assert "does not compose an answer" in text
+    assert "no model calls" in text
+
+
+def test_the_locate_pane_repeats_the_calibration_state():
+    """A reviewer who lands here and reads 'insufficient' is exactly the person who needs
+    to know the floor came from a different corpus."""
+    from cairn.locate_pane import render as locate
+    page = locate(calibrated=False, calibration="NO calibration record for this corpus.")
+    assert "NO calibration record" in page
+    assert 'class="cal warn"' in page
+
+
+def test_the_locate_pane_fetches_span_text_through_the_verifying_accessor():
+    """The text a reviewer reads is fetched via get_span, which re-verifies the document
+    hash (I3) — so it is exactly what verification would confirm, not a cached copy."""
+    from cairn.locate_pane import render as locate
+    page = locate(calibrated=True, calibration="ok")
+    assert "tool/get_span" in page
+    assert "tool/check_support" in page
