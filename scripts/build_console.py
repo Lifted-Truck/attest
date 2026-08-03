@@ -27,6 +27,7 @@ from cairn.annotate_pane import render as annotate_pane
 from cairn.calibration import load as load_calibration
 from cairn.console import ConsoleState, Pane, render
 from cairn.contract import CONTRACT_VERSION
+from cairn.corpus_pane import render as corpus_pane
 from cairn.ingest import DocumentStore
 from cairn.locate_pane import render as locate_pane
 from cairn.review_queue import build as build_queue
@@ -136,11 +137,26 @@ def main() -> int:
         "unreliable and skew toward refusing questions the documents can in fact answer. "
         "Run scripts/calibrate_threshold.py --write.")
 
+    # Corpus-scoped constants this corpus has not exercised either way. "Inert is not
+    # validated" (D43) — reported so a reviewer knows what is untested here, not merely
+    # what failed.
+    from cairn.corpus_fit import CORPUS, by_scope
+    untested = [(c.name, c.falsifier.split(".")[0][:150] + ".")
+                for c in by_scope(CORPUS)][:8]
+    n_sheets = 0
+    if (fig_dir / "ocr_manifest.json").exists():
+        import json as _j
+        n_sheets = len(_j.loads((fig_dir / "ocr_manifest.json")
+                                .read_text(encoding="utf-8"))["pages"])
+    (out / "corpus.html").write_text(corpus_pane(
+        doc_ids=ids, hashes={d: doc_store.load(d).content_hash for d in ids},
+        sizes={d: len(doc_store.load(d).canonical_text) for d in ids},
+        calibration=calibration, calibrated=rec is not None, stale=False,
+        fitted_untested=untested, sheets=n_sheets, adjudications=adjudications,
+        chain_ok=True), encoding="utf-8")
+
     panes = [
-        Pane("corpus", "Corpus", "what are we searching?", None,
-             "Corpus management has no page yet (RT-2). Documents, hashes and calibration "
-             "state are summarised in the header above; adding and removing documents is "
-             "still done with scripts/ingest_files.py."),
+        Pane("corpus", "Corpus", "what are we searching?", "corpus.html", ""),
         Pane("locate", "Locate", "ask, and find or abstain", "locate.html",
              ""),
         Pane("evidence", "Evidence", "show the work and its limits",
