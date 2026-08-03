@@ -23,6 +23,7 @@ from pathlib import Path
 import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
 from cairn.adjudicate_pane import render as adjudicate_pane
+from cairn.annotate_pane import render as annotate_pane
 from cairn.calibration import load as load_calibration
 from cairn.console import ConsoleState, Pane, render
 from cairn.contract import CONTRACT_VERSION
@@ -155,6 +156,9 @@ def main() -> int:
              "The review queue is built from the drawings reconciliation, and this store "
              "has no OCR manifest. Judgments can still be recorded with "
              "scripts/adjudicate.py."),
+        Pane("annotate", "Mark a sheet", "assert what OCR missed",
+             "annotate.html" if ok_figures else None,
+             "Marking a sheet needs drawing sheets, and this store has none."),
         Pane("record", "Record", "the signable deliverable",
              "record.html" if ok_record else None,
              "The record of inquiry could not be generated for this store."),
@@ -171,6 +175,23 @@ def main() -> int:
     (out / "locate.html").write_text(
         locate_pane(calibrated=rec is not None, calibration=calibration), encoding="utf-8")
     if ok_figures:
+        # Sheets are copied INTO the console directory rather than served from the
+        # engagement dir: the server is confined to one root (D49), and widening that to
+        # reach client material would trade a containment guarantee for a copy.
+        sheets_dir = out / "sheets"
+        sheets_dir.mkdir(exist_ok=True)
+        sheets = []
+        import json as _json
+        import shutil
+        manifest = _json.loads((fig_dir / "ocr_manifest.json").read_text(encoding="utf-8"))
+        for pg in manifest["pages"]:
+            src = fig_dir / pg["file"]
+            if src.exists():
+                shutil.copy2(src, sheets_dir / pg["file"])
+                sheets.append({"page": pg["page"], "file": pg["file"],
+                               "figures": ",".join(f["fig"] for f in pg.get("fig_labels", []))})
+        (out / "annotate.html").write_text(
+            annotate_pane(sheets, reviewer=None, on=None), encoding="utf-8")
         (out / "adjudicate.html").write_text(
             adjudicate_pane(queue, reviewer=None, on=None), encoding="utf-8")
     (out / "index.html").write_text(render(state), encoding="utf-8")

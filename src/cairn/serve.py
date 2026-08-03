@@ -126,6 +126,22 @@ def make_handler(tools: dict[str, Tool], root: Path, port: int, *,
                 self._json(400, {"error": f"bad request: {e}"})
                 return
             from .adjudication import KINDS, Adjudication
+            # A drawn box arrives as browser pixels; the conversion to manifest
+            # coordinates happens in Python (annotate.py) so a Layer-0 test can reach it.
+            # The page never sends its own idea of a normalized coordinate.
+            if "box_px" in body:
+                from .annotate import BoxError, box_from_pixels
+                bp = body["box_px"]
+                try:
+                    nb = box_from_pixels(bp["x0"], bp["y0"], bp["x1"], bp["y1"],
+                                         width=bp["width"], height=bp["height"])
+                except (BoxError, KeyError, TypeError) as e:
+                    self._json(400, {"error": f"box: {e}"})
+                    return
+                tgt = dict(body.get("target") or {})
+                body["target"] = nb.as_target(
+                    page=tgt.get("page"), numeral=tgt.get("numeral", ""))
+
             kind = body.get("kind")
             if kind not in KINDS:
                 self._json(400, {"error": f"kind must be one of {sorted(KINDS)}"})
