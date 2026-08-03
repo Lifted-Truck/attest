@@ -78,6 +78,8 @@ def main() -> int:
     ap.add_argument("--doc", help="document id — enables the patent panes")
     ap.add_argument("--on", required=True, metavar="YYYY-MM-DD")
     ap.add_argument("--engagement")
+    ap.add_argument("--reviewer", help="who will be recording judgments — must match "
+                                       "the --reviewer passed to serve_console.py")
     ap.add_argument("--out", default="console")
     ns = ap.parse_args()
 
@@ -87,6 +89,11 @@ def main() -> int:
     doc_store = DocumentStore(store_dir)
     ids = doc_store.list_docs()
 
+    # The panes state who they will record as; the SERVER decides whether they can. If
+    # the two disagree the endpoint refuses and the page shows that error, which is the
+    # safe direction — but a page claiming read-only while the server would record is not,
+    # so the identity is threaded through rather than hardcoded to None.
+    judged_on = ns.on
     print(f"building console for {len(ids)} document(s) → {out}/")
 
     # --from-audit takes the LOG PATH as its value; passing it as a bare flag silently
@@ -207,9 +214,9 @@ def main() -> int:
                 sheets.append({"page": pg["page"], "file": pg["file"],
                                "figures": ",".join(f["fig"] for f in pg.get("fig_labels", []))})
         (out / "annotate.html").write_text(
-            annotate_pane(sheets, reviewer=None, on=None), encoding="utf-8")
+            annotate_pane(sheets, reviewer=ns.reviewer, on=judged_on), encoding="utf-8")
         (out / "adjudicate.html").write_text(
-            adjudicate_pane(queue, reviewer=None, on=None), encoding="utf-8")
+            adjudicate_pane(queue, reviewer=ns.reviewer, on=judged_on), encoding="utf-8")
     (out / "index.html").write_text(render(state), encoding="utf-8")
     built = [p.label for p in panes if p.page]
     print(f"\nOK — {out / 'index.html'}")
