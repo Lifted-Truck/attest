@@ -105,3 +105,69 @@ def test_a_nameless_server_renders_the_pane_read_only():
     from cairn.annotate_pane import render
     page = render([{"page": 3, "file": "p3.png", "figures": ""}], reviewer=None, on=None)
     assert "Read-only" in page and "--reviewer" in page
+
+
+def test_drawing_a_box_back_lands_on_the_same_ink():
+    """The round trip is where a y-flip hides. A reviewer draws a box, it is stored in
+    manifest coordinates, and the console draws it back — if either direction is wrong
+    the mark moves, and a reviewer confirming it would be confirming the wrong thing."""
+    from cairn.annotate import box_to_display
+    W = H = 1000
+    drawn = box_from_pixels(100, 200, 300, 400, width=W, height=H)
+    back = box_to_display(drawn.x, drawn.y, drawn.w, drawn.h)
+    assert back["left"] * W == pytest.approx(100)
+    assert back["top"] * H == pytest.approx(200), "the box must return to where it was drawn"
+    assert back["width"] * W == pytest.approx(200)
+    assert back["height"] * H == pytest.approx(200)
+
+
+def test_a_mark_at_the_top_of_the_sheet_draws_at_the_top():
+    """The direction that would be invisible in a round trip if BOTH were flipped."""
+    from cairn.annotate import box_to_display
+    high = box_to_display(x=0.1, y=0.95, w=0.02, h=0.02)   # y near 1 = near the top
+    assert high["top"] == pytest.approx(0.03), "high y must draw near the top edge"
+    low = box_to_display(x=0.1, y=0.0, w=0.02, h=0.02)
+    assert low["top"] == pytest.approx(0.98), "y=0 must draw near the bottom edge"
+
+
+def _pane(marks):
+    from cairn.annotate_pane import render
+    return render([{"page": 3, "file": "p3.png", "figures": "2", "marks": marks}],
+                  reviewer="J. Smith", on="2026-07-28")
+
+
+def test_existing_marks_are_shown_with_their_labels():
+    page = _pane([{"left": 0.1, "top": 0.2, "width": 0.03, "height": 0.02,
+                   "numeral": "72", "x": 0.1, "y": 0.78, "human": False,
+                   "engines": "vision,tesseract"}])
+    assert '"numeral": "72"' in page.replace("'", '"') or '"numeral":"72"' in page
+    assert "show the" in page and "marks already located" in page
+
+
+def test_human_and_machine_marks_are_distinguishable():
+    """A reviewer's own sighting must never be mistaken for an OCR read, or the record
+    stops meaning anything (D28's honesty model, at the pixel)."""
+    page = _pane([])
+    assert 'data-human' in page
+    assert '.mk[data-human="1"]' in page, "human marks get their own style"
+    assert "recorded by" in page and "located by OCR" in page
+
+
+def test_revising_and_removing_are_offered_but_never_edit():
+    """Neither action edits the record: a revision appends a judgment naming what it
+    supersedes, and both stay readable (D47)."""
+    page = _pane([])
+    assert "doCorrect" in page and "doRefute" in page
+    assert "judge('correct'" in page and "judge('refute'" in page
+    assert "Neither edits the record" in page
+    assert "supersedes" in page
+
+
+def test_the_pane_positions_marks_but_never_computes_their_position():
+    """Same split as the drawing half: `box_to_display` converts in Python, the page
+    only places what it is given."""
+    page = _pane([])
+    script = page[page.index("<script>"):]
+    assert "m.left * 100" in script and "m.top * 100" in script
+    for leak in ("1 - m.y", "1 - (m.y", "/ r.height", "/ r.width"):
+        assert leak not in script, f"page computes its own position: {leak!r}"

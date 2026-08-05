@@ -82,3 +82,20 @@ def box_from_pixels(x0: float, y0: float, x1: float, y1: float,
         w=round(w, 4),
         h=round(h, 4),
     )
+
+
+def box_to_display(x: float, y: float, w: float, h: float) -> dict:
+    """Manifest coordinates → fractions from the TOP-left, for drawing in a browser.
+
+    The exact inverse of `box_from_pixels`, and it lives here for the same reason: the
+    round trip is where a y-flip hides. A box drawn by a reviewer, stored, and drawn back
+    must land on the same ink — so both directions are one tested pair rather than one
+    tested function and one hopeful line of JavaScript.
+
+        top = 1 - (y + h)
+
+    because `y` is the distance from the bottom to the box's LOWER edge, and CSS wants
+    the distance from the top to its UPPER edge.
+    """
+    return {"left": round(float(x), 6), "top": round(1.0 - (float(y) + float(h)), 6),
+            "width": round(float(w), 6), "height": round(float(h), 6)}

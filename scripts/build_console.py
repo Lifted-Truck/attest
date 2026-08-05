@@ -203,15 +203,30 @@ def main() -> int:
         sheets_dir = out / "sheets"
         sheets_dir.mkdir(exist_ok=True)
         sheets = []
-        import json as _json
         import shutil
-        manifest = _json.loads((fig_dir / "ocr_manifest.json").read_text(encoding="utf-8"))
+
+        from cairn.annotate import box_to_display
+        from cairn.figures_map import load_manifest as _load_merged
+        # The MERGED manifest, so reviewer marks appear beside OCR ones and can be
+        # revised in turn — a human judgment is evidence, not a separate layer.
+        manifest = _load_merged(store_dir)
         for pg in manifest["pages"]:
             src = fig_dir / pg["file"]
-            if src.exists():
-                shutil.copy2(src, sheets_dir / pg["file"])
-                sheets.append({"page": pg["page"], "file": pg["file"],
-                               "figures": ",".join(f["fig"] for f in pg.get("fig_labels", []))})
+            if not src.exists():
+                continue
+            shutil.copy2(src, sheets_dir / pg["file"])
+            marks = []
+            for n in pg.get("numerals", []):
+                d = box_to_display(n.get("x", 0), n.get("y", 0),
+                                   n.get("w", 0.02), n.get("h", 0.02))
+                marks.append({**d, "numeral": str(n["numeral"]),
+                              "x": n.get("x", 0), "y": n.get("y", 0),
+                              "human": n.get("method") == "human",
+                              "by": n.get("by"), "on": n.get("on"),
+                              "engines": ",".join(n.get("engines", []))})
+            sheets.append({"page": pg["page"], "file": pg["file"],
+                           "figures": ",".join(f["fig"] for f in pg.get("fig_labels", [])),
+                           "marks": marks})
         (out / "annotate.html").write_text(
             annotate_pane(sheets, reviewer=ns.reviewer, on=judged_on), encoding="utf-8")
         (out / "adjudicate.html").write_text(
