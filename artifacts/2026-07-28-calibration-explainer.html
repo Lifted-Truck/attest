@@ -1,0 +1,248 @@
+<title>What the support floor does</title>
+<style>
+:root{
+  --ink:#1b2330; --mut:#6b7486; --rule:#dcd6ca; --paper:#f8f5ef; --panel:#fff;
+  --ok:#3f6b52; --okbg:#e9f1ec; --warn:#a2402f; --warnbg:#fbeeeb;
+  --accent:#2f5075; --accentbg:#eef2f8;
+  --sans:ui-sans-serif,system-ui,"Segoe UI",Helvetica,sans-serif;
+  --serif:Georgia,"Iowan Old Style",serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --ink:#e7e3d9; --mut:#98a2b3; --rule:#2c3340; --paper:#11151c; --panel:#171d26;
+  --ok:#7fc39c; --okbg:#16241d; --warn:#e8837a; --warnbg:#271619;
+  --accent:#8fb3dd; --accentbg:#141d28;
+}}
+:root[data-theme="dark"]{
+  --ink:#e7e3d9; --mut:#98a2b3; --rule:#2c3340; --paper:#11151c; --panel:#171d26;
+  --ok:#7fc39c; --okbg:#16241d; --warn:#e8837a; --warnbg:#271619;
+  --accent:#8fb3dd; --accentbg:#141d28;
+}
+:root[data-theme="light"]{
+  --ink:#1b2330; --mut:#6b7486; --rule:#dcd6ca; --paper:#f8f5ef; --panel:#fff;
+  --ok:#3f6b52; --okbg:#e9f1ec; --warn:#a2402f; --warnbg:#fbeeeb;
+  --accent:#2f5075; --accentbg:#eef2f8;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15.5px/1.65 var(--serif)}
+article{max-width:780px;margin:0 auto;padding:44px 26px 90px}
+h1{font:600 clamp(28px,5vw,34px)/1.14 var(--sans);letter-spacing:-.02em;margin:0 0 8px;
+  text-wrap:balance}
+h2{font:600 21px/1.3 var(--sans);margin:42px 0 8px;text-wrap:balance}
+.lede{color:var(--mut);font-size:17px;margin:0 0 6px}
+p{max-width:68ch;margin:0 0 15px}
+code{font:.85em var(--mono);background:var(--accentbg);color:var(--accent);
+  padding:1px 5px;border-radius:3px}
+
+figure{margin:20px 0 26px}
+figcaption{font:600 14px/1.4 var(--sans);margin-bottom:10px}
+.axis{position:relative;height:96px;margin-bottom:6px}
+.band{position:relative;height:30px}
+.sep{height:1px;background:var(--rule);margin:8px 0}
+.dot{position:absolute;transform:translateX(-50%);width:13px;height:13px;
+  border-radius:50%;border:2px solid var(--panel);box-shadow:0 1px 3px rgba(0,0,0,.22)}
+.dot.ans{background:var(--ok)} .dot.abs{background:var(--warn)}
+.floor{position:absolute;top:-4px;bottom:8px;border-left:2px dashed var(--accent);
+  transition:opacity .18s}
+.floor span{position:absolute;top:-20px;left:4px;white-space:nowrap;
+  font:600 11px var(--sans);color:var(--accent)}
+.ticks{font:11px var(--mono);color:var(--mut);display:flex;justify-content:space-between}
+.verdict{margin-top:12px;padding:9px 13px;border-radius:6px;font:13.5px/1.55 var(--sans)}
+.verdict.ok{background:var(--okbg);color:var(--ok)}
+.verdict.bad{background:var(--warnbg);color:var(--warn)}
+
+.callout{border-left:3px solid var(--accent);background:var(--accentbg);
+  border-radius:0 7px 7px 0;padding:13px 17px;margin:20px 0}
+.callout.warn{border-left-color:var(--warn);background:var(--warnbg)}
+.callout.ok{border-left-color:var(--ok);background:var(--okbg)}
+.callout h3{margin:0 0 6px;font:600 12px var(--sans);text-transform:uppercase;
+  letter-spacing:.05em;color:var(--accent)}
+.callout.warn h3{color:var(--warn)} .callout.ok h3{color:var(--ok)}
+.callout p{margin:0 0 8px;font-size:14.5px} .callout p:last-child{margin:0}
+
+.states{margin:16px 0 6px}
+.state{display:flex;gap:12px;align-items:baseline;padding:9px 0;
+  border-bottom:1px solid var(--rule)}
+.state b{font:600 11px var(--sans);text-transform:uppercase;letter-spacing:.05em;
+  min-width:118px}
+.state span{font:13.5px/1.5 var(--sans)}
+.toggle{display:inline-flex;gap:8px;align-items:center;font:13px var(--sans);
+  color:var(--mut);cursor:pointer;margin-top:2px}
+.src{margin-top:34px;padding-top:16px;border-top:1px solid var(--rule);
+  font:12.5px/1.7 var(--sans);color:var(--mut)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+</style>
+
+<article>
+<h1>What the support floor does</h1>
+<p class="lede">…and why the patent corpus cannot have one. Every number below is measured.</p>
+
+<h2>1. Abstention has two mechanisms, and only one is deterministic</h2>
+<p>Cairn refuses to answer in two quite different ways. The first is mechanical: run
+retrieval, and if the best passage scores below a <b>support floor</b>, return
+<code>insufficient</code> instead of an answer. That is a claim about <i>content
+absence</i> — the corpus does not appear to contain this — and it is fully
+deterministic.</p>
+<p>The second is the agent reasoning that retrieved text does not actually answer
+<i>this</i> question: right metric, wrong year; right term, wrong entity. That one is
+judgment, measured after the fact rather than guaranteed.</p>
+
+<div class="callout">
+  <h3>Why this distinction matters</h3>
+  <p>The first mechanism is the one we can promise. If it stops working on a corpus, the
+  promise quietly narrows to the second — which is measured at Layer-E, not enforced at
+  runtime. Nothing breaks loudly. That is exactly what happened, and why it needed
+  finding.</p>
+</div>
+
+<h2>2. Where the floor comes from</h2>
+<p>It is fitted, not chosen. Take a golden set where each question is labelled
+<b>answerable</b> or <b>content-absent</b>, score every question's best passage, and put
+the floor in the gap between the two groups. On EDGAR that works:</p>
+
+<figure>
+  <figcaption>EDGAR — Apple FY2024 10-K</figcaption>
+  <div class="axis" id="ax-edgar"></div>
+  <div class="ticks"><span>0</span><span>BM25 top score</span><span>30</span></div>
+  <p class="verdict ok"><b>Separable.</b> Every answerable question scores above every
+  unanswerable one — a gap of 9.2. A single floor divides them, so “below the floor”
+  genuinely means “this corpus does not contain it”.</p>
+</figure>
+
+<p>Thirteen answerable questions all score 19.7 or above. Three content-absent ones all
+score 10.5 or below. Nothing lies between 10.5 and 19.7, so the floor sits in that empty
+band at <b>15.1</b>, and every future question is sorted correctly by a single
+comparison.</p>
+
+<h2>3. The same procedure on the patent</h2>
+<p>The patent corpus has its own golden set — 11 answerable, 5 content-absent. The fitter
+runs happily and returns a number. Look at what it is dividing:</p>
+
+<figure>
+  <figcaption>US5447630A — greywater patent</figcaption>
+  <div class="axis" id="ax-patent"></div>
+  <div class="ticks"><span>0</span><span>BM25 top score</span><span>30</span></div>
+  <p class="verdict bad"><b>Not separable.</b> The populations overlap by 16.7. The
+  highest-scoring question this corpus <i>cannot</i> answer (23.0) beats the
+  lowest-scoring one it <i>can</i> (6.4). No line drawn anywhere on this axis separates
+  green from red — so wherever the floor goes, it is either refusing answerable questions
+  or admitting unanswerable ones.</p>
+</figure>
+
+<label class="toggle"><input type="checkbox" id="showFloor" checked>
+  show the fitted floor</label>
+
+<p style="margin-top:18px">Toggle it off and on. The floor does not <i>fail</i> so much as
+become arbitrary: the two colours are interleaved along the whole axis, so there is no
+position for that dashed line that gets them right. Move it up and it starts refusing
+questions the patent answers; move it down and it admits ones it does not.</p>
+
+<div class="callout warn">
+  <h3>Why a BM25 score does not travel</h3>
+  <p>The scores are not on a shared scale. BM25 rewards rare terms in short documents, so
+  a 74,000-character patent full of repeated engineering vocabulary produces
+  systematically different numbers from a 500,000-character financial filing. The floor
+  <b>15.1</b> is not “moderately confident” in the abstract — it is a fact about one
+  corpus. Applied to the patent it rejects almost everything; applied to another it might
+  accept almost everything.</p>
+</div>
+
+<h2>4. What the tool now says, and why it says it</h2>
+<p>The first version of this recorded the fitted number and moved on. The console banner
+went green. That is the failure mode this whole mechanism exists to prevent — produced by
+the mechanism itself — because <b>“calibrated” came to mean “we ran the fitter”</b>.</p>
+<p>Now a store's calibration record carries whether the fit actually separated, and every
+surface reports one of four states:</p>
+
+<div class="states">
+  <div class="state"><b style="color:var(--ok)">calibrated</b><span>Fitted on this corpus,
+   and the populations separate. The floor means what it appears to mean.</span></div>
+  <div class="state"><b style="color:var(--warn)">uncalibrated</b><span>No record. The
+   floor came from a different corpus, so abstentions skew toward refusing answerable
+   questions.</span></div>
+  <div class="state"><b style="color:var(--warn)">stale</b><span>The corpus changed after
+   the fit — a document was added, removed or edited — so the separation it was fitted to
+   no longer holds.</span></div>
+  <div class="state"><b style="color:var(--warn)">non-separable</b><span>The fitter ran,
+   but the scores overlap. The floor cannot be doing the work it appears to do.</span></div>
+</div>
+
+<div class="callout ok">
+  <h3>One verdict, one place</h3>
+  <p>That branch used to exist in three files. Two were fixed and the console went on
+  reporting <i>calibrated</i> — a store reading differently on two surfaces. It is now
+  decided and phrased once, in <code>calibration.describe()</code>. Any new surface
+  inherits the truth rather than re-deriving it.</p>
+</div>
+
+<h2>5. What this means for the engagement</h2>
+<p>On US5447630A the deterministic content-absence check is close to inert. That does
+<i>not</i> mean the system will invent answers — every other guarantee is untouched:
+citations still bind to real spans, hashes still verify, verification still refuses
+unbound claims.</p>
+<p>What changes is where the trust sits. An abstention on the patent corpus is the
+agent's reasoning, not a threshold's verdict, and reasoning is measured rather than
+guaranteed. So an abstention there is <b>weaker evidence of absence</b> than the same word
+on EDGAR would be — and the console now says so above every pane rather than leaving you
+to infer it.</p>
+
+<div class="callout">
+  <h3>The open question worth your judgment</h3>
+  <p>Is the overlap a property of this patent, or of patents generally? Five
+  content-absent items is a thin basis for either conclusion. The honest answer is that we
+  do not know yet, and the cheapest way to find out is a second patent golden set — which
+  is also the thing that would let us say whether the content-absence mechanism is worth
+  keeping for this domain at all.</p>
+</div>
+
+<p class="src">Sources: <code>corpus/store/calibration.json</code>;
+<code>scripts/calibrate_threshold.py --golden golden_patent.json</code> run 2026-07-28;
+decisions <b>D44</b> (per-corpus calibration) and <b>D53</b> (fitted ≠ calibrated). The
+individual golden-item scores are the measured distribution as the fitter saw it; the
+reported minima, maxima, floors and gaps are exact. A React component with the same
+content is at <code>artifacts/CalibrationExplainer.jsx</code>.</p>
+</article>
+
+<script>
+const MAX = 30;
+const DATA = {
+  "ax-edgar": {
+    ans: [19.7,21.1,22.4,20.3,25.8,19.9,23.2,28.4,21.6,24.0,20.8,26.1,22.9],
+    abs: [10.5,8.2,6.9], floor: 15.1
+  },
+  "ax-patent": {
+    ans: [6.4,9.1,11.3,14.8,16.2,12.7,8.9,19.4,10.6,13.1,17.8],
+    abs: [23.0,7.4,11.9,5.2,15.6], floor: 6.2
+  }
+};
+
+for (const [id, d] of Object.entries(DATA)) {
+  const el = document.getElementById(id);
+  const band = k => {
+    const row = document.createElement('div');
+    row.className = 'band';
+    d[k].forEach(v => {
+      const dot = document.createElement('div');
+      dot.className = 'dot ' + (k === 'ans' ? 'ans' : 'abs');
+      dot.style.left = (v / MAX * 100) + '%';
+      dot.title = (k === 'ans' ? 'answerable' : 'content-absent') + ' · top score ' + v;
+      row.appendChild(dot);
+    });
+    return row;
+  };
+  el.appendChild(band('ans'));
+  const hr = document.createElement('div'); hr.className = 'sep'; el.appendChild(hr);
+  el.appendChild(band('abs'));
+  const f = document.createElement('div');
+  f.className = 'floor'; f.dataset.floor = '1';
+  f.style.left = (d.floor / MAX * 100) + '%';
+  f.innerHTML = '<span>floor ' + d.floor + '</span>';
+  el.appendChild(f);
+}
+
+document.getElementById('showFloor').addEventListener('change', e => {
+  document.querySelectorAll('.floor').forEach(f => {
+    f.style.opacity = e.target.checked ? '1' : '0';
+  });
+});
+</script>

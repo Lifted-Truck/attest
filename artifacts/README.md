@@ -17,6 +17,8 @@ Open any of them directly in a browser; none needs a server or a network connect
 
 | File | What it explains |
 |---|---|
+| [`2026-07-28-calibration-explainer.html`](2026-07-28-calibration-explainer.html) | **How the support floor works, and why the patent corpus cannot have one.** The measured score distributions for both corpora on one axis, the four calibration states, and what "non-separable" means for where trust sits in an engagement. |
+| [`CalibrationExplainer.jsx`](CalibrationExplainer.jsx) | The same explainer as a self-contained React component — no imports beyond React, no chart library. Drop into a React app, or read as prose with diagrams attached. |
 | [`2026-07-26-ocr-rotation-and-integrity.html`](2026-07-26-ocr-rotation-and-integrity.html) | D32–D34: why rotation is a per-glyph property, the 6↔9 phantom problem, and the wrong-citation bug a research swarm found in our own numeral extractor. |
 
 Earlier explainers live in [`../docs/`](../docs/) rather than here, because they are
