@@ -157,3 +157,34 @@ def test_the_client_facing_report_states_non_separability(tmp_path):
     ident = corpus_identity(tmp_path / "store", store)
     assert "DO NOT SEPARATE" in ident.calibration
     assert not ident.calibrated
+
+
+def test_a_question_naming_the_document_scores_on_the_identifier_alone(tmp_path):
+    """D55: the sharpest limit of a BM25 support floor on a SINGLE-document corpus.
+
+    A question that quotes the document's own identifier matches the title line, which
+    every document has and which contains no content. So a metadata question — "any
+    reexamination?", "are fees current?" — looks strongly supported whether or not the
+    answer is anywhere in the text. On US5447630A this alone accounted for two-thirds of
+    the apparent non-separability (gap -16.7 as written, -5.3 with the identifier removed).
+    """
+    from cairn.ingest.document import make_document
+    from cairn.retrieval import Retriever
+    from cairn.spans import SpanStore
+
+    doc = make_document("US5447630A", (
+        "United States Patent US 5,447,630 A\n\n"
+        "A greywater treatment system for reuse of household wastewater. The system "
+        "includes a settling tank and a filter. Greywater from a bathtub is collected "
+        "and treated before irrigation use.\n"))
+    r = Retriever(SpanStore([doc]))
+
+    with_id = r.search("Are maintenance fees current for US 5,447,630?", 1)
+    without = r.search("Are maintenance fees current?", 1)
+    got = with_id[0].score if with_id else 0.0
+    bare = without[0].score if without else 0.0
+    assert got > bare, (
+        "naming the document must be recognised as inflating the score — if this ever "
+        "stops holding, the artifact has been fixed and D55's caveat can be revisited")
+    # And the passage it wins on is furniture, not content.
+    assert "United States Patent" in with_id[0].span.text

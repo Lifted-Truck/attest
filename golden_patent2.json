@@ -1,0 +1,27 @@
+{
+  "corpus": "US8046721B2",
+  "note": "A SEPARABILITY PROBE, not a ratified oracle. Built 2026-07-28 to answer one question: is the non-separability found on US5447630A (D53) a property of that patent, or of narrow-vocabulary single-document corpora generally? Every answerable item names a topic the patent discusses repeatedly (verified by term counts); every content-absent item names a topic with ZERO mentions (verified the same way), so 'absent' is a checked fact rather than an intuition. NOT ratified and NOT frozen: it exists to fit a floor, not to grade answers.",
+  "items": [
+    {"id": "P2-01", "question": "How is the device unlocked?", "answerable": true},
+    {"id": "P2-02", "question": "What is an unlock image and what does it do?", "answerable": true},
+    {"id": "P2-03", "question": "What is the optical intensity of a user-interface object?", "answerable": true},
+    {"id": "P2-04", "question": "How does the device indicate progress towards satisfying the unlock condition?", "answerable": true},
+    {"id": "P2-05", "question": "What happens when the unlock gesture is not completed?", "answerable": true},
+    {"id": "P2-06", "question": "What is the user-interface lock state?", "answerable": true},
+    {"id": "P2-07", "question": "How does the device transition to a user-interface active state?", "answerable": true},
+    {"id": "P2-08", "question": "How are multiple unlock images used to select an application?", "answerable": true},
+    {"id": "P2-09", "question": "What is a predefined gesture for unlocking?", "answerable": true},
+    {"id": "P2-10", "question": "How does the device conserve power in the lock state?", "answerable": true},
+
+    {"id": "P2-11", "question": "What is the battery capacity of the device?", "answerable": false,
+     "tests": ["abstention", "out-of-document-fact"]},
+    {"id": "P2-12", "question": "What is the operating temperature range of the device?", "answerable": false,
+     "tests": ["abstention", "out-of-document-fact"]},
+    {"id": "P2-13", "question": "How much does the device cost to manufacture?", "answerable": false,
+     "tests": ["abstention", "out-of-document-fact"]},
+    {"id": "P2-14", "question": "What warranty is offered with the device?", "answerable": false,
+     "tests": ["abstention", "out-of-document-fact"]},
+    {"id": "P2-15", "question": "How is Bluetooth pairing performed on the device?", "answerable": false,
+     "tests": ["abstention", "not-disclosed-metric"]}
+  ]
+}
