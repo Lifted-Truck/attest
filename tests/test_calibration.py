@@ -111,3 +111,49 @@ def test_an_explicit_threshold_overrides_the_store_and_says_so(tmp_path):
     rec = reg["check_support"].handler({"query": "total assets"})
     assert rec["provenance"]["threshold"] == 5.0, "the caller's floor must win"
     assert "EXPLICIT OVERRIDE" in rec["calibration_warning"]
+
+
+def test_a_non_separable_fit_does_not_read_as_calibrated(tmp_path):
+    """Running the fitter is not the same as separating. On the patent corpus, some
+    content-absent questions outscore some answerable ones (overlap 16.7), so no single
+    floor divides them — and a record saying "calibrated" would be exactly the false
+    comfort this mechanism exists to remove."""
+    store = _store(tmp_path)
+    ids = store.list_docs()
+    write(tmp_path / "store", CalibrationRecord(
+        threshold=6.2, corpus_id="patent", doc_ids=ids,
+        corpus_hash=corpus_hash(ids, [store.load(d).content_hash for d in ids]),
+        calibrated_on="2026-07-28", method="golden-gap", n_present=11, n_absent=5,
+        separable=False, gap=-16.7))
+    choice = resolve(tmp_path / "store", default=15.0,
+                     live_doc_ids=ids,
+                     live_hashes=[store.load(d).content_hash for d in ids])
+    assert choice.calibrated is False, "a failed fit is not a calibration"
+    assert "NON-SEPARABLE" in choice.warning
+    assert "16.7" in choice.warning
+    assert choice.threshold == 6.2, "the fitted number is still reported, not hidden"
+
+
+def test_a_separable_fit_is_unaffected(tmp_path):
+    store = _store(tmp_path)
+    ids = store.list_docs()
+    write(tmp_path / "store", _record(store, threshold=15.1))
+    choice = resolve(tmp_path / "store", default=15.0, live_doc_ids=ids,
+                     live_hashes=[store.load(d).content_hash for d in ids])
+    assert choice.calibrated is True and choice.warning is None
+
+
+def test_the_client_facing_report_states_non_separability(tmp_path):
+    """It must reach the deliverable too: a reader trusting an abstention deserves to
+    know the floor could not have produced it."""
+    from cairn.review_report import corpus_identity
+    store = _store(tmp_path)
+    ids = store.list_docs()
+    write(tmp_path / "store", CalibrationRecord(
+        threshold=6.2, corpus_id="p", doc_ids=ids,
+        corpus_hash=corpus_hash(ids, [store.load(d).content_hash for d in ids]),
+        calibrated_on="2026-07-28", method="golden-gap", n_present=11, n_absent=5,
+        separable=False, gap=-16.7))
+    ident = corpus_identity(tmp_path / "store", store)
+    assert "DO NOT SEPARATE" in ident.calibration
+    assert not ident.calibrated

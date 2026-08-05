@@ -44,6 +44,12 @@ class CalibrationRecord:
     method: str               # e.g. "golden-gap" (support.calibrate_threshold)
     n_present: int
     n_absent: int
+    # Whether the fit actually SEPARATES answerable from content-absent items. A floor
+    # fitted on overlapping scores is a number, not a separator: some unanswerable
+    # questions outscore some answerable ones, so no single threshold can divide them.
+    # Recorded because "calibrated" must not be able to mean "we ran the fitter".
+    separable: bool = True
+    gap: float = 0.0          # min(answerable) - max(content-absent); negative = overlap
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), indent=2, sort_keys=True) + "\n"
@@ -91,6 +97,36 @@ class ThresholdChoice:
         return d
 
 
+def describe(store_dir: str | Path, doc_ids=None, hashes=None) -> tuple[str, bool]:
+    """The calibration verdict as a sentence, plus whether it counts as calibrated.
+
+    Every surface that shows calibration state uses this: the console header, the
+    client-facing report, and anything added later. Three copies of the same branch is
+    how a store comes to read "calibrated" on one surface and "non-separable" on
+    another — which happened, and is exactly the class of drift this project keeps
+    designing against.
+    """
+    choice = resolve(store_dir, 0.0, doc_ids, hashes)
+    rec = load(store_dir)
+    if rec is None:
+        return ("This corpus has NO calibration record — the support floor was fitted "
+                "elsewhere. A relevance score does not transfer between corpora, so "
+                "abstentions here are unreliable and skew toward refusing questions the "
+                "documents can in fact answer. Run scripts/calibrate_threshold.py --write.",
+                False)
+    if not rec.separable:
+        return (f"Fitted {rec.calibrated_on}, but answerable and content-absent scores "
+                f"DO NOT SEPARATE (overlap {abs(rec.gap):.1f}). No single floor divides "
+                f"them, so the content-absence check is close to inert here and "
+                f"abstentions rest on the agent's reasoning rather than on the score.",
+                False)
+    if choice.warning:                      # stale — the corpus moved under the fit
+        return (choice.warning, False)
+    return (f"Support floor {rec.threshold}, calibrated {rec.calibrated_on} against this "
+            f"corpus ({rec.method}, {rec.n_present} answerable / {rec.n_absent} "
+            f"content-absent). Abstentions here are fitted to these documents.", True)
+
+
 def resolve(store_dir: str | Path, default: float,
             live_doc_ids: list[str] | None = None,
             live_hashes: list[str] | None = None) -> ThresholdChoice:
@@ -120,4 +156,12 @@ def resolve(store_dir: str | Path, default: float,
                 f"{rec.calibrated_on} against corpus {rec.corpus_hash[:12]}…, but this "
                 f"store now hashes to {now[:12]}… — documents were added, removed or "
                 f"edited since. Re-calibrate.")
+    if not rec.separable:
+        return ThresholdChoice(
+            rec.threshold, False,
+            f"NON-SEPARABLE CALIBRATION: the floor {rec.threshold} was fitted on "
+            f"{rec.calibrated_on}, but answerable and content-absent scores OVERLAP by "
+            f"{abs(rec.gap):.1f}. No single threshold divides them, so this floor cannot "
+            f"be doing the work it appears to do — abstention here rests on the agent's "
+            f"reasoning, not on the score.")
     return ThresholdChoice(rec.threshold, True, None)

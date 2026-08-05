@@ -90,8 +90,10 @@ def test_an_uncalibrated_corpus_says_so_in_the_report(tmp_path):
     ident = corpus_identity(tmp_path / "store", _store(tmp_path))
     assert not ident.calibrated
     page = _text(render(_data(ident)))
-    assert "NOT CALIBRATED" in page
-    assert "refusing questions the corpus can in fact answer" in page
+    # The claim, not the phrasing: the wording is now produced in one place
+    # (calibration.describe) so every surface says the same thing (D53).
+    assert "NO calibration record" in page
+    assert "refusing questions the documents can in fact answer" in page
 
 
 def test_a_calibrated_corpus_reports_its_provenance(tmp_path):

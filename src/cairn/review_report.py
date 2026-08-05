@@ -33,7 +33,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .calibration import load as load_calibration
+from .calibration import describe as describe_calibration
 from .contract import CONTRACT_VERSION
 
 
@@ -57,20 +57,17 @@ class ReportData:
 
 
 def corpus_identity(store_dir: str | Path, doc_store) -> CorpusIdentity:
+    """What was searched, pinned so the reader can verify it independently.
+
+    The calibration verdict comes from `calibration.resolve`, not from a second reading
+    of the record here: the client-facing report and the audit log must never disagree
+    about whether a floor can be trusted, and two branches over the same fields is how
+    they would come to.
+    """
     ids = doc_store.list_docs()
     hashes = {d: doc_store.load(d).content_hash for d in ids}
-    rec = load_calibration(store_dir)
-    if rec is None:
-        note = ("NOT CALIBRATED to this corpus — the relevance floor used was fitted to a "
-                "different document set. Abstentions in this report are therefore less "
-                "reliable than answers, and skew toward refusing questions the corpus can "
-                "in fact answer.")
-    else:
-        note = (f"Calibrated {rec.calibrated_on} against this corpus "
-                f"({rec.corpus_hash[:12]}…), method {rec.method}, "
-                f"floor {rec.threshold} fitted on {rec.n_present} answerable / "
-                f"{rec.n_absent} content-absent items.")
-    return CorpusIdentity(ids, hashes, note, rec is not None)
+    note, calibrated = describe_calibration(store_dir, ids, [hashes[d] for d in ids])
+    return CorpusIdentity(ids, hashes, note, calibrated)
 
 
 # --- the declared limits ------------------------------------------------------------

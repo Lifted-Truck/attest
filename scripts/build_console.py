@@ -24,6 +24,7 @@ import _bootstrap  # noqa: F401  (puts src/ on sys.path)
 
 from cairn.adjudicate_pane import render as adjudicate_pane
 from cairn.annotate_pane import render as annotate_pane
+from cairn.calibration import describe as describe_calibration
 from cairn.calibration import load as load_calibration
 from cairn.console import ConsoleState, Pane, render
 from cairn.contract import CONTRACT_VERSION
@@ -134,15 +135,12 @@ def main() -> int:
         except Exception as e:                    # noqa: BLE001 — reported, not fatal
             print(f"  ✗ review queue: {type(e).__name__}: {e}")
 
+    # One place decides the verdict and one place phrases it (D53) — three copies of
+    # this branch is how a store came to read "calibrated" here while the report said
+    # "non-separable".
     rec = load_calibration(store_dir)
-    calibration = (
-        f"Support floor {rec.threshold}, calibrated {rec.calibrated_on} against this "
-        f"corpus ({rec.method}). Abstentions here are fitted to these documents."
-        if rec else
-        "This corpus has NO calibration record — the support floor was fitted elsewhere. "
-        "A relevance score does not transfer between corpora, so abstentions here are "
-        "unreliable and skew toward refusing questions the documents can in fact answer. "
-        "Run scripts/calibrate_threshold.py --write.")
+    calibration, is_calibrated = describe_calibration(
+        store_dir, ids, [doc_store.load(d).content_hash for d in ids])
 
     # Corpus-scoped constants this corpus has not exercised either way. "Inert is not
     # validated" (D43) — reported so a reviewer knows what is untested here, not merely
@@ -158,7 +156,8 @@ def main() -> int:
     (out / "corpus.html").write_text(corpus_pane(
         doc_ids=ids, hashes={d: doc_store.load(d).content_hash for d in ids},
         sizes={d: len(doc_store.load(d).canonical_text) for d in ids},
-        calibration=calibration, calibrated=rec is not None, stale=False,
+        calibration=calibration, calibrated=is_calibrated,
+        stale=bool(rec and not rec.separable),
         fitted_untested=untested, sheets=n_sheets, adjudications=adjudications,
         chain_ok=True), encoding="utf-8")
 
@@ -189,7 +188,7 @@ def main() -> int:
 
     state = ConsoleState(
         engagement=ns.engagement or store_dir.parent.name,
-        doc_ids=ids, calibration=calibration, calibrated=rec is not None,
+        doc_ids=ids, calibration=calibration, calibrated=is_calibrated,
         contract=CONTRACT_VERSION, adjudications=adjudications,
         generated_on=ns.on, panes=panes)
 

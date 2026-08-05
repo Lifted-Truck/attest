@@ -59,7 +59,14 @@ def main() -> int:
             threshold=c.threshold, corpus_id=Path(ns.store).parent.name, doc_ids=ids,
             corpus_hash=corpus_hash(ids, [doc_store.load(d).content_hash for d in ids]),
             calibrated_on=ns.write, method="golden-gap",
-            n_present=c.n_present, n_absent=c.n_absent)
+            n_present=c.n_present, n_absent=c.n_absent,
+            separable=c.clean, gap=c.gap)
+        if not c.clean:
+            print("\n  ⚠ the scores OVERLAP — this floor does not separate answerable "
+                  "from content-absent")
+            print("    items. Recording it anyway, flagged NON-SEPARABLE, because "
+                  "hiding a failed fit")
+            print("    would let 'calibrated' mean 'we ran the fitter'.")
         print(f"\nwrote {write_calibration(ns.store, rec)}")
         print(f"  corpus_hash = {rec.corpus_hash[:16]}…  "
               f"(a doc added/removed/edited after this makes the record STALE)")
