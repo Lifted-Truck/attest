@@ -18,7 +18,12 @@ dev = [
   "ruff>=0.4",
 ]
 mcp = [
-  "mcp>=1.0",   # the MCP server adapter (mcp_server.py); not needed for the Layer-0 gate
+  # Bounded on purpose (D57). 2.x implements the MODERN protocol era (2026-07-28):
+  # no `initialize` handshake, per-request `_meta`, and a mandatory `server/discover`.
+  # `mcp_server.py` is written against the legacy handshake API, so an unbounded pin
+  # would silently pull 2.x and break the server on a fresh install. Moving to 2.x is
+  # the modern-era upgrade and gets its own decision, not a version bump.
+  "mcp>=1.28,<2",   # MCP server adapter (mcp_server.py); not needed for the Layer-0 gate
 ]
 ocr = [
   # Ingestion-time drawing-sheet OCR (scripts/ocr_patent_figures.py, D28/D29).
